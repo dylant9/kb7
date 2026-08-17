@@ -1,0 +1,264 @@
+{
+  "format": "kb7-profile-v1",
+  "name": "Neon Control",
+  "screen_document": {
+    "format": "kb7-screen-v1",
+    "boot_screen": 1,
+    "screens": [
+      {
+        "id": 1,
+        "name": "Command Center",
+        "background": "#07101e",
+        "widgets": [
+          {
+            "id": 10,
+            "type": "label",
+            "x": 28,
+            "y": 30,
+            "width": 424,
+            "height": 66,
+            "text": "COMMAND CENTER",
+            "foreground": "#f4f7ff",
+            "background": "#111f35"
+          },
+          {
+            "id": 11,
+            "type": "gauge",
+            "x": 28,
+            "y": 122,
+            "width": 424,
+            "height": 128,
+            "text": "ACTUATION",
+            "minimum": 0,
+            "maximum": 255,
+            "value": 128,
+            "foreground": "#65e6ff",
+            "background": "#10263a",
+            "action": {
+              "type": "actuation"
+            }
+          },
+          {
+            "id": 12,
+            "type": "slider",
+            "x": 28,
+            "y": 278,
+            "width": 424,
+            "height": 92,
+            "text": "BRIGHTNESS",
+            "minimum": 0,
+            "maximum": 100,
+            "value": 68,
+            "foreground": "#9d7cff",
+            "background": "#1a1838",
+            "action": {
+              "type": "brightness"
+            }
+          },
+          {
+            "id": 13,
+            "type": "button",
+            "x": 28,
+            "y": 398,
+            "width": 202,
+            "height": 106,
+            "text": "AURORA",
+            "foreground": "#dffcff",
+            "background": "#13364a",
+            "action": {
+              "type": "rgb_color",
+              "arg1": 4385535
+            }
+          },
+          {
+            "id": 14,
+            "type": "button",
+            "x": 250,
+            "y": 398,
+            "width": 202,
+            "height": 106,
+            "text": "MEDIA",
+            "foreground": "#fff3df",
+            "background": "#3b253b",
+            "action": {
+              "type": "navigate",
+              "target_screen": 2
+            }
+          },
+          {
+            "id": 15,
+            "type": "toggle",
+            "x": 28,
+            "y": 536,
+            "width": 424,
+            "height": 96,
+            "text": "RAPID TRIGGER",
+            "minimum": 0,
+            "maximum": 1,
+            "value": 1,
+            "foreground": "#b5ffcb",
+            "background": "#123229",
+            "action": {
+              "type": "rapid_trigger",
+              "arg0": 12,
+              "arg1": 12
+            }
+          },
+          {
+            "id": 16,
+            "type": "label",
+            "x": 28,
+            "y": 672,
+            "width": 424,
+            "height": 72,
+            "text": "OFFLINE READY",
+            "foreground": "#7e91aa",
+            "background": "#0b1628"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "name": "Media",
+        "background": "#100c1c",
+        "widgets": [
+          {
+            "id": 20,
+            "type": "label",
+            "x": 28,
+            "y": 30,
+            "width": 424,
+            "height": 74,
+            "text": "MEDIA DECK",
+            "foreground": "#fff5fd",
+            "background": "#271630"
+          },
+          {
+            "id": 21,
+            "type": "button",
+            "x": 28,
+            "y": 138,
+            "width": 424,
+            "height": 124,
+            "text": "PLAY PAUSE",
+            "foreground": "#ffffff",
+            "background": "#713c82",
+            "action": {
+              "type": "media_key",
+              "arg0": 205
+            }
+          },
+          {
+            "id": 22,
+            "type": "button",
+            "x": 28,
+            "y": 290,
+            "width": 202,
+            "height": 112,
+            "text": "VOLUME DOWN",
+            "foreground": "#f5f7ff",
+            "background": "#263553",
+            "action": {
+              "type": "media_key",
+              "arg0": 234
+            }
+          },
+          {
+            "id": 23,
+            "type": "button",
+            "x": 250,
+            "y": 290,
+            "width": 202,
+            "height": 112,
+            "text": "VOLUME UP",
+            "foreground": "#f5f7ff",
+            "background": "#263553",
+            "action": {
+              "type": "media_key",
+              "arg0": 233
+            }
+          },
+          {
+            "id": 24,
+            "type": "button",
+            "x": 28,
+            "y": 674,
+            "width": 424,
+            "height": 74,
+            "text": "BACK",
+            "foreground": "#b9ddff",
+            "background": "#10253e",
+            "action": {
+              "type": "navigate",
+              "target_screen": 1
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "lighting": {
+    "enabled": true,
+    "effect": "aurora",
+    "brightness": 68,
+    "speed": 42,
+    "direction": "east",
+    "primary": "#42efff",
+    "secondary": "#9d5cff",
+    "reactive": "#b5ffcb",
+    "per_key": {
+      "A": "#42efff",
+      "D": "#9d5cff",
+      "S": "#65e6ff",
+      "W": "#b5ffcb"
+    }
+  },
+  "switches": {
+    "travel_mm": 3.2,
+    "actuation_mm": 1.6,
+    "rapid_trigger": true,
+    "rapid_press_delta_mm": 0.15,
+    "rapid_release_delta_mm": 0.15,
+    "per_key": {
+      "A": {
+        "actuation_mm": 1.0,
+        "rapid_trigger": true
+      },
+      "D": {
+        "actuation_mm": 1.0,
+        "rapid_trigger": true
+      },
+      "S": {
+        "actuation_mm": 1.0,
+        "rapid_trigger": true
+      },
+      "W": {
+        "actuation_mm": 1.0,
+        "rapid_trigger": true
+      }
+    }
+  },
+  "analog": {
+    "enabled": true,
+    "output": "gamepad_left_stick",
+    "curve": "linear",
+    "deadzone_mm": 0.12,
+    "saturation_mm": 3.2,
+    "smoothing": 2,
+    "invert_x": false,
+    "invert_y": false,
+    "digital_passthrough": true,
+    "bindings": {
+      "x_negative": "LEFT",
+      "x_positive": "RIGHT",
+      "y_negative": "UP",
+      "y_positive": "DOWN"
+    }
+  },
+  "capabilities": {
+    "hall_keymap": "device-mapping-not-included",
+    "rgb_position_mapping": "pending_hardware",
+    "analog_hid_output": "planned_unverified",
+    "device_io": false
+  }
+}

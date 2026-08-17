@@ -1,0 +1,34 @@
+# Local build output
+build/
+**/build/
+*.bin
+*.elf
+*.o
+*.d
+*.map
+*.dis
+
+# Firmware/reference material must never enter the public repository
+firmware/
+captures/
+decompiled/
+ghidra_projects/
+*.hex
+*.uf2
+*.img
+*.dump
+*.rom
+*.exe
+*.dll
+*.7z
+*.zip
+
+# Python/editor state
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.venv/
+.idea/
+.vscode/
+.DS_Store

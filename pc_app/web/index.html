@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KB7 Studio</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="ambient ambient-a"></div>
+  <div class="ambient ambient-b"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+      <div><strong>KB7 Studio</strong><small>Custom firmware workshop</small></div>
+    </div>
+
+    <nav class="workspace-nav" id="workspaceNav" aria-label="Studio workspace">
+      <button class="active" data-workspace="display"><i>▣</i><span>Display</span></button>
+      <button data-workspace="lighting"><i>✦</i><span>Lighting</span></button>
+      <button data-workspace="switches"><i>⌁</i><span>Switches</span></button>
+      <button data-workspace="analog"><i>◎</i><span>Analog</span></button>
+    </nav>
+
+    <div class="project-title">
+      <span class="status-dot"></span>
+      <input id="projectName" value="Neon Control" maxlength="64" aria-label="Profile name">
+      <span id="saveState">Saved locally</span>
+    </div>
+
+    <div class="top-actions">
+      <label class="button ghost" for="fileInput">Import</label>
+      <input id="fileInput" type="file" accept=".json,.kbs,application/json" hidden>
+      <button class="button ghost secondary-export" id="exportJson">Screen JSON</button>
+      <button class="button ghost" id="exportProfile">Export profile</button>
+      <button class="button primary" id="exportBinary">Export .kbs</button>
+    </div>
+  </header>
+
+  <main class="workspace-stack">
+    <section class="workspace workspace-view active" id="view-display" data-view="display">
+      <aside class="sidebar left-panel">
+        <section>
+          <div class="section-title"><span>Widgets</span><small>Drag to display</small></div>
+          <div class="widget-palette" id="palette">
+            <button draggable="true" data-type="label"><i>Tx</i><span>Label<small>Text and headings</small></span></button>
+            <button draggable="true" data-type="button"><i>↗</i><span>Button<small>Trigger an action</small></span></button>
+            <button draggable="true" data-type="slider"><i>━</i><span>Slider<small>Adjust a value</small></span></button>
+            <button draggable="true" data-type="toggle"><i>◉</i><span>Toggle<small>Switch a feature</small></span></button>
+            <button draggable="true" data-type="gauge"><i>◒</i><span>Gauge<small>Visualise a level</small></span></button>
+          </div>
+        </section>
+
+        <section class="screens-section">
+          <div class="section-title"><span>Screens</span><button id="addScreen" title="Add screen">＋</button></div>
+          <div id="screenList" class="screen-list"></div>
+        </section>
+
+        <section class="device-card">
+          <div class="device-icon">⌁</div>
+          <div><strong>Device-free mode</strong><small>No KB7 is accessed. Exports remain offline artifacts.</small></div>
+        </section>
+      </aside>
+
+      <section class="stage">
+        <div class="stage-toolbar">
+          <div class="segmented" id="displayMode">
+            <button class="active" data-mode="design">Design</button>
+            <button data-mode="preview">Preview</button>
+          </div>
+          <div class="viewport-meta"><span>480 × 800</span><span>RGB565</span><span id="objectCount">0 widgets</span></div>
+          <button class="icon-button" id="resetView" title="Reset preview">↺</button>
+        </div>
+        <div class="device-wrap">
+          <div class="device-shadow"></div>
+          <div class="device-shell">
+            <div class="device-top"><span>COMMAND DISPLAY</span><div class="sensor"></div></div>
+            <div id="display" class="display" tabindex="0"><div class="drop-hint">Drop a widget here</div></div>
+            <div class="device-chin"><span class="roller"></span><span class="logo">TB</span><span class="power-light"></span></div>
+          </div>
+        </div>
+        <div class="tip"><kbd>Shift</kbd> while dragging to snap softly · click controls in Preview to exercise navigation</div>
+      </section>
+
+      <aside class="sidebar inspector">
+        <div class="section-title"><span>Inspector</span><small id="selectionLabel">Screen</small></div>
+        <div id="inspectorBody"></div>
+        <section class="format-health">
+          <div><span>Format health</span><strong id="formatHealth">Valid</strong></div>
+          <div class="health-bar"><span></span></div>
+          <small id="formatDetail">CRC and layout will be checked on export.</small>
+        </section>
+      </aside>
+    </section>
+
+    <section class="workspace keyboard-workspace workspace-view" id="view-lighting" data-view="lighting" hidden>
+      <aside class="sidebar left-panel control-sidebar">
+        <section>
+          <div class="section-title"><span>Effect</span><small>Live preview</small></div>
+          <div class="preset-list effect-list" id="lightingEffects">
+            <button data-effect="aurora"><i>✦</i><span>Aurora<small>Drifting two-color field</small></span></button>
+            <button data-effect="static"><i>●</i><span>Static<small>One fixed color</small></span></button>
+            <button data-effect="gradient"><i>↗</i><span>Gradient<small>Directional blend</small></span></button>
+            <button data-effect="reactive"><i>⌁</i><span>Reactive<small>Light keys on travel</small></span></button>
+            <button data-effect="heatmap"><i>▦</i><span>Heatmap<small>Usage-driven intensity</small></span></button>
+          </div>
+        </section>
+
+        <section class="control-section">
+          <div class="section-title"><span>Selection</span><small id="lightingSelectionCount">All keys</small></div>
+          <div class="zone-grid" id="lightingZones">
+            <button data-zone="all" class="active">All</button>
+            <button data-zone="alphas">Alphas</button>
+            <button data-zone="wasd">WASD</button>
+            <button data-zone="arrows">Arrows</button>
+          </div>
+        </section>
+
+        <section class="evidence-card warning-card">
+          <div class="evidence-icon">!</div>
+          <div><strong>Preview mapping</strong><small>The public editor models logical lighting positions; device-specific LED correlation is not included.</small></div>
+        </section>
+      </aside>
+
+      <section class="control-stage">
+        <div class="stage-toolbar control-toolbar">
+          <div><strong>Keyboard lighting</strong><small>Paint keys or preview an effect</small></div>
+          <div class="viewport-meta"><span>Logical positions</span><span>Offline only</span><span id="lightingStatus">Aurora · 68%</span></div>
+          <button class="icon-button play-button active" id="lightingPlay" title="Pause lighting preview">Ⅱ</button>
+        </div>
+
+        <div class="keyboard-canvas lighting-canvas">
+          <div class="canvas-heading">
+            <div><span class="eyebrow">NEON CONTROL</span><h2>Per-key lighting canvas</h2></div>
+            <div class="canvas-legend"><span><i class="legend-primary"></i>Primary</span><span><i class="legend-secondary"></i>Secondary</span><span><i class="legend-custom"></i>Painted</span></div>
+          </div>
+          <div class="keyboard-frame">
+            <div class="keyboard-glow"></div>
+            <div class="keyboard-board" id="lightingKeyboard" aria-label="Lighting keyboard preview"></div>
+            <div class="keyboard-lip"><span>KB7</span><span>LOGICAL LIGHTING PREVIEW</span><span class="mini-power"></span></div>
+          </div>
+          <div class="effect-timeline">
+            <span>Effect phase</span><div class="timeline-track"><i id="lightingPhase"></i></div><output id="lightingPhaseLabel">42%</output>
+          </div>
+        </div>
+      </section>
+
+      <aside class="sidebar inspector control-inspector">
+        <div class="section-title"><span>Lighting</span><small id="lightingInspectorSelection">All keys</small></div>
+        <div class="inspector-group">
+          <h3>Power & color</h3>
+          <label class="toggle-field"><span><strong>Lighting enabled</strong><small>Included in exported profile</small></span><input id="lightingEnabled" type="checkbox" checked><i></i></label>
+          <div class="color-field"><label for="lightingPrimary">Primary</label><input id="lightingPrimary" type="color" value="#42efff"><output id="lightingPrimaryValue">#42efff</output></div>
+          <div class="color-field"><label for="lightingSecondary">Secondary</label><input id="lightingSecondary" type="color" value="#9d5cff"><output id="lightingSecondaryValue">#9d5cff</output></div>
+          <div class="color-field"><label for="lightingReactive">Reactive</label><input id="lightingReactive" type="color" value="#b5ffcb"><output id="lightingReactiveValue">#b5ffcb</output></div>
+        </div>
+        <div class="inspector-group">
+          <h3>Motion</h3>
+          <label class="range-field"><span>Brightness <output id="lightingBrightnessValue">68%</output></span><input id="lightingBrightness" type="range" min="0" max="100" value="68"></label>
+          <label class="range-field"><span>Speed <output id="lightingSpeedValue">42%</output></span><input id="lightingSpeed" type="range" min="0" max="100" value="42"></label>
+          <div class="select-field"><label for="lightingDirection">Direction</label><select id="lightingDirection"><option value="east">Left → right</option><option value="west">Right → left</option><option value="north">Bottom → top</option><option value="south">Top → bottom</option><option value="radial">Radial</option></select></div>
+        </div>
+        <div class="inspector-group paint-group">
+          <h3>Per-key paint</h3>
+          <p id="paintHint">Select one or more keys on the canvas, then apply the primary color.</p>
+          <button class="button primary wide" id="applyKeyColor">Apply primary color</button>
+          <button class="button ghost wide" id="clearKeyColors">Clear painted keys</button>
+        </div>
+        <section class="format-health compact-health"><div><span>RGB artifact</span><strong>Preview only</strong></div><div class="health-bar pending"><span></span></div><small>Exports intent by key name until physical LED mapping is confirmed.</small></section>
+      </aside>
+    </section>
+
+    <section class="workspace keyboard-workspace workspace-view" id="view-switches" data-view="switches" hidden>
+      <aside class="sidebar left-panel control-sidebar">
+        <section>
+          <div class="section-title"><span>Presets</span><small>Starting points</small></div>
+          <div class="preset-list" id="switchPresets">
+            <button data-preset="gaming"><i>1.0</i><span>Competitive<small>Fast actuation + rapid trigger</small></span></button>
+            <button data-preset="balanced" class="active"><i>1.6</i><span>Balanced<small>Responsive everyday setup</small></span></button>
+            <button data-preset="typing"><i>2.4</i><span>Typing<small>Deliberate keystrokes</small></span></button>
+          </div>
+        </section>
+        <section class="control-section">
+          <div class="section-title"><span>Quick select</span><small>Per-key override</small></div>
+          <div class="zone-grid" id="switchZones">
+            <button data-zone="all">All</button>
+            <button data-zone="alphas">Alphas</button>
+            <button data-zone="wasd" class="active">WASD</button>
+            <button data-zone="arrows">Arrows</button>
+          </div>
+        </section>
+        <section class="evidence-card success-card">
+          <div class="evidence-icon">✓</div>
+          <div><strong>Logical keyboard layout</strong><small>The public editor uses portable key names; device-specific selector values are not included.</small></div>
+        </section>
+      </aside>
+
+      <section class="control-stage">
+        <div class="stage-toolbar control-toolbar">
+          <div><strong>Hall switch tuning</strong><small>Global defaults with per-key overrides</small></div>
+          <div class="viewport-meta"><span>3.2 mm travel</span><span>0.1 mm UI steps</span><span id="switchStatus">1.6 mm · Rapid Trigger</span></div>
+          <button class="icon-button" id="resetSwitches" title="Reset switch tuning">↺</button>
+        </div>
+        <div class="keyboard-canvas switch-canvas">
+          <div class="canvas-heading">
+            <div><span class="eyebrow">HALL EFFECT</span><h2>Actuation map</h2></div>
+            <div class="canvas-legend"><span><i class="legend-global"></i>Global</span><span><i class="legend-override"></i>Override</span><span><i class="legend-selected"></i>Selected</span></div>
+          </div>
+          <div class="keyboard-frame switch-frame">
+            <div class="keyboard-board" id="switchKeyboard" aria-label="Hall switch actuation map"></div>
+            <div class="keyboard-lip"><span>LOGICAL HALL KEYS</span><span>DEVICE MAP OMITTED</span><span class="mini-power green"></span></div>
+          </div>
+
+          <section class="travel-lab">
+            <div class="travel-copy"><span class="eyebrow">CALIBRATION LAB</span><h3>Test <strong id="switchTestKey">W</strong> through full travel</h3><p>Move the simulated switch to see the press threshold and rapid-trigger reset window.</p></div>
+            <div class="travel-visual">
+              <div class="travel-readout"><strong id="switchTravelValue">0.0 mm</strong><span id="switchTravelState">Released</span></div>
+              <div class="travel-ruler" id="travelRuler"><span class="travel-fill" id="travelFill"></span><i class="actuation-marker" id="actuationMarker"><b>ACT</b></i><i class="release-marker" id="releaseMarker"><b>RT</b></i></div>
+              <input id="switchTravelSimulation" type="range" min="0" max="32" value="0" aria-label="Simulated key travel">
+              <div class="ruler-labels"><span>0.0</span><span>0.8</span><span>1.6</span><span>2.4</span><span>3.2 mm</span></div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <aside class="sidebar inspector control-inspector">
+        <div class="section-title"><span>Switches</span><small id="switchInspectorSelection">WASD · 4 keys</small></div>
+        <div class="inspector-group">
+          <h3>Actuation</h3>
+          <label class="range-field"><span>Global point <output id="actuationValue">1.6 mm</output></span><input id="actuationPoint" type="range" min="1" max="32" value="16"></label>
+          <label class="range-field"><span>Full travel <output id="travelValue">3.2 mm</output></span><input id="fullTravel" type="range" min="5" max="60" value="32"></label>
+          <label class="toggle-field"><span><strong>Per-key override</strong><small>Apply point to selected keys</small></span><input id="perKeyActuation" type="checkbox" checked><i></i></label>
+        </div>
+        <div class="inspector-group">
+          <h3>Rapid Trigger</h3>
+          <label class="toggle-field"><span><strong>Rapid Trigger</strong><small>Dynamic press and reset points</small></span><input id="rapidTrigger" type="checkbox" checked><i></i></label>
+          <label class="range-field"><span>Press delta <output id="rapidPressValue">0.15 mm</output></span><input id="rapidPress" type="range" min="5" max="150" value="15"></label>
+          <label class="range-field"><span>Release delta <output id="rapidReleaseValue">0.15 mm</output></span><input id="rapidRelease" type="range" min="5" max="150" value="15"></label>
+        </div>
+        <button class="button ghost wide" id="clearSwitchOverrides">Clear selected overrides</button>
+        <section class="format-health compact-health"><div><span>Policy owner</span><strong>SNC-local</strong></div><div class="health-bar"><span></span></div><small>MCU2 supplies normalized samples; custom firmware applies actuation policy.</small></section>
+      </aside>
+    </section>
+
+    <section class="workspace keyboard-workspace workspace-view" id="view-analog" data-view="analog" hidden>
+      <aside class="sidebar left-panel control-sidebar">
+        <section>
+          <div class="section-title"><span>Axis presets</span><small>Four Hall keys</small></div>
+          <div class="preset-list" id="analogPresets">
+            <button data-preset="arrows" class="active"><i>↔</i><span>Arrow stick<small>Portable logical preset</small></span></button>
+            <button data-preset="wasd"><i>W</i><span>WASD stick<small>Game movement layout</small></span></button>
+            <button data-preset="racing"><i>◒</i><span>Racing axes<small>Steer plus throttle/brake</small></span></button>
+          </div>
+        </section>
+        <section class="control-section binding-section">
+          <div class="section-title"><span>Bindings</span><small>Logical keys</small></div>
+          <label><span>X−</span><select id="bindingXNegative"></select></label>
+          <label><span>X+</span><select id="bindingXPositive"></select></label>
+          <label><span>Y−</span><select id="bindingYNegative"></select></label>
+          <label><span>Y+</span><select id="bindingYPositive"></select></label>
+        </section>
+        <section class="evidence-card info-card">
+          <div class="evidence-icon">i</div>
+          <div><strong>Axis simulation</strong><small>The offline model exercises the full signed X/Y range and returns to centre without device access.</small></div>
+        </section>
+      </aside>
+
+      <section class="control-stage">
+        <div class="stage-toolbar control-toolbar">
+          <div><strong>Analog output designer</strong><small>Map switch travel to virtual axes</small></div>
+          <div class="viewport-meta"><span>−32767…32767</span><span>4 sources</span><span id="analogStatus">Left stick · Linear</span></div>
+          <button class="icon-button" id="centerAnalog" title="Center simulated axes">◎</button>
+        </div>
+        <div class="keyboard-canvas analog-canvas">
+          <div class="canvas-heading">
+            <div><span class="eyebrow">ANALOG LAB</span><h2>Keyswitch joystick output</h2></div>
+            <div class="axis-legend"><span class="axis-x">X axis</span><span class="axis-y">Y axis</span><span>Opposites cancel</span></div>
+          </div>
+          <div class="keyboard-frame analog-frame">
+            <div class="keyboard-board" id="analogKeyboard" aria-label="Analog keyboard mapping"></div>
+            <div class="keyboard-lip"><span>HALL DEPTH SOURCES</span><span id="analogBindingSummary">← → · ↑ ↓</span><span class="mini-power violet"></span></div>
+          </div>
+
+          <section class="analog-lab">
+            <div class="stick-card">
+              <div class="stick-header"><div><span class="eyebrow">OUTPUT MONITOR</span><h3 id="stickOutputName">Gamepad left stick</h3></div><output id="stickCoordinates">X 0 · Y 0</output></div>
+              <div class="stick-pad" id="stickPad"><i class="deadzone-ring" id="deadzoneRing"></i><span class="axis-horizontal"></span><span class="axis-vertical"></span><b id="stickDot"></b></div>
+            </div>
+            <div class="axis-simulator">
+              <div class="simulator-header"><span class="eyebrow">TRAVEL INPUTS</span><button id="randomAnalog">Exercise axes</button></div>
+              <label><span id="simXNegLabel">Left</span><input id="simXNegative" type="range" min="0" max="32" value="0"><output id="simXNegValue">0.0</output></label>
+              <label><span id="simXPosLabel">Right</span><input id="simXPositive" type="range" min="0" max="32" value="0"><output id="simXPosValue">0.0</output></label>
+              <label><span id="simYNegLabel">Up</span><input id="simYNegative" type="range" min="0" max="32" value="0"><output id="simYNegValue">0.0</output></label>
+              <label><span id="simYPosLabel">Down</span><input id="simYPositive" type="range" min="0" max="32" value="0"><output id="simYPosValue">0.0</output></label>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <aside class="sidebar inspector control-inspector">
+        <div class="section-title"><span>Analog</span><small>Offline simulation</small></div>
+        <div class="inspector-group">
+          <h3>Output</h3>
+          <label class="toggle-field"><span><strong>Analog output</strong><small>Include axis mapping in profile</small></span><input id="analogEnabled" type="checkbox" checked><i></i></label>
+          <div class="select-field"><label for="analogOutput">Target</label><select id="analogOutput"><option value="gamepad_left_stick">Gamepad left stick</option><option value="gamepad_right_stick">Gamepad right stick</option><option value="gamepad_triggers">Gamepad triggers</option></select></div>
+          <div class="select-field"><label for="analogCurve">Response</label><select id="analogCurve"><option value="linear">Linear</option><option value="exponential">Exponential</option><option value="s_curve">S-curve</option></select></div>
+        </div>
+        <div class="inspector-group">
+          <h3>Axis shaping</h3>
+          <label class="range-field"><span>Deadzone <output id="deadzoneValue">0.12 mm</output></span><input id="analogDeadzone" type="range" min="0" max="150" value="12"></label>
+          <label class="range-field"><span>Saturation <output id="saturationValue">3.20 mm</output></span><input id="analogSaturation" type="range" min="10" max="320" value="320"></label>
+          <label class="range-field"><span>Smoothing <output id="smoothingValue">2</output></span><input id="analogSmoothing" type="range" min="0" max="10" value="2"></label>
+          <div class="toggle-grid">
+            <label><input id="invertX" type="checkbox"><span>Invert X</span></label>
+            <label><input id="invertY" type="checkbox"><span>Invert Y</span></label>
+          </div>
+          <label class="toggle-field"><span><strong>Digital passthrough</strong><small>Keep ordinary key presses too</small></span><input id="digitalPassthrough" type="checkbox" checked><i></i></label>
+        </div>
+        <section class="format-health compact-health warning-health"><div><span>Gamepad HID</span><strong>Planned</strong></div><div class="health-bar pending"><span></span></div><small>The app exports and simulates axes; firmware descriptor/output still requires hardware validation.</small></section>
+      </aside>
+    </section>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

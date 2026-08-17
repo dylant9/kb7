@@ -1,0 +1,23 @@
+name: source checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Public-tree boundary
+        run: python3 tools/check_public_tree.py .
+      - name: Python tests
+        run: PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=pc_app python3 -m unittest discover -s pc_app/tests -v
+      - name: JavaScript syntax
+        run: node --check pc_app/web/app.js
