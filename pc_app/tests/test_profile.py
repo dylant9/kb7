@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class ProfileFormatTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.document = json.loads((ROOT / "samples/neon-control-profile.json").read_text())
+        cls.document = json.loads((ROOT / "samples/offline-example-profile.json").read_text())
 
     def test_sample_is_valid_and_canonical(self) -> None:
         canonical = canonical_profile(self.document)
@@ -21,6 +21,10 @@ class ProfileFormatTests(unittest.TestCase):
         self.assertEqual(canonical["analog"]["bindings"]["x_negative"], "LEFT")
         self.assertEqual(canonical["switches"]["per_key"]["W"]["actuation_mm"], 1.0)
         self.assertEqual(canonical["capabilities"]["rgb_position_mapping"], "pending_hardware")
+        self.assertEqual(canonical["capabilities"]["hall_keymap"],
+                         "implemented-hardware-unverified")
+        self.assertEqual(canonical["capabilities"]["analog_hid_output"],
+                         "implemented-hardware-unverified")
         self.assertFalse(canonical["capabilities"]["device_io"])
         validate_profile(canonical)
 
@@ -30,6 +34,20 @@ class ProfileFormatTests(unittest.TestCase):
         canonical = canonical_profile(changed)
         self.assertEqual(list(canonical["lighting"]["per_key"]), ["A", "W"])
         self.assertEqual(canonical["lighting"]["per_key"]["W"], "#ffffff")
+
+    def test_firmware_layer_authoring_is_validated_and_preserved(self) -> None:
+        changed = copy.deepcopy(self.document)
+        changed["firmware"] = {
+            "layout_variant": 1, "initial_mode": "game",
+            "actions": {"game": {"A": {"type": "keyboard", "usage": "B"}}},
+        }
+        canonical = canonical_profile(changed)
+        self.assertEqual(canonical["firmware"], changed["firmware"])
+        bad = copy.deepcopy(changed)
+        bad["firmware"]["actions"] = {"primary": {"FN": {"type": "consumer",
+                                                               "usage": 233}}}
+        with self.assertRaisesRegex(ProfileFormatError, "consumer usage"):
+            canonical_profile(bad)
 
     def test_rejects_unknown_key_and_duplicate_axis_bindings(self) -> None:
         bad = copy.deepcopy(self.document)

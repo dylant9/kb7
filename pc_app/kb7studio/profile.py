@@ -13,19 +13,23 @@ import math
 from pathlib import Path
 from typing import Any
 
-from .format import ScreenFormatError, compile_document
+from .format import ScreenFormatError, compile_document, parse_binary
 
 PROFILE_FORMAT = "kb7-profile-v1"
-MAX_PROFILE_NAME_BYTES = 64
+MAX_PROFILE_NAME_BYTES = 63  # KBP1 reserves byte 64 for a NUL terminator.
 
 LIGHTING_EFFECTS = {"static", "gradient", "aurora", "reactive", "heatmap"}
 LIGHTING_DIRECTIONS = {"east", "west", "north", "south", "radial"}
 ANALOG_OUTPUTS = {"gamepad_left_stick", "gamepad_right_stick", "gamepad_triggers"}
 ANALOG_CURVES = {"linear", "exponential", "s_curve"}
 AXIS_BINDINGS = ("x_negative", "x_positive", "y_negative", "y_positive")
+FIRMWARE_MODES = ("primary", "game", "easy_shift", "fn1")
+FIRMWARE_INITIAL_MODES = {"primary", "game", "easy_shift"}
+FIRMWARE_ACTIONS = {"transparent", "none", "keyboard", "consumer", "momentary_fn1"}
 
-# Logical key names used by the offline editor. Device-specific selector values
-# are intentionally not included in the public source tree.
+# Logical key names used by the offline editor. The recovered selector/routing
+# tables are present in the firmware; physical layout-variant validation remains
+# a hardware gate.
 KNOWN_KEYS = frozenset({
     "ESC", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
     "GRAVE", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "MINUS", "EQUAL", "BACKSPACE",
@@ -181,6 +185,75 @@ def _canonical_analog(value: Any, travel_mm: float) -> dict[str, Any]:
     }
 
 
+def _firmware_key(value: Any) -> str:
+    if isinstance(value, str) and value in KNOWN_KEYS:
+        return value
+    if isinstance(value, str) and value.startswith("logical:"):
+        try:
+            logical = int(value[8:], 10)
+        except ValueError as exc:
+            raise ProfileFormatError(f"invalid firmware logical key {value!r}") from exc
+        if 0 <= logical < 85 and value == f"logical:{logical}":
+            return value
+    raise ProfileFormatError(f"unknown firmware logical key {value!r}")
+
+
+def _canonical_firmware(value: Any) -> dict[str, Any]:
+    firmware = _object(value, "firmware")
+    if set(firmware) - {"layout_variant", "initial_mode", "actions"}:
+        raise ProfileFormatError("firmware contains unknown fields")
+    layout = _integer(firmware.get("layout_variant", 0),
+                      "firmware.layout_variant", 0, 3)
+    initial = firmware.get("initial_mode", "primary")
+    if not isinstance(initial, str) or initial not in FIRMWARE_INITIAL_MODES:
+        raise ProfileFormatError("firmware.initial_mode must be primary/game/easy_shift")
+    actions = _object(firmware.get("actions", {}), "firmware.actions")
+    if set(actions) - set(FIRMWARE_MODES):
+        raise ProfileFormatError("firmware.actions contains an unknown mode")
+    canonical_actions: dict[str, dict[str, dict[str, Any]]] = {}
+    for mode in FIRMWARE_MODES:
+        if mode not in actions:
+            continue
+        overrides = _object(actions[mode], f"firmware.actions.{mode}")
+        canonical_overrides: dict[str, dict[str, Any]] = {}
+        for raw_key, raw_action in sorted(overrides.items()):
+            key_name = _firmware_key(raw_key)
+            action = _object(raw_action, f"firmware.actions.{mode}.{key_name}")
+            action_type = action.get("type")
+            if not isinstance(action_type, str) or action_type not in FIRMWARE_ACTIONS:
+                raise ProfileFormatError(f"invalid firmware action type for {key_name}")
+            allowed = {"type", "usage"} if action_type in {"keyboard", "consumer"} else {"type"}
+            if set(action) - allowed:
+                raise ProfileFormatError(f"firmware action for {key_name} has unknown fields")
+            is_fn = key_name in {"FN", "logical:78"}
+            result: dict[str, Any] = {"type": action_type}
+            if action_type == "keyboard":
+                usage = action.get("usage")
+                if isinstance(usage, str):
+                    if usage not in KNOWN_KEYS or usage == "FN":
+                        raise ProfileFormatError("firmware keyboard usage name is invalid")
+                elif (isinstance(usage, bool) or not isinstance(usage, int) or
+                      not (0 < usage < 152 or 0xE0 <= usage <= 0xE7)):
+                    raise ProfileFormatError("firmware keyboard usage integer is invalid")
+                if is_fn:
+                    raise ProfileFormatError("Fn cannot emit a keyboard usage")
+                result["usage"] = usage
+            elif action_type == "consumer":
+                usage = action.get("usage")
+                if (isinstance(usage, bool) or not isinstance(usage, int) or
+                        not 0 < usage <= 0xFFFF or is_fn):
+                    raise ProfileFormatError("firmware consumer usage is invalid")
+                result["usage"] = usage
+            elif action_type == "momentary_fn1" and not is_fn:
+                raise ProfileFormatError("momentary_fn1 is only valid on Fn")
+            if mode == "primary" and is_fn and action_type != "momentary_fn1":
+                raise ProfileFormatError("firmware primary Fn action must remain momentary_fn1")
+            canonical_overrides[key_name] = result
+        canonical_actions[mode] = canonical_overrides
+    return {"layout_variant": layout, "initial_mode": initial,
+            "actions": canonical_actions}
+
+
 def canonical_profile(document: dict[str, Any]) -> dict[str, Any]:
     """Return a validated, deterministic profile representation."""
 
@@ -190,13 +263,13 @@ def canonical_profile(document: dict[str, Any]) -> dict[str, Any]:
     name = _text(profile.get("name"), "profile.name", MAX_PROFILE_NAME_BYTES)
     screen_document = copy.deepcopy(_object(profile.get("screen_document"), "screen_document"))
     try:
-        compile_document(screen_document)
+        screen_document = parse_binary(compile_document(screen_document))
     except ScreenFormatError as exc:
         raise ProfileFormatError(f"screen_document: {exc}") from exc
     lighting = _canonical_lighting(profile.get("lighting"))
     switches = _canonical_switches(profile.get("switches"))
     analog = _canonical_analog(profile.get("analog"), switches["travel_mm"])
-    return {
+    result = {
         "format": PROFILE_FORMAT,
         "name": name,
         "screen_document": screen_document,
@@ -204,12 +277,15 @@ def canonical_profile(document: dict[str, Any]) -> dict[str, Any]:
         "switches": switches,
         "analog": analog,
         "capabilities": {
-            "hall_keymap": "device-mapping-not-included",
+            "hall_keymap": "implemented-hardware-unverified",
             "rgb_position_mapping": "pending_hardware",
-            "analog_hid_output": "planned_unverified",
+            "analog_hid_output": "implemented-hardware-unverified",
             "device_io": False,
         },
     }
+    if "firmware" in profile:
+        result["firmware"] = _canonical_firmware(profile["firmware"])
+    return result
 
 
 def validate_profile(document: dict[str, Any]) -> None:

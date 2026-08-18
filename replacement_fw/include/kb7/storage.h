@@ -8,6 +8,9 @@
 #define KB7_STORAGE_SCREEN_A UINT32_C(0x01570000)
 #define KB7_STORAGE_SCREEN_B UINT32_C(0x01770000)
 #define KB7_STORAGE_SCREEN_SLOT_BYTES UINT32_C(0x00200000)
+#define KB7_STORAGE_PROFILE_A UINT32_C(0x01f70000)
+#define KB7_STORAGE_PROFILE_B UINT32_C(0x01fa8000)
+#define KB7_STORAGE_PROFILE_SLOT_BYTES UINT32_C(0x00038000)
 #define KB7_STORAGE_SLOT_MAGIC UINT32_C(0x314c534b) /* KSL1 */
 #define KB7_STORAGE_SLOT_VERSION 1U
 
@@ -29,6 +32,8 @@ struct KB7_PACKED kb7_slot_header {
 struct kb7_slot_choice { uint32_t offset; struct kb7_slot_header header; bool valid; };
 bool kb7_storage_header_valid(const struct kb7_slot_header *header);
 struct kb7_slot_choice kb7_storage_read_slot(uint32_t offset);
+struct kb7_slot_choice kb7_storage_select_pair(uint32_t slot_a, uint32_t slot_b);
 struct kb7_slot_choice kb7_storage_select(void);
+struct kb7_slot_choice kb7_storage_select_profiles(void);
 
 #endif

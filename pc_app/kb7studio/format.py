@@ -16,6 +16,7 @@ SCREEN = struct.Struct("<HHHHIHH")
 WIDGET = struct.Struct("<HBBhhhhHHhhhHBBHIIHH")
 MAX_SCREENS = 16
 MAX_WIDGETS = 128
+MAX_BINARY_SIZE = 0x200000 - 64  # KBS1 payload capacity of one firmware slot.
 
 WIDGET_TYPES = {"label": 1, "button": 2, "slider": 3, "toggle": 4, "gauge": 5}
 ACTIONS = {
@@ -38,6 +39,8 @@ def crc32(data: bytes) -> int:
 
 
 def rgb565(value: str | int) -> int:
+    if isinstance(value, bool):
+        raise ScreenFormatError("RGB565 color cannot be boolean")
     if isinstance(value, int):
         if 0 <= value <= 0xFFFF:
             return value
@@ -83,8 +86,10 @@ def _validate_action_fields(action: int, target: int, arg0: int, arg1: int,
         valid = arg0 == 0 and arg1 == 0
     elif action == ACTIONS["rgb_color"]:
         valid = arg0 == 0 and arg1 <= 0xFFFFFF
-    elif action in (ACTIONS["rgb_effect"], ACTIONS["profile"]):
-        valid = arg0 <= 0xFF and arg1 == 0
+    elif action == ACTIONS["rgb_effect"]:
+        valid = arg0 <= 4 and arg1 == 0
+    elif action == ACTIONS["profile"]:
+        valid = arg0 <= 3 and arg1 == 0
     elif action == ACTIONS["brightness"]:
         valid = minimum >= 0 and maximum <= 100 and arg0 == 0 and arg1 == 0
     elif action == ACTIONS["actuation"]:
@@ -92,9 +97,9 @@ def _validate_action_fields(action: int, target: int, arg0: int, arg1: int,
     elif action == ACTIONS["rapid_trigger"]:
         valid = minimum >= 0 and maximum <= 1 and arg0 <= 0xFF and arg1 <= 0xFF
     elif action == ACTIONS["hid_key"]:
-        valid = (arg0 < KEYBOARD_USAGE_BITS or 0xE0 <= arg0 <= 0xE7) and arg1 == 0
+        valid = arg0 != 0 and (arg0 < KEYBOARD_USAGE_BITS or 0xE0 <= arg0 <= 0xE7) and arg1 == 0
     elif action == ACTIONS["media_key"]:
-        valid = arg1 == 0
+        valid = arg0 != 0 and arg1 == 0
     else:  # host_event
         valid = True
     if not valid:
@@ -196,6 +201,8 @@ def compile_document(document: dict[str, Any]) -> bytes:
     strings_offset = widgets_offset + len(widget_blobs) * WIDGET.size
     body = b"".join(screen_blobs + widget_blobs) + bytes(strings)
     total_length = HEADER.size + len(body)
+    if total_length > MAX_BINARY_SIZE:
+        raise ScreenFormatError("compiled KBS1 exceeds the firmware screen-slot capacity")
     header = HEADER.pack(
         MAGIC, VERSION, HEADER.size, total_length, crc32(body), len(screen_blobs), boot,
         len(widget_blobs), 0,
@@ -205,6 +212,8 @@ def compile_document(document: dict[str, Any]) -> bytes:
 
 
 def parse_binary(blob: bytes) -> dict[str, Any]:
+    if len(blob) > MAX_BINARY_SIZE:
+        raise ScreenFormatError("KBS1 exceeds the firmware screen-slot capacity")
     if len(blob) < HEADER.size:
         raise ScreenFormatError("truncated header")
     fields = HEADER.unpack_from(blob)

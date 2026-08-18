@@ -10,6 +10,8 @@ static int16_t widget_values[KB7_SCREEN_MAX_WIDGETS];
 
 #define KB7_NO_ACTIVE_WIDGET UINT16_C(0xffff)
 
+static void release_active_widget(void);
+
 static void pixel(int16_t x, int16_t y, uint16_t color) {
     if (x >= 0 && y >= 0 && x < (int16_t)KB7_DISPLAY_WIDTH && y < (int16_t)KB7_DISPLAY_HEIGHT) {
         volatile uint16_t *framebuffer = (volatile uint16_t *)target;
@@ -53,14 +55,18 @@ static uint8_t glyph_column(char character, uint8_t column) {
 }
 
 static void text(int16_t x, int16_t y, const char *value, uint16_t length, uint16_t color) {
+    int32_t pen_x = x;
     for (uint16_t character = 0U; character < length; ++character) {
+        if (pen_x >= (int32_t)KB7_DISPLAY_WIDTH) break;
         for (uint8_t column = 0U; column < 5U; ++column) {
             const uint8_t bits = glyph_column(value[character], column);
             for (uint8_t row = 0U; row < 7U; ++row) {
-                if ((bits & KB7_BIT(row)) != 0U) pixel((int16_t)(x + column), (int16_t)(y + row), color);
+                if ((bits & KB7_BIT(row)) != 0U) {
+                    pixel((int16_t)(pen_x + column), (int16_t)(y + row), color);
+                }
             }
         }
-        x = (int16_t)(x + 7);
+        pen_x += 7;
     }
 }
 
@@ -101,12 +107,28 @@ void kb7_ui_init(uintptr_t framebuffer, const struct kb7_screen_store *store,
     }
 }
 
+void kb7_ui_set_store(const struct kb7_screen_store *store) {
+    release_active_widget();
+    screen_store = store;
+    active_screen = store != NULL && store->header != NULL ? store->header->boot_screen : 0U;
+    for (uint16_t index = 0U; index < KB7_SCREEN_MAX_WIDGETS; ++index) {
+        widget_values[index] = 0;
+    }
+    if (store != NULL && store->header != NULL) {
+        for (uint16_t index = 0U; index < store->header->widget_count; ++index) {
+            const struct kb7_widget_record *const widget = kb7_screen_widget(store, index);
+            if (widget != NULL) widget_values[index] = widget->value;
+        }
+    }
+    kb7_ui_render();
+}
+
 void kb7_ui_render(void) {
     if (target == 0U) return;
     if (screen_store == NULL || screen_store->header == NULL) {
         rectangle(0, 0, KB7_DISPLAY_WIDTH, KB7_DISPLAY_HEIGHT, 0x0841U);
         rectangle(24, 24, 432, 112, 0x18e3U);
-        text(52, 68, "KB7 CUSTOM", 10U, 0xffffU);
+        text(52, 68, "OFFLINE CONTROL", 15U, 0xffffU);
         text(52, 96, "SAFE DEFAULT", 12U, 0x9e7fU);
         kb7_dsb();
         return;
@@ -130,6 +152,16 @@ static int16_t slider_value(const struct kb7_widget_record *widget, uint16_t x) 
     const int32_t position = (int32_t)x - widget->x;
     return (int16_t)(widget->minimum +
                      (span * position + (widget->width - 1) / 2) / (widget->width - 1));
+}
+
+static void release_active_widget(void) {
+    if (active_widget == KB7_NO_ACTIVE_WIDGET) return;
+    const struct kb7_widget_record *const widget =
+        kb7_screen_widget(screen_store, active_widget);
+    if (widget != NULL && handle_action != NULL) {
+        handle_action(widget, widget_values[active_widget], KB7_UI_UP);
+    }
+    active_widget = KB7_NO_ACTIVE_WIDGET;
 }
 
 void kb7_ui_touch(uint16_t x, uint16_t y, enum kb7_ui_phase phase) {
@@ -183,7 +215,7 @@ void kb7_ui_touch(uint16_t x, uint16_t y, enum kb7_ui_phase phase) {
 
 bool kb7_ui_navigate(uint16_t screen_id) {
     if (screen_store == NULL || kb7_screen_find(screen_store, screen_id) == NULL) return false;
-    active_widget = KB7_NO_ACTIVE_WIDGET;
+    release_active_widget();
     active_screen = screen_id;
     kb7_ui_render();
     return true;

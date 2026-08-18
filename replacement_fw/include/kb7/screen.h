@@ -6,6 +6,7 @@
 #define KB7_SCREEN_MAGIC UINT32_C(0x3153424b) /* KBS1 */
 #define KB7_SCREEN_VERSION 1U
 #define KB7_SCREEN_HEADER_SIZE 48U
+#define KB7_SCREEN_MIN_SIZE 64U /* header plus the required first screen */
 #define KB7_SCREEN_MAX_SCREENS 16U
 #define KB7_SCREEN_MAX_WIDGETS 128U
 

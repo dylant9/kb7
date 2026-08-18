@@ -48,11 +48,19 @@ struct kb7_slot_choice kb7_storage_read_slot(uint32_t offset) {
     result.offset = offset;
     result.valid = false;
     kb7_memset(&result.header, 0, sizeof(result.header));
-    if (offset != KB7_STORAGE_SCREEN_A && offset != KB7_STORAGE_SCREEN_B) return result;
+    uint32_t capacity = 0U;
+    if (offset == KB7_STORAGE_SCREEN_A || offset == KB7_STORAGE_SCREEN_B) {
+        capacity = KB7_STORAGE_SCREEN_SLOT_BYTES;
+    } else if (offset == KB7_STORAGE_PROFILE_A || offset == KB7_STORAGE_PROFILE_B) {
+        capacity = KB7_STORAGE_PROFILE_SLOT_BYTES;
+    } else {
+        return result;
+    }
     volatile struct kb7_runtime_api *const api = kb7_runtime();
     if (api->magic == KB7_RUNTIME_MAGIC && api->flash_read != NULL &&
         api->flash_read(offset, &result.header, sizeof(result.header)) == 0 &&
-        kb7_storage_header_valid(&result.header)) {
+        kb7_storage_header_valid(&result.header) &&
+        result.header.payload_length <= capacity - sizeof(result.header)) {
         result.valid = payload_crc_valid(offset, &result.header);
     }
     return result;
@@ -67,10 +75,18 @@ static bool generation_after(uint32_t left, uint32_t right) {
     return (int32_t)(left - right) > 0;
 }
 
-struct kb7_slot_choice kb7_storage_select(void) {
-    struct kb7_slot_choice a = kb7_storage_read_slot(KB7_STORAGE_SCREEN_A);
-    struct kb7_slot_choice b = kb7_storage_read_slot(KB7_STORAGE_SCREEN_B);
+struct kb7_slot_choice kb7_storage_select_pair(uint32_t slot_a, uint32_t slot_b) {
+    struct kb7_slot_choice a = kb7_storage_read_slot(slot_a);
+    struct kb7_slot_choice b = kb7_storage_read_slot(slot_b);
     if (!a.valid) return b;
     if (!b.valid) return a;
     return generation_after(a.header.generation, b.header.generation) ? a : b;
+}
+
+struct kb7_slot_choice kb7_storage_select(void) {
+    return kb7_storage_select_pair(KB7_STORAGE_SCREEN_A, KB7_STORAGE_SCREEN_B);
+}
+
+struct kb7_slot_choice kb7_storage_select_profiles(void) {
+    return kb7_storage_select_pair(KB7_STORAGE_PROFILE_A, KB7_STORAGE_PROFILE_B);
 }

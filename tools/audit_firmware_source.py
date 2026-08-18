@@ -17,7 +17,8 @@ def main() -> int:
         return (firmware / relative).read_text(encoding="utf-8")
 
     config = source("include/kb7/config.h")
-    for setting in ("DRAM_INIT", "DISPLAY", "TOUCH", "RGB", "MCU2", "ENCODER"):
+    for setting in ("DRAM_INIT", "RECOVERY_CHORD", "DISPLAY", "TOUCH", "RGB", "MCU2",
+                    "ENCODER", "ACTION_BAR"):
         pattern = rf"#define KB7_ENABLE_(?:UNVERIFIED_)?{setting} 0\b"
         if re.search(pattern, config) is None:
             failures.append(f"public default KB7_ENABLE_{setting} is not zero")
@@ -38,16 +39,40 @@ def main() -> int:
     startup = source("core0/startup.c")
     linker = source("linker/core0.ld")
     if "vectors[79]" not in startup or "[16 ... 78]" not in startup:
-        failures.append("core0 no longer defines all 79 vector words")
+        if "[16 ... 21]" not in startup or "[22] = kb7_usb_irq_handler" not in startup or \
+                "[23 ... 78]" not in startup:
+            failures.append("core0 no longer defines all 79 vectors with USB IRQ6")
     if "SIZEOF(.isr_vector) == 79 * 4" not in linker:
         failures.append("linker no longer enforces the vector-table size")
 
     usb = source("core0/usb.c")
-    if "bool kb7_usb_init(void) {\n    return false;" not in usb or "return -2;" not in usb:
-        failures.append("public USB transport no longer fails closed")
+    usb_profile = source("include/kb7/usb_device.h")
+    if "#define KB7_USB_VENDOR_ID 0U" not in usb_profile or \
+            "#define KB7_USB_PRODUCT_ID 0U" not in usb_profile or \
+            "#define KB7_USB_BOARD_PROFILE_VERIFIED 0" not in usb_profile:
+        failures.append("public USB identity/board profile no longer defaults fail closed")
+    if "KB7_USB_BOARD_PROFILE_VERIFIED != 1" not in usb or \
+            "KB7_HOST_MAILBOX_FULL" not in usb or "KB7_BIT(6)" not in usb:
+        failures.append("USB board gate, mailbox, or IRQ6 integration is missing")
     flash = source("drivers/flash.c")
-    if flash.count("return -1;") < 3:
-        failures.append("public NOR mutation stubs no longer fail closed")
+    if "#define KB7_ENABLE_FLASH_MUTATION 0" not in flash or \
+            "kb7_flash_range_mutable" not in flash or \
+            "KB7_STORAGE_PROFILE_A" not in flash or "KB7_STORAGE_SCREEN_A" not in flash:
+        failures.append("NOR mutation gate or storage-only allow-list is missing")
+    mcu2 = source("drivers/mcu2.c")
+    mcu2_profile = source("include/kb7/mcu2_protocol.h")
+    if "#define KB7_MCU2_BOARD_PROFILE_VERIFIED 0" not in mcu2_profile or \
+            "KB7_ENABLE_MCU2 && KB7_MCU2_BOARD_PROFILE_VERIFIED" not in mcu2:
+        failures.append("MCU2 board profile no longer defaults non-transmitting")
+    main_source = source("core1/main.c")
+    if "#define KB7_ACTION_BAR_BOARD_PROFILE_VERIFIED 0" not in config or \
+            "KB7_ENABLE_ACTION_BAR && KB7_ACTION_BAR_BOARD_PROFILE_VERIFIED" not in main_source:
+        failures.append("action-bar board profile no longer defaults non-sampling")
+    recovery = source("drivers/recovery.c")
+    if "SNC_SCB_AIRCR" in recovery or "0x05fa0004" in recovery:
+        failures.append("software reset was reintroduced as a false loader-entry path")
+    if "kb7_disable_irq();" not in recovery or "SNC_SYST_CSR) = 0U" not in recovery:
+        failures.append("unproven loader request no longer parks fail closed")
 
     makefile = source("Makefile")
     if "OBJCOPY" in makefile or "exit 2" not in makefile:
@@ -60,10 +85,22 @@ def main() -> int:
         "SNC_SPI_NOR_BASE": "0x40022000",
         "SNC_SD0_BASE": "0x40023000",
         "SNC_SDIO_BASE": "0x40024000",
+        "SNC_SERIAL0_BASE": "0x4000e000",
+        "SNC_USB_BASE": "0x40100000",
     }
     for name, value in required_bases.items():
         if f"#define {name} UINT32_C({value})" not in regs:
             failures.append(f"datasheet-corroborated base {name} is not {value}")
+
+    storage = source("include/kb7/storage.h")
+    for marker in ("KB7_STORAGE_PROFILE_A", "KB7_STORAGE_PROFILE_B",
+                   "KB7_STORAGE_PROFILE_SLOT_BYTES"):
+        if marker not in storage:
+            failures.append(f"persistent profile slot marker {marker} is missing")
+
+    profile = source("core1/profile_blob.c")
+    if "KB7_PROFILE_RECORD_SIZE" not in profile or "kb7_input_profile_valid" not in profile:
+        failures.append("KBP1 parser no longer validates fixed records and runtime profiles")
 
     if failures:
         for failure in failures:

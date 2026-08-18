@@ -15,6 +15,7 @@ void kb7_gpio_write(uint8_t logical, bool high);
 bool kb7_gpio_read(uint8_t logical);
 
 void kb7_delay_cycles(volatile uint32_t cycles);
+bool kb7_delay_us(uint32_t microseconds);
 bool kb7_delay_ms(uint32_t milliseconds);
 void kb7_backlight_init(void);
 void kb7_backlight_set(uint16_t duty);
@@ -36,6 +37,9 @@ void kb7_lcdc_fill(uintptr_t framebuffer, uint16_t color);
 
 struct kb7_touch_point { uint16_t x; uint16_t y; uint8_t id; uint8_t pressure; };
 struct kb7_touch_frame { uint8_t count; struct kb7_touch_point points[10]; };
+bool kb7_touch_decode_records(const uint8_t *records, uint8_t contacts,
+                              struct kb7_touch_frame *frame);
+bool kb7_touch_geometry_supported(uint16_t maximum_x, uint16_t maximum_y);
 bool kb7_touch_init(void);
 bool kb7_touch_read(struct kb7_touch_frame *frame);
 
@@ -82,6 +86,7 @@ void kb7_usb_consumer_usage(uint16_t usage);
 void kb7_usb_consumer_action(uint16_t usage, bool pressed);
 void kb7_usb_consumer_pulse(uint16_t usage);
 
+/* Legacy name: records a recovery request and parks for external ROM reset. */
 void kb7_enter_loader(void) KB7_NORETURN;
 
 #endif

@@ -9,6 +9,14 @@ infrastructure, each cross-checked against the source and the format specs. All
 findings below were verified against the code; no repository files were modified
 during the review.
 
+> **Historical snapshot.** This review describes the earlier stubbed tree at its
+> 38-test baseline. The subsequent completion work addressed R1–R4, the live and
+> latent F-series defects, the listed Python/browser correctness issues, CI
+> enforcement, and the material coverage gaps. The current implementation and
+> verification record are in `FIRMWARE-COMPLETION-2026-08-18.md` and
+> `AUDIT-REMEDIATION-2026-08-17.md`; the original findings remain below as an
+> audit trail rather than a description of current behavior.
+
 ## Repository at a glance
 
 A deliberately non-flashable, source-only research prototype in two halves

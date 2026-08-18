@@ -25,14 +25,25 @@ struct kb7_runtime_api {
     int32_t (*flash_read)(uint32_t offset, void *data, uint32_t length);
     int32_t (*flash_erase_4k)(uint32_t offset);
     int32_t (*flash_program)(uint32_t offset, const void *data, uint32_t length);
+    /* Legacy ABI name; current implementation parks for external ROM reset. */
     void (*enter_loader)(void);
 };
 
 struct kb7_shared_state {
     volatile uint32_t milliseconds;
     volatile uint32_t boot_flags;
+    /* Monotonic epoch incremented whenever Core 0 discards USB data queues. */
     volatile uint32_t usb_events;
     volatile uint32_t last_error;
+};
+
+#define KB7_SHARED_HOST_REPORT_BYTES 64U
+enum kb7_host_mailbox_state { KB7_HOST_MAILBOX_EMPTY = 0, KB7_HOST_MAILBOX_FULL = 1 };
+
+struct kb7_shared_host_mailbox {
+    volatile uint32_t state;
+    volatile uint32_t dropped;
+    volatile uint8_t report[KB7_SHARED_HOST_REPORT_BYTES];
 };
 
 static inline volatile struct kb7_runtime_api *kb7_runtime(void) {
@@ -41,6 +52,11 @@ static inline volatile struct kb7_runtime_api *kb7_runtime(void) {
 
 static inline volatile struct kb7_shared_state *kb7_shared(void) {
     return (volatile struct kb7_shared_state *)(uintptr_t)KB7_SHARED_STATE_ADDRESS;
+}
+
+static inline volatile struct kb7_shared_host_mailbox *kb7_host_mailbox(void) {
+    return (volatile struct kb7_shared_host_mailbox *)(uintptr_t)
+        KB7_SHARED_HOST_MAILBOX_ADDRESS;
 }
 
 #endif

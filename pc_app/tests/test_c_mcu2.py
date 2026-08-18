@@ -19,9 +19,11 @@ class CMcu2Tests(unittest.TestCase):
             subprocess.run([
                 compiler, "-std=c11", "-Wall", "-Wextra", "-Werror", "-fno-builtin",
                 "-DKB7_HOST_TEST", "-DKB7_ENABLE_MCU2=1",
+                "-DKB7_MCU2_BOARD_PROFILE_VERIFIED=1",
                 "-I", str(ROOT / "replacement_fw/include"),
                 str(ROOT / "replacement_fw/tests/mcu2_host.c"),
                 str(ROOT / "replacement_fw/drivers/mcu2.c"),
+                str(ROOT / "replacement_fw/drivers/gpio.c"),
                 str(ROOT / "replacement_fw/common/memory.c"),
                 "-o", str(executable),
             ], check=True)

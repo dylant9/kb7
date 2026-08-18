@@ -7,7 +7,8 @@ import struct
 import unittest
 from pathlib import Path
 
-from kb7studio.format import HEADER, SCREEN, WIDGET, ScreenFormatError, compile_document, crc32, parse_binary
+from kb7studio.format import (HEADER, MAX_BINARY_SIZE, SCREEN, WIDGET, ScreenFormatError,
+                              compile_document, crc32, parse_binary)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -15,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class ScreenFormatTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.document = json.loads((ROOT / "samples/neon-control.json").read_text())
+        cls.document = json.loads((ROOT / "samples/offline-example.json").read_text())
         cls.blob = compile_document(cls.document)
 
     def test_round_trip_is_canonical(self) -> None:
@@ -34,6 +35,18 @@ class ScreenFormatTests(unittest.TestCase):
         corrupted[-1] ^= 0x80
         with self.assertRaisesRegex(ScreenFormatError, "CRC"):
             parse_binary(bytes(corrupted))
+
+    def test_firmware_screen_slot_capacity_is_enforced(self) -> None:
+        widgets = [{
+            "id": index + 1, "type": "label", "x": 0, "y": 0,
+            "width": 1, "height": 1, "text": "x" * 65535,
+        } for index in range(33)]
+        oversized = {"format": "kb7-screen-v1", "boot_screen": 1,
+                     "screens": [{"id": 1, "name": "", "widgets": widgets}]}
+        with self.assertRaisesRegex(ScreenFormatError, "screen-slot capacity"):
+            compile_document(oversized)
+        with self.assertRaisesRegex(ScreenFormatError, "screen-slot capacity"):
+            parse_binary(b"\0" * (MAX_BINARY_SIZE + 1))
 
     def test_version_mismatch_is_rejected(self) -> None:
         corrupted = bytearray(self.blob)
@@ -68,6 +81,12 @@ class ScreenFormatTests(unittest.TestCase):
         with self.assertRaises(ScreenFormatError):
             parse_binary(bytes(bad))
 
+    def test_boolean_is_not_an_rgb565_integer(self) -> None:
+        bad = copy.deepcopy(self.document)
+        bad["screens"][0]["background"] = True
+        with self.assertRaisesRegex(ScreenFormatError, "boolean"):
+            compile_document(bad)
+
         bad = bytearray(self.blob)
         widget_offset = HEADER.size + len(self.document["screens"]) * SCREEN.size
         struct.pack_into("<H", bad, widget_offset + WIDGET.size - 2, 1)
@@ -87,6 +106,16 @@ class ScreenFormatTests(unittest.TestCase):
         bad["screens"][0]["widgets"][3]["action"]["arg1"] = 0x1000000
         with self.assertRaises(ScreenFormatError):
             compile_document(bad)
+        for action in (
+            {"type": "rgb_effect", "arg0": 5},
+            {"type": "profile", "arg0": 4},
+            {"type": "hid_key", "arg0": 0},
+            {"type": "media_key", "arg0": 0},
+        ):
+            bad = copy.deepcopy(self.document)
+            bad["screens"][0]["widgets"][0]["action"] = action
+            with self.subTest(action=action), self.assertRaises(ScreenFormatError):
+                compile_document(bad)
 
     def test_binary_duplicate_widget_and_bad_range_are_rejected(self) -> None:
         bad = bytearray(self.blob)

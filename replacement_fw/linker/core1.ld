@@ -36,3 +36,4 @@ SECTIONS
 
 ASSERT(LOADADDR(.data) + SIZEOF(.data) <= ORIGIN(IMAGE) + LENGTH(IMAGE), "core1 image overflow")
 ASSERT(__bss_end__ <= ORIGIN(SRAM) + LENGTH(SRAM), "core1 SRAM overflow")
+ASSERT(__bss_end__ + 0x4000 <= 0x1803f5c0, "less than 16 KiB runtime stack headroom")

@@ -9,9 +9,39 @@
 #define TOUCH_ADDRESS_WRITE 0xaaU
 #define TOUCH_ADDRESS_READ 0xabU
 #define TOUCH_STRETCH_TIMEOUT UINT32_C(10000)
+#define TOUCH_MAX_CONTACTS 10U
+
+bool kb7_touch_geometry_supported(uint16_t maximum_x, uint16_t maximum_y) {
+    /* No rotation/mirroring transform is yet proven, so accept portrait only. */
+    return (maximum_x == KB7_DISPLAY_WIDTH || maximum_x + 1U == KB7_DISPLAY_WIDTH) &&
+           (maximum_y == KB7_DISPLAY_HEIGHT || maximum_y + 1U == KB7_DISPLAY_HEIGHT);
+}
+
+bool kb7_touch_decode_records(const uint8_t *records, uint8_t contacts,
+                              struct kb7_touch_frame *frame) {
+    if (records == NULL || frame == NULL || contacts == 0U || contacts > TOUCH_MAX_CONTACTS) {
+        return false;
+    }
+    frame->count = 0U;
+    for (uint8_t slot = 0U; slot < contacts; ++slot) {
+        const uint8_t *const record = &records[(size_t)slot * 7U];
+        if ((record[0] & 0x80U) == 0U) continue;
+        const uint16_t x = (uint16_t)(((uint16_t)(record[0] & 0x3fU) << 8U) | record[1]);
+        const uint16_t y = (uint16_t)(((uint16_t)(record[2] & 0x3fU) << 8U) | record[3]);
+        if (x >= KB7_DISPLAY_WIDTH || y >= KB7_DISPLAY_HEIGHT) continue;
+        struct kb7_touch_point *point = &frame->points[frame->count++];
+        point->x = x;
+        point->y = y;
+        point->id = slot;
+        point->pressure = record[5];
+    }
+    return true;
+}
 
 #if KB7_ENABLE_TOUCH
-static void i2c_delay(void) { kb7_delay_cycles(32U); }
+static uint8_t touch_max_contacts;
+
+static bool i2c_delay(void) { return kb7_delay_us(2U); }
 
 static void sda_release(void) {
     kb7_gpio_configure(TOUCH_SDA, KB7_GPIO_INPUT, 0U, KB7_GPIO_PULL_UP);
@@ -42,9 +72,9 @@ static bool scl_release(void) {
 static bool i2c_start(void) {
     sda_release();
     if (!scl_release()) return false;
-    i2c_delay();
+    if (!i2c_delay()) return false;
     sda_low();
-    i2c_delay();
+    if (!i2c_delay()) return false;
     scl_low();
     return true;
 }
@@ -55,9 +85,9 @@ static bool i2c_stop(void) {
         sda_release();
         return false;
     }
-    i2c_delay();
+    if (!i2c_delay()) return false;
     sda_release();
-    i2c_delay();
+    if (!i2c_delay()) return false;
     return true;
 }
 
@@ -69,14 +99,16 @@ static bool i2c_write(uint8_t value) {
             sda_low();
         }
         if (!scl_release()) return false;
-        i2c_delay();
+        if (!i2c_delay()) return false;
         scl_low();
+        if (!i2c_delay()) return false;
     }
     sda_release();
     if (!scl_release()) return false;
-    i2c_delay();
+    if (!i2c_delay()) return false;
     const bool ack = !kb7_gpio_read(TOUCH_SDA);
     scl_low();
+    if (!i2c_delay()) return false;
     return ack;
 }
 
@@ -86,19 +118,32 @@ static bool i2c_read(bool acknowledge, uint8_t *result) {
     for (uint8_t bit = 0U; bit < 8U; ++bit) {
         value <<= 1U;
         if (!scl_release()) return false;
-        i2c_delay();
+        if (!i2c_delay()) return false;
         value |= kb7_gpio_read(TOUCH_SDA) ? 1U : 0U;
         scl_low();
+        if (!i2c_delay()) return false;
     }
     if (acknowledge) {
         sda_low();
     }
     if (!scl_release()) return false;
-    i2c_delay();
+    if (!i2c_delay()) return false;
     scl_low();
     sda_release();
+    if (!i2c_delay()) return false;
     *result = value;
     return true;
+}
+
+static bool i2c_recover(void) {
+    sda_release();
+    if (!scl_release()) return false;
+    for (uint8_t pulse = 0U; pulse < 9U && !kb7_gpio_read(TOUCH_SDA); ++pulse) {
+        scl_low();
+        if (!i2c_delay() || !scl_release() || !i2c_delay()) return false;
+    }
+    if (!kb7_gpio_read(TOUCH_SDA)) return false;
+    return i2c_stop();
 }
 
 static bool touch_read_register(uint16_t address, uint8_t *data, size_t length) {
@@ -123,16 +168,35 @@ static bool touch_read_register(uint16_t address, uint8_t *data, size_t length) 
 }
 
 bool kb7_touch_init(void) {
+    touch_max_contacts = 0U;
     kb7_gpio_configure(TOUCH_IRQ, KB7_GPIO_INPUT, 0U, KB7_GPIO_PULL_UP);
     kb7_gpio_configure(TOUCH_RESET, KB7_GPIO_OUTPUT, 0U, KB7_GPIO_FLOATING);
     sda_release();
-    if (!scl_release()) return false;
+    if (!i2c_recover()) return false;
     kb7_gpio_write(TOUCH_RESET, false);
-    kb7_delay_cycles(50000U);
+    if (!kb7_delay_ms(10U)) return false;
     kb7_gpio_write(TOUCH_RESET, true);
-    kb7_delay_cycles(300000U);
+    if (!kb7_delay_ms(110U)) return false;
+
     uint8_t identity = 0U;
-    return touch_read_register(0x00f4U, &identity, 1U) && identity != 0U && identity != 0xffU;
+    uint8_t maximum = 0U;
+    uint8_t status = 0U;
+    uint8_t geometry[4];
+    if (!touch_read_register(0x00f4U, &identity, 1U) || identity == 0U || identity == 0xffU ||
+        !touch_read_register(0x0009U, &maximum, 1U) || maximum == 0U ||
+        maximum > TOUCH_MAX_CONTACTS ||
+        !touch_read_register(0x0001U, &status, 1U) ||
+        !touch_read_register(0x0005U, geometry, sizeof(geometry))) {
+        return false;
+    }
+    const uint16_t maximum_x = (uint16_t)(((uint16_t)geometry[0] << 8U) | geometry[1]);
+    const uint16_t maximum_y = (uint16_t)(((uint16_t)geometry[2] << 8U) | geometry[3]);
+    if (!kb7_touch_geometry_supported(maximum_x, maximum_y)) {
+        return false;
+    }
+    (void)status; /* A successful status transaction is the recovered health check. */
+    touch_max_contacts = maximum;
+    return true;
 }
 
 bool kb7_touch_read(struct kb7_touch_frame *frame) {
@@ -143,27 +207,11 @@ bool kb7_touch_read(struct kb7_touch_frame *frame) {
     if (kb7_gpio_read(TOUCH_IRQ)) {
         return true;
     }
-    for (uint8_t slot = 0U; slot < 10U; ++slot) {
-        uint8_t record[7];
-        if (!touch_read_register((uint16_t)(0x14U + slot * 7U), record, sizeof(record))) {
-            frame->count = 0U;
-            return false;
-        }
-        if ((record[0] & 0x80U) == 0U) {
-            continue;
-        }
-        const uint16_t x = (uint16_t)(((uint16_t)(record[0] & 0x3fU) << 8U) | record[1]);
-        const uint16_t y = (uint16_t)(((uint16_t)(record[2] & 0x3fU) << 8U) | record[3]);
-        if (x >= KB7_DISPLAY_WIDTH || y >= KB7_DISPLAY_HEIGHT) {
-            continue;
-        }
-        struct kb7_touch_point *point = &frame->points[frame->count++];
-        point->x = x;
-        point->y = y;
-        point->id = slot;
-        point->pressure = record[4];
-    }
-    return true;
+    if (touch_max_contacts == 0U) return false;
+    uint8_t records[TOUCH_MAX_CONTACTS * 7U];
+    const size_t length = (size_t)touch_max_contacts * 7U;
+    if (!touch_read_register(0x0014U, records, length)) return false;
+    return kb7_touch_decode_records(records, touch_max_contacts, frame);
 }
 #else
 bool kb7_touch_init(void) {

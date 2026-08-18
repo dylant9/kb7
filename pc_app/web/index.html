@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>KB7 Studio</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
+  <title>Control Studio</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -13,10 +14,10 @@
   <header class="topbar">
     <div class="brand">
       <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
-      <div><strong>KB7 Studio</strong><small>Custom firmware workshop</small></div>
+      <div><strong>Control Studio</strong><small>Offline input workshop</small></div>
     </div>
 
-    <nav class="workspace-nav" id="workspaceNav" aria-label="Studio workspace">
+    <nav class="workspace-nav" id="workspaceNav" aria-label="Editor workspace">
       <button class="active" data-workspace="display"><i>▣</i><span>Display</span></button>
       <button data-workspace="lighting"><i>✦</i><span>Lighting</span></button>
       <button data-workspace="switches"><i>⌁</i><span>Switches</span></button>
@@ -25,7 +26,7 @@
 
     <div class="project-title">
       <span class="status-dot"></span>
-      <input id="projectName" value="Neon Control" maxlength="64" aria-label="Profile name">
+      <input id="projectName" value="Offline Profile" maxlength="64" aria-label="Profile name">
       <span id="saveState">Saved locally</span>
     </div>
 
@@ -59,7 +60,7 @@
 
         <section class="device-card">
           <div class="device-icon">⌁</div>
-          <div><strong>Device-free mode</strong><small>No KB7 is accessed. Exports remain offline artifacts.</small></div>
+          <div><strong>Device-free mode</strong><small>No device is accessed. Exports remain offline artifacts.</small></div>
         </section>
       </aside>
 
@@ -68,6 +69,7 @@
           <div class="segmented" id="displayMode">
             <button class="active" data-mode="design">Design</button>
             <button data-mode="preview">Preview</button>
+            <button data-mode="trace">Touch Trace</button>
           </div>
           <div class="viewport-meta"><span>480 × 800</span><span>RGB565</span><span id="objectCount">0 widgets</span></div>
           <button class="icon-button" id="resetView" title="Reset preview">↺</button>
@@ -75,18 +77,18 @@
         <div class="device-wrap">
           <div class="device-shadow"></div>
           <div class="device-shell">
-            <div class="device-top"><span>COMMAND DISPLAY</span><div class="sensor"></div></div>
+            <div class="device-top"><span>DISPLAY PREVIEW</span><div class="sensor"></div></div>
             <div id="display" class="display" tabindex="0"><div class="drop-hint">Drop a widget here</div></div>
-            <div class="device-chin"><span class="roller"></span><span class="logo">TB</span><span class="power-light"></span></div>
+            <div class="device-chin"><span class="roller"></span><span class="chin-grip" aria-hidden="true"><i></i><i></i><i></i></span><span class="power-light"></span></div>
           </div>
         </div>
-        <div class="tip"><kbd>Shift</kbd> while dragging to snap softly · click controls in Preview to exercise navigation</div>
+        <div class="tip" id="displayTip"><kbd>Shift</kbd> while dragging to snap softly · click controls in Preview to exercise navigation</div>
       </section>
 
       <aside class="sidebar inspector">
-        <div class="section-title"><span>Inspector</span><small id="selectionLabel">Screen</small></div>
+        <div class="section-title"><span id="inspectorTitle">Inspector</span><small id="selectionLabel">Screen</small></div>
         <div id="inspectorBody"></div>
-        <section class="format-health">
+        <section class="format-health" id="formatHealthCard">
           <div><span>Format health</span><strong id="formatHealth">Valid</strong></div>
           <div class="health-bar"><span></span></div>
           <small id="formatDetail">CRC and layout will be checked on export.</small>
@@ -132,13 +134,13 @@
 
         <div class="keyboard-canvas lighting-canvas">
           <div class="canvas-heading">
-            <div><span class="eyebrow">NEON CONTROL</span><h2>Per-key lighting canvas</h2></div>
+            <div><span class="eyebrow">PER-KEY RGB</span><h2>Per-key lighting canvas</h2></div>
             <div class="canvas-legend"><span><i class="legend-primary"></i>Primary</span><span><i class="legend-secondary"></i>Secondary</span><span><i class="legend-custom"></i>Painted</span></div>
           </div>
           <div class="keyboard-frame">
             <div class="keyboard-glow"></div>
             <div class="keyboard-board" id="lightingKeyboard" aria-label="Lighting keyboard preview"></div>
-            <div class="keyboard-lip"><span>KB7</span><span>LOGICAL LIGHTING PREVIEW</span><span class="mini-power"></span></div>
+            <div class="keyboard-lip"><span>MODIFIED TKL · 78 KEYS</span><span>LOGICAL LIGHTING PREVIEW</span><span class="mini-power"></span></div>
           </div>
           <div class="effect-timeline">
             <span>Effect phase</span><div class="timeline-track"><i id="lightingPhase"></i></div><output id="lightingPhaseLabel">42%</output>
@@ -317,12 +319,13 @@
           </div>
           <label class="toggle-field"><span><strong>Digital passthrough</strong><small>Keep ordinary key presses too</small></span><input id="digitalPassthrough" type="checkbox" checked><i></i></label>
         </div>
-        <section class="format-health compact-health warning-health"><div><span>Gamepad HID</span><strong>Planned</strong></div><div class="health-bar pending"><span></span></div><small>The app exports and simulates axes; firmware descriptor/output still requires hardware validation.</small></section>
+        <section class="format-health compact-health warning-health"><div><span>Gamepad HID</span><strong>Implemented · gated</strong></div><div class="health-bar pending"><span></span></div><small>The app exports and simulates axes; the firmware report path is implemented but still requires hardware validation.</small></section>
       </aside>
     </section>
   </main>
 
   <div id="toast" role="status" aria-live="polite"></div>
+  <script src="touch-trace.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

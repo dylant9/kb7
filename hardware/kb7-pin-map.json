@@ -1,0 +1,419 @@
+{
+  "schema": "kb7.hardware.pin-map",
+  "schema_version": 1,
+  "generated_on": "2026-08-18",
+  "source": {
+    "datasheet": {
+      "title": "SNC7320 Series 32-bit Dual-Core SoC Data Sheet",
+      "revision": "2.1",
+      "sha256": "d360aca16c2695f12edf91d263b2994b36edf5ad6faf130547a9220dfaca94b4",
+      "package_pages": [11, 19, 20, 21, 22, 23],
+      "pinmux_pages": [24, 25, 26, 27, 28],
+      "included_in_repository": false
+    },
+    "board_roles": "independently summarized clean-room firmware recovery and user-observed PCB labels"
+  },
+  "package_assumption": {
+    "part": "SNC73200M1NLFG-000",
+    "package": "LQFP128L",
+    "status": "conditional",
+    "basis": "abbreviated observed marking is consistent with this part",
+    "required_confirmation": ["complete marking photograph", "pin-1 orientation", "PCB revision"],
+    "warning": "A different device or package suffix invalidates every lead number."
+  },
+  "logical_gpio_formula": {
+    "range": [0, 79],
+    "port": "logical >> 4",
+    "bit": "logical & 15",
+    "mmio_base": "0x40018000 + port * 0x1000",
+    "evidence": "firmware_recovery"
+  },
+  "gpio_package_leads": {
+    "P0": [120, 122, 66, 64, 79, 80, 81, 82, 110, 42, 119, 39, 121, 44, 2, 3],
+    "P1": [4, 5, 112, 111, 52, 50, 38, 37, 36, 35, 117, 116, 115, 114, 45, 43],
+    "P2": [31, 30, 27, 26, 109, 108, 107, 106, 105, 104, 77, 76, 75, 74, 73, 72],
+    "P3": [71, 70, 61, 60, 59, 58, 57, 56, 53, 51, 32, 7, 128, 127, 126, 125],
+    "P4": [40, 65, 83, 84, 10, 11, 12, 13, 100, 98, 97, 94, 93, 92, 91, 90]
+  },
+  "fixed_and_supply_leads": [
+    {"signal": "RSTN", "lead": 88, "evidence": "datasheet", "source_pages": [11, 21]},
+    {"signal": "WKPN", "lead": 89, "evidence": "datasheet", "source_pages": [11, 21]},
+    {"signal": "SWO_P4_5", "lead": 11, "evidence": "datasheet", "source_pages": [11, 19, 26]},
+    {"signal": "SWCLK_P4_6", "lead": 12, "evidence": "datasheet", "source_pages": [11, 19, 26]},
+    {"signal": "SWDIO_P4_7", "lead": 13, "evidence": "datasheet", "external_pullup_recommended_ohms": 100000, "source_pages": [11, 19, 26]},
+    {"signal": "USB_DEVICE_DP", "lead": 16, "evidence": "datasheet", "source_pages": [11, 19]},
+    {"signal": "USB_DEVICE_DM", "lead": 17, "evidence": "datasheet", "source_pages": [11, 19]},
+    {"signal": "XIN_12M", "lead": 28, "evidence": "datasheet", "source_pages": [11, 20]},
+    {"signal": "XOUT_12M", "lead": 29, "evidence": "datasheet", "source_pages": [11, 20]},
+    {"signal": "VDDIO33", "leads": [1, 9, 33, 41, 55, 62, 68, 95, 102, 123], "nominal_v": 3.3, "evidence": "datasheet"},
+    {"signal": "VSSIO", "leads": [6, 8, 34, 54, 69, 96, 103, 124], "evidence": "datasheet"},
+    {"signal": "VDDC", "leads": [15, 25, 47, 49, 67, 101, 113, 118], "nominal_v": 1.22, "evidence": "datasheet"},
+    {"signal": "VDD18_DRAM", "leads": [46, 48], "nominal_v": 1.82, "evidence": "datasheet"},
+    {"signal": "NC", "leads": [85, 86], "evidence": "datasheet"}
+  ],
+  "kb7_signals": [
+    {
+      "function": "MCU_RST board pad candidate",
+      "logical_gpio": null,
+      "soc_pad": "RSTN",
+      "package_lead": 88,
+      "active_level": "low",
+      "evidence": ["datasheet", "user_observation", "inference"],
+      "continuity": "unverified",
+      "required_test": "powered-off continuity from labeled pad to lead 88; released-voltage and reset-waveform measurement"
+    },
+    {
+      "function": "ST1633i touch SCL",
+      "logical_gpio": 0,
+      "soc_pad": "P0.0",
+      "package_lead": 120,
+      "datasheet_mux": {"mode": 1, "function": "I2C0_SCL"},
+      "firmware_use": "bit-banged open-drain-style GPIO",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "ST1633i touch SDA",
+      "logical_gpio": 1,
+      "soc_pad": "P0.1",
+      "package_lead": 122,
+      "datasheet_mux": {"mode": 1, "function": "I2C0_SDA"},
+      "firmware_use": "bit-banged open-drain-style GPIO",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "display auxiliary input 0",
+      "logical_gpio": 2,
+      "soc_pad": "P0.2",
+      "package_lead": 66,
+      "confidence": "role_unresolved",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "display auxiliary input 1",
+      "logical_gpio": 3,
+      "soc_pad": "P0.3",
+      "package_lead": 64,
+      "confidence": "role_unresolved",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "panel reset",
+      "logical_gpio": 4,
+      "soc_pad": "P0.4",
+      "package_lead": 79,
+      "firmware_use": "GPIO output",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "panel 9-bit data or D-C",
+      "logical_gpio": 5,
+      "soc_pad": "P0.5",
+      "package_lead": 80,
+      "firmware_use": "GPIO output",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "display backlight PWM",
+      "logical_gpio": 6,
+      "soc_pad": "P0.6",
+      "package_lead": 81,
+      "datasheet_mux": {"mode": 7, "function": "CT32B6_PWM1"},
+      "firmware_use": "timer 6 PWM channel 1",
+      "polarity": "unverified",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "ST1633i touch IRQ",
+      "logical_gpio": 12,
+      "soc_pad": "P0.12",
+      "package_lead": 121,
+      "alternate_function": "SPIFC_D2_WP in mode 1",
+      "firmware_use": "GPIO input with interrupt opportunity",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified",
+      "conflict": "Cannot be a continuously independent touch IRQ and active quad-SPI IO2 without isolation or time multiplexing."
+    },
+    {
+      "function": "peripheral enable or power candidate",
+      "logical_gpio": 18,
+      "soc_pad": "P1.2",
+      "package_lead": 112,
+      "confidence": "inferred",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "MCU2 SPI ready/status input",
+      "logical_gpio": 19,
+      "soc_pad": "P1.3",
+      "package_lead": 111,
+      "confidence": "firmware behavior proven; board continuity unverified",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "ST1633i touch reset",
+      "logical_gpio": 26,
+      "soc_pad": "P1.10",
+      "package_lead": 117,
+      "firmware_use": "GPIO output",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "RGB bank or control 0 candidate",
+      "logical_gpio": 32,
+      "soc_pad": "P2.0",
+      "package_lead": 31,
+      "confidence": "inferred",
+      "alternate_function": "SDIO_D0 in mode 1",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "RGB bank or control 1 candidate",
+      "logical_gpio": 33,
+      "soc_pad": "P2.1",
+      "package_lead": 30,
+      "confidence": "inferred",
+      "alternate_function": "SDIO_D1 in mode 1",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "RGB chip-select or latch candidate",
+      "logical_gpio": 35,
+      "soc_pad": "P2.3",
+      "package_lead": 26,
+      "confidence": "firmware behavior proven; electrical role inferred",
+      "alternate_function": "SDIO_D3 in mode 1",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "RGB reset or power candidate",
+      "logical_gpio": 58,
+      "soc_pad": "P3.10",
+      "package_lead": 32,
+      "confidence": "strong_inference",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "RGB auxiliary or SPI1 chip-select candidate",
+      "logical_gpio": 60,
+      "soc_pad": "P3.12",
+      "package_lead": 128,
+      "datasheet_mux": {"mode": 1, "function": "SPI1_CS"},
+      "confidence": "role_unresolved",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "Action Bar key bit 3",
+      "logical_gpio": 64,
+      "soc_pad": "P4.0",
+      "package_lead": 40,
+      "firmware_use": "GPIO input",
+      "polarity": "unverified",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "panel serial clock",
+      "logical_gpio": 66,
+      "soc_pad": "P4.2",
+      "package_lead": 83,
+      "firmware_use": "recovered GPIO serializer",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "panel serial chip select",
+      "logical_gpio": 67,
+      "soc_pad": "P4.3",
+      "package_lead": 84,
+      "active_level": "low",
+      "firmware_use": "recovered GPIO serializer",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "system power or sleep control candidate",
+      "logical_gpio": 68,
+      "soc_pad": "P4.4",
+      "package_lead": 10,
+      "confidence": "inferred",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "volume roller phase A",
+      "logical_gpio": 72,
+      "soc_pad": "P4.8",
+      "package_lead": 100,
+      "firmware_use": "GPIO input",
+      "direction": "unverified",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "volume roller phase B",
+      "logical_gpio": 73,
+      "soc_pad": "P4.9",
+      "package_lead": 98,
+      "firmware_use": "GPIO input",
+      "direction": "unverified",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "Action Bar key bit 4",
+      "logical_gpio": 74,
+      "soc_pad": "P4.10",
+      "package_lead": 97,
+      "polarity": "unverified",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "Action Bar key bit 0",
+      "logical_gpio": 75,
+      "soc_pad": "P4.11",
+      "package_lead": 94,
+      "polarity": "unverified",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "Action Bar key bit 1",
+      "logical_gpio": 76,
+      "soc_pad": "P4.12",
+      "package_lead": 93,
+      "polarity": "unverified",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "Action Bar key bit 2",
+      "logical_gpio": 77,
+      "soc_pad": "P4.13",
+      "package_lead": 92,
+      "polarity": "unverified",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "Action Bar key bit 5",
+      "logical_gpio": 78,
+      "soc_pad": "P4.14",
+      "package_lead": 91,
+      "polarity": "unverified",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    },
+    {
+      "function": "Action Bar key bit 6",
+      "logical_gpio": 79,
+      "soc_pad": "P4.15",
+      "package_lead": 90,
+      "polarity": "unverified",
+      "evidence": ["datasheet", "firmware_recovery"],
+      "continuity": "unverified"
+    }
+  ],
+  "interface_groups": {
+    "spi_nor": {
+      "controller": "SFC at 0x40022000",
+      "mux_mode": 1,
+      "signals": [
+        {"name": "CS", "pad": "P0.8", "lead": 110},
+        {"name": "CLK", "pad": "P0.9", "lead": 42},
+        {"name": "MISO_IO1", "pad": "P0.10", "lead": 119},
+        {"name": "MOSI_IO0", "pad": "P0.11", "lead": 39},
+        {"name": "IO2_WP", "pad": "P0.12", "lead": 121},
+        {"name": "IO3", "pad": "P0.13", "lead": 44}
+      ],
+      "continuity": "unverified"
+    },
+    "lcd_rgb18": {
+      "controller": "PPU/TFT at 0x40050000",
+      "mux_mode": 1,
+      "control": [
+        {"name": "HSYNC", "pad": "P2.4", "lead": 109},
+        {"name": "VSYNC", "pad": "P2.5", "lead": 108},
+        {"name": "DE", "pad": "P2.6", "lead": 107},
+        {"name": "DCLK", "pad": "P2.7", "lead": 106}
+      ],
+      "data_leads_d0_through_d17": [105, 104, 77, 76, 75, 74, 73, 72, 71, 70, 61, 60, 59, 58, 57, 56, 53, 51],
+      "continuity": "unverified",
+      "note": "Package capability agrees with the recovered stock group; panel-connector routing remains to be measured."
+    },
+    "rgb_spi1_candidate": {
+      "controller": "SPI1 at 0x4000f000",
+      "mux_mode": 1,
+      "signals": [
+        {"name": "CS", "pad": "P3.12", "lead": 128},
+        {"name": "CLK", "pad": "P3.13", "lead": 127},
+        {"name": "MISO", "pad": "P3.14", "lead": 126},
+        {"name": "MOSI", "pad": "P3.15", "lead": 125}
+      ],
+      "continuity_to_led_driver": "unverified"
+    },
+    "mcu2_spi0": {
+      "controller": "SPI0 at 0x4000e000",
+      "mux_mode": 4,
+      "signals": [
+        {"name": "CS", "pad": "P0.14", "lead": 2},
+        {"name": "CLK", "pad": "P0.15", "lead": 3},
+        {"name": "MISO", "pad": "P1.0", "lead": 4},
+        {"name": "MOSI", "pad": "P1.1", "lead": 5},
+        {"name": "READY_STATUS", "pad": "P1.3", "lead": 111, "logical_gpio": 19}
+      ],
+      "firmware_evidence": "The V1.22 A3 protocol object selects serial instance 0, whose base is 0x4000e000; its sender polls +0x0c and transfers at +0x1c.",
+      "continuity_to_at32_spi3": "unverified"
+    },
+    "sdio_unassigned_candidate": {
+      "controller": "SD1/SDIO at 0x40024000",
+      "mux_mode": 1,
+      "signals": [
+        {"name": "CLK", "pad": "P1.14", "lead": 45},
+        {"name": "CMD", "pad": "P1.15", "lead": 43},
+        {"name": "D0", "pad": "P2.0", "lead": 31},
+        {"name": "D1", "pad": "P2.1", "lead": 30},
+        {"name": "D2", "pad": "P2.2", "lead": 27},
+        {"name": "D3", "pad": "P2.3", "lead": 26}
+      ],
+      "board_role": "not used by the recovered A3 transport",
+      "warning": "The data pins overlap recovered RGB-control GPIOs. The earlier MCU2 attribution was disproved by the serial-instance trace."
+    },
+    "swd": {
+      "signals": [
+        {"name": "SWO", "lead": 11},
+        {"name": "SWCLK", "lead": 12},
+        {"name": "SWDIO", "lead": 13},
+        {"name": "RSTN", "lead": 88}
+      ],
+      "board_test_points": "unmapped",
+      "core_routing": "unverified"
+    }
+  },
+  "priority_tests": [
+    "Confirm complete SoC marking and pin-1 orientation.",
+    "Verify MCU_RST continuity to lead 88 and measure released voltage.",
+    "Map external flash and resolve the P0.12 touch-IRQ versus IO2 conflict.",
+    "Map touch controller signals to leads 120, 122, 121, and 117.",
+    "Map the panel connector to the RGB18 group and sideband leads 79, 80, 81, 83, and 84.",
+    "Map the LED controller to SPI1 and candidate auxiliary GPIOs.",
+    "Continuity-map AT32 SPI3 pads to the recovered SNC SPI0 leads 2 through 5 and map the ready/status net to lead 111.",
+    "Measure 3.3-V, 1.22-V, and 1.82-V rails under stock operation.",
+    "Passively capture touch, panel, RGB, SPI-NOR, and secondary-MCU traffic before enabling a custom driver."
+  ]
+}

@@ -2,15 +2,16 @@
 
 ## Purpose
 
-`kb7-profile-v1` is the editable project artifact used by KB7 Studio. It keeps
+`kb7-profile-v1` is the editable project artifact used by Offline Control Studio. It keeps
 the display document, RGB design, Hall-switch policy, and intended analog-axis
 mapping together without implying live device access.
 
 The browser exports JSON and the Python `profile-check` command validates and
-canonicalizes it. Only the embedded `screen_document` currently compiles to the
-firmware-consumed `KBS1` binary. Lighting, switch, and analog sections are
-staged control intent for the host/firmware integration that follows hardware
-validation.
+canonicalizes it. `profile-compile` now compiles the lighting, switch and analog
+sections into the firmware-consumed `KBP1` container. The embedded
+`screen_document` remains a separate `KBS1` object. The compiler deliberately
+rejects per-key RGB until logical keys have been physically correlated with LED
+controller channels.
 
 ## Top-level object
 
@@ -26,7 +27,7 @@ validation.
 }
 ```
 
-`name` is non-empty UTF-8 text of at most 64 bytes. `screen_document` must pass
+`name` is non-empty UTF-8 text of at most 63 bytes. `screen_document` must pass
 the complete `KBS1` compiler validation.
 
 ## Lighting
@@ -76,8 +77,15 @@ physical key legends for those positions are still `pending_hardware`.
 - per-key entries may only name supported logical ANSI keys or Fn
   candidate.
 
-The UI defaults to 3.2 mm as a configurable offline modeling range. Firmware owns actuation
-policy on the SNC; MCU2 supplies normalized Hall samples.
+The UI accepts a wider simulation range, but `KBP1` compilation currently
+requires 3.2 mm because the recovered firmware model has 33 levels (`0..32`,
+0.1 mm each). Firmware owns actuation policy on the SNC; MCU2 supplies 82 raw
+Hall samples, which the input pipeline converts with the recovered monotonic
+lookup table.
+
+`KBP1` stores travel values in 0.1 mm units. Compilation uses decimal round-half-
+up quantization: for example 0.05→0.1, 0.15→0.2, and 0.25→0.3 mm. This avoids
+language-dependent binary-float/banker's-rounding behavior.
 
 ## Analog axes
 
@@ -109,10 +117,94 @@ policy on the SNC; MCU2 supplies normalized Hall samples.
   switch travel; and
 - all four bindings must be distinct logical keys.
 
-After deadzone removal, the simulator normalizes magnitude to saturation,
+After deadzone removal, both simulator and firmware normalize magnitude to saturation,
 applies the selected curve, then maps it to `-32767..32767`. Opposing keys
-cancel. The Arrow preset uses four logical directional keys exercised by the
-1,519-packet replay: Left `0x27`, Up `0x3a`, Down `0x3b`, Right `0x4f`.
+cancel. The Arrow preset uses the recovered logical routing table: Left
+`0x27`, Up `0x3a`, Down `0x3b`, Right `0x4f`. Physical-layout validation remains
+a hardware gate.
+
+Firmware emits the result as HID report `0x07` (buttons, hat, four signed
+16-bit axes and two triggers). The independent `0x06` report remains a 64-byte
+paged Hall telemetry report.
+
+## `KBP1` binary container
+
+`KBP1` is a fixed-layout, little-endian format designed for strict validation
+without dynamic allocation:
+
+- 48-byte header: magic `KBP1`, version/header/total lengths, body CRC-32,
+  profile count `1..4`, active slot, fixed record size, flags and zero reserved
+  bytes;
+- one to four 1,792-byte records;
+- each record contains a NUL-terminated UTF-8 name, layout/mode, global
+  lighting state, 85 four-byte Hall records, four by 85 four-byte action
+  records, and the analog configuration; and
+- exact total length, canonical offsets, enum/range values, reserved bits,
+  UTF-8, CRC, actions and the complete runtime profile are validated before a
+  flash slot can become `VALID`.
+
+The A/B profile slots are `0x01f70000` and `0x01fa8000`, each `0x38000` bytes.
+Selection validates both the slot header and complete payload CRC, then the
+runtime parser falls back to the older generation if the newest payload is
+corrupt or semantically invalid.
+
+### Layout and action-table authoring
+
+A singular `kb7-profile-v1` may include an optional `firmware` object. It is
+preserved by `profile-check` and consumed by `profile-compile`:
+
+```json
+{
+  "layout_variant": 1,
+  "initial_mode": "game",
+  "actions": {
+    "game": {
+      "A": {"type": "keyboard", "usage": "B"},
+      "logical:80": {"type": "consumer", "usage": 233}
+    },
+    "easy_shift": {"A": {"type": "none"}}
+  }
+}
+```
+
+`layout_variant` is `0..3`; recovered variants `0`, `2`, and `3` use the
+80-selector route while `1` uses the alternate 82-selector route. Initial mode
+is `primary`, `game`, or `easy_shift`. Action-table modes are those three plus
+`fn1`. Action types are `transparent`, `none`, `keyboard`, `consumer`, and
+`momentary_fn1`. Keyboard usages may be a known key name or a numeric HID usage;
+consumer usages are nonzero 16-bit integers. `logical:0` through `logical:84`
+provide explicit access to recovered selectors whose physical legends remain
+unverified. Primary Fn is always validated as momentary FN1 and cannot be
+rebound to a host usage.
+
+To emit multiple runtime slots, `profile-compile` also accepts the following
+set envelope. This block is deliberately schematic: the abbreviated profile
+entries are **not** valid standalone input. Replace each entry with a complete
+`kb7-profile-v1` document such as `pc_app/samples/offline-example-profile.json`.
+
+```json
+{
+  "format": "kb7-profile-set-v1",
+  "active_profile": 1,
+  "profiles": [
+    {"format": "kb7-profile-v1", "name": "Primary"},
+    {"format": "kb7-profile-v1", "name": "Game"}
+  ]
+}
+```
+
+Each nested profile contains the complete screen/lighting/switch/analog fields
+described above. The set contains one to four profiles and the active index must
+name one of them. The browser edits a singular profile; the versioned set and
+full layer table are deliberately available through JSON and the offline CLI.
+
+```sh
+PYTHONPATH=pc_app python3 -m kb7studio.cli profile-compile \
+  pc_app/samples/offline-example-profile.json example.kbp
+PYTHONPATH=pc_app python3 -m kb7studio.cli profile-inspect example.kbp
+PYTHONPATH=pc_app python3 -m kb7studio.cli protocol-plan \
+  --store profile example.kbp profile-transfer.json
+```
 
 ## Capability record
 
@@ -120,13 +212,15 @@ The canonical validator writes this exact record:
 
 ```json
 {
-  "hall_keymap": "device-mapping-not-included",
+  "hall_keymap": "implemented-hardware-unverified",
   "rgb_position_mapping": "pending_hardware",
-  "analog_hid_output": "planned_unverified",
+  "analog_hid_output": "implemented-hardware-unverified",
   "device_io": false
 }
 ```
 
-Consumers must not upgrade any of these claims merely because a profile parses.
-Hardware integration evidence and a redistributable mapping are required to
-change either pending state.
+The capability record describes the offline editor's hardware claims and is
+kept conservative. The firmware contains a recovered logical routing/usage
+model and an implemented gamepad report, but neither has been validated on the
+physical board. Consumers must not upgrade these claims merely because a
+profile parses.

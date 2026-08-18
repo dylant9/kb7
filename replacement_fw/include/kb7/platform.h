@@ -16,11 +16,13 @@ static inline void kb7_dmb(void) { __asm__ volatile("" ::: "memory"); }
 static inline void kb7_dsb(void) { __asm__ volatile("" ::: "memory"); }
 static inline void kb7_isb(void) { __asm__ volatile("" ::: "memory"); }
 static inline void kb7_wfi(void) { __asm__ volatile("" ::: "memory"); }
+static inline void kb7_disable_irq(void) { __asm__ volatile("" ::: "memory"); }
 #else
 static inline void kb7_dmb(void) { __asm__ volatile("dmb" ::: "memory"); }
 static inline void kb7_dsb(void) { __asm__ volatile("dsb" ::: "memory"); }
 static inline void kb7_isb(void) { __asm__ volatile("isb" ::: "memory"); }
 static inline void kb7_wfi(void) { __asm__ volatile("wfi"); }
+static inline void kb7_disable_irq(void) { __asm__ volatile("cpsid i" ::: "memory"); }
 #endif
 
 void *kb7_memcpy(void *destination, const void *source, size_t length);

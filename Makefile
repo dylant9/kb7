@@ -1,6 +1,6 @@
-.PHONY: check test studio-check firmware-check
+.PHONY: check test studio-check firmware-check hardware-check
 
-check: test studio-check firmware-check
+check: test studio-check firmware-check hardware-check
 	python3 tools/check_public_tree.py .
 	python3 tools/audit_firmware_source.py .
 
@@ -9,8 +9,13 @@ test:
 
 studio-check:
 	node --check pc_app/web/app.js
+	node pc_app/web/validation-test.js
 
 firmware-check:
 	$(MAKE) -C replacement_fw clean all
 	$(MAKE) -C replacement_fw audit-profile
+	$(MAKE) -C replacement_fw integration-check
 	$(MAKE) -C replacement_fw clean
+
+hardware-check:
+	python3 tools/check_hardware_facts.py

@@ -1,5 +1,6 @@
 #include "kb7/screen.h"
 #include "kb7/reports.h"
+#include "kb7/regs.h"
 
 _Static_assert(sizeof(struct kb7_screen_header) == KB7_SCREEN_HEADER_SIZE,
                "screen header wire size changed");
@@ -41,8 +42,9 @@ static bool action_fields_valid(const struct kb7_widget_record *widget) {
     case KB7_ACTION_RGB_COLOR:
         return widget->action_arg0 == 0U && widget->action_arg1 <= UINT32_C(0x00ffffff);
     case KB7_ACTION_RGB_EFFECT:
+        return widget->action_arg0 <= 4U && widget->action_arg1 == 0U;
     case KB7_ACTION_PROFILE:
-        return widget->action_arg0 <= UINT8_MAX && widget->action_arg1 == 0U;
+        return widget->action_arg0 <= 3U && widget->action_arg1 == 0U;
     case KB7_ACTION_BRIGHTNESS:
         return widget->minimum >= 0 && widget->maximum <= 100 &&
                widget->action_arg0 == 0U && widget->action_arg1 == 0U;
@@ -53,11 +55,12 @@ static bool action_fields_valid(const struct kb7_widget_record *widget) {
         return widget->minimum >= 0 && widget->maximum <= 1 &&
                widget->action_arg0 <= UINT8_MAX && widget->action_arg1 <= UINT8_MAX;
     case KB7_ACTION_HID_KEY:
-        return (widget->action_arg0 < KB7_KEYBOARD_USAGE_BITS ||
+        return widget->action_arg0 != 0U &&
+               (widget->action_arg0 < KB7_KEYBOARD_USAGE_BITS ||
                 (widget->action_arg0 >= 0xe0U && widget->action_arg0 <= 0xe7U)) &&
                widget->action_arg1 == 0U;
     case KB7_ACTION_MEDIA_KEY:
-        return widget->action_arg1 == 0U;
+        return widget->action_arg0 != 0U && widget->action_arg1 == 0U;
     case KB7_ACTION_HOST_EVENT:
         return true;
     default:
@@ -152,6 +155,7 @@ enum kb7_screen_error kb7_screen_parse(const void *bytes, size_t length,
     }
     const struct kb7_screen_record *screens =
         (const struct kb7_screen_record *)((const uint8_t *)bytes + header->screens_offset);
+    const uint8_t *strings = (const uint8_t *)bytes + header->strings_offset;
     bool boot_found = false;
     uint16_t next_widget = 0U;
     for (uint16_t index = 0; index < header->screen_count; ++index) {
@@ -165,7 +169,8 @@ enum kb7_screen_error kb7_screen_parse(const void *bytes, size_t length,
         if (screen->flags != 0U || screen->first_widget != next_widget ||
             (uint32_t)screen->first_widget + screen->widget_count > header->widget_count ||
             screen->name_offset > header->strings_length ||
-            screen->name_length > header->strings_length - screen->name_offset) {
+            screen->name_length > header->strings_length - screen->name_offset ||
+            !utf8_valid(strings + screen->name_offset, screen->name_length)) {
             return KB7_SCREEN_LAYOUT_ERROR;
         }
         next_widget = (uint16_t)(next_widget + screen->widget_count);
@@ -184,12 +189,13 @@ enum kb7_screen_error kb7_screen_parse(const void *bytes, size_t length,
             widget->flags != 0U || !action_valid(widget->action) ||
             !action_fields_valid(widget) || widget->reserved != 0U ||
             widget->width <= 0 || widget->height <= 0 || widget->x < 0 || widget->y < 0 ||
-            (uint32_t)widget->x + (uint32_t)widget->width > 480U ||
-            (uint32_t)widget->y + (uint32_t)widget->height > 800U ||
+            (uint32_t)widget->x + (uint32_t)widget->width > KB7_DISPLAY_WIDTH ||
+            (uint32_t)widget->y + (uint32_t)widget->height > KB7_DISPLAY_HEIGHT ||
             widget->minimum > widget->maximum || widget->value < widget->minimum ||
             widget->value > widget->maximum ||
             widget->text_offset > header->strings_length ||
-            widget->text_length > header->strings_length - widget->text_offset) {
+            widget->text_length > header->strings_length - widget->text_offset ||
+            !utf8_valid(strings + widget->text_offset, widget->text_length)) {
             return KB7_SCREEN_LAYOUT_ERROR;
         }
         if (widget->action == KB7_ACTION_NAVIGATE &&
@@ -197,7 +203,6 @@ enum kb7_screen_error kb7_screen_parse(const void *bytes, size_t length,
             return KB7_SCREEN_LAYOUT_ERROR;
         }
     }
-    const uint8_t *strings = (const uint8_t *)bytes + header->strings_offset;
     if (!utf8_valid(strings, header->strings_length)) {
         return KB7_SCREEN_LAYOUT_ERROR;
     }

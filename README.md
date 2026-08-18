@@ -4,17 +4,21 @@ This repository contains independently authored, source-only interoperability
 work for an unofficial KB7 firmware architecture and offline configuration
 studio.
 
-**It is not flash-ready firmware. Do not install it on hardware.** The current
-firmware has known correctness and recovery blockers, and the public export
-intentionally omits device-specific panel, RGB, USB, and key-selector data.
-Flash-image generation is disabled.
+**It is not yet board-validated firmware. Do not install it on hardware.** The
+software-owned drivers and protocols are now implemented, but several
+electrical/pinmux/controller assumptions and the recovery procedure still need
+physical proof. Public defaults remain fail-closed and flash-image generation
+is disabled.
 
 ## Repository contents
 
-- `replacement_fw/` — freestanding Cortex-M3 source that can be compiled to ELF
-  files for static inspection. Hardware-sensitive public drivers fail closed.
+- `replacement_fw/` — freestanding Cortex-M3 source with platform boot, USB,
+  LCD/touch/RGB, Hall input, HID/gamepad, persistent profile/screen storage and
+  recovery diagnostics. Hardware-sensitive paths require explicit gates.
 - `pc_app/` — dependency-free browser editor plus Python validators, compiler,
   protocol model, storage model, samples, and tests. It performs no device I/O.
+- `hardware/` — page-cited, machine-readable SoC/MMIO/IRQ/DMA and KB7 package
+  pin facts, with explicit confidence and continuity status.
 - `docs/` — project-owned screen/profile/control/storage formats, the full
   security audit, remediation matrix, report schemas, and public-source
   provenance review.
@@ -23,7 +27,8 @@ Flash-image generation is disabled.
 
 The private reverse-engineering evidence, vendor firmware, decompiler output,
 captures, stock-patch experiments, and generated images are not part of this
-repository and are not required to run the offline studio.
+repository. The implementations here are independently authored from recovered
+interoperability facts and published datasheet facts.
 
 ## Try the studio
 
@@ -45,10 +50,14 @@ With GNU Make and an `arm-none-eabi` GCC/binutils toolchain:
 
 ```sh
 make -C replacement_fw clean all
+make -C replacement_fw audit-profile
+make -C replacement_fw integration-check
 ```
 
-This creates ignored ELF/disassembly files for local inspection. `make bundle`
-deliberately fails: no flash image can be produced from the public tree.
+The default, guarded audit, and all-branches integration profiles create ignored
+ELF/disassembly files for local inspection. `integration-check` compiles board-
+verified branches but is not evidence that a board passed those gates. `make
+bundle` deliberately fails: no flash image can be produced by that target.
 
 ## Publication boundary
 
@@ -56,7 +65,9 @@ Read [OPEN-SOURCE-REVIEW.md](docs/OPEN-SOURCE-REVIEW.md) before publication and
 [SECURITY-AUDIT-2026-08-17.md](docs/SECURITY-AUDIT-2026-08-17.md) before changing
 any hardware-facing code, then review
 [AUDIT-REMEDIATION-2026-08-17.md](docs/AUDIT-REMEDIATION-2026-08-17.md) and the
-later [SNC7320 datasheet audit](docs/SOC-DATASHEET-AUDIT-2026-08-18.md). Run
+later [firmware completion status](docs/FIRMWARE-COMPLETION-2026-08-18.md),
+[SNC7320 datasheet audit](docs/SOC-DATASHEET-AUDIT-2026-08-18.md), and
+[boot/recovery model](docs/BOOT-RECOVERY-MODEL.md). Run
 this immediately before every commit or release:
 
 ```sh

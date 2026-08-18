@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""Fail closed if a public-source tree contains likely private/binary material."""
+"""Catch direct or plainly encoded private/binary material in a public tree.
+
+This is a publication accident detector, not a proof against deliberate data
+concealment. Human provenance review remains mandatory.
+"""
 
 from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 
 
@@ -34,6 +39,10 @@ MAGICS = {
     b"MZ": "PE/DOS executable",
     b"PK\x03\x04": "ZIP archive",
     b"7z\xbc\xaf\x27\x1c": "7-Zip archive",
+}
+ENCODED_BLOCKS = {
+    "large base64-like block": re.compile(r"(?<![A-Za-z0-9+/])(?:[A-Za-z0-9+/]{4}){128,}(?:==|=)?"),
+    "large hexadecimal block": re.compile(r"(?<![0-9A-Fa-f])[0-9A-Fa-f]{1024,}(?![0-9A-Fa-f])"),
 }
 
 
@@ -70,6 +79,9 @@ def inspect(root: Path) -> dict[str, object]:
         for marker in DENIED_TEXT:
             if marker in text:
                 failures.append(f"private marker {marker!r}: {relative}")
+        for description, pattern in ENCODED_BLOCKS.items():
+            if pattern.search(text):
+                failures.append(f"{description}: {relative}")
     return {
         "root": str(root),
         "files_checked": checked,

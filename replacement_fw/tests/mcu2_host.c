@@ -4,6 +4,7 @@
 #include <sys/mman.h>
 
 #include "kb7/drivers.h"
+#include "kb7/mcu2_protocol.h"
 #include "kb7/regs.h"
 
 #ifndef MAP_FIXED_NOREPLACE
@@ -28,7 +29,7 @@ int main(void) {
     response[0] = 0U;
     if (kb7_mcu2_decode_normalized(response, values) != KB7_MCU2_BAD_FRAME) return 4;
 
-    void *mapping = mmap((void *)(uintptr_t)SNC_MCU2_LINK_CANDIDATE_BASE, 4096U,
+    void *mapping = mmap((void *)(uintptr_t)SNC_MCU2_SERIAL_BASE, 4096U,
                          PROT_READ | PROT_WRITE,
                          MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
     if (mapping == MAP_FAILED) return 77;
@@ -37,6 +38,8 @@ int main(void) {
     request[1] = 0xa3U;
     const uint8_t trailer[] = {0xaaU, 0xbbU, 0xccU, 0xddU, 0xeeU};
     memcpy(&request[79], trailer, sizeof(trailer));
+    /* With the recovered block enabled, an idle-zero status register must
+     * fail closed at the finite timeout instead of hanging or returning data. */
     if (kb7_mcu2_exchange(request, response) != KB7_MCU2_IO) return 5;
     return 0;
 }

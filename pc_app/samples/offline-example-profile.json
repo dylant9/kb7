@@ -1,13 +1,13 @@
 {
   "format": "kb7-profile-v1",
-  "name": "Neon Control",
+  "name": "Offline Profile",
   "screen_document": {
     "format": "kb7-screen-v1",
     "boot_screen": 1,
     "screens": [
       {
         "id": 1,
-        "name": "Command Center",
+        "name": "Overview",
         "background": "#07101e",
         "widgets": [
           {
@@ -17,7 +17,7 @@
             "y": 30,
             "width": 424,
             "height": 66,
-            "text": "COMMAND CENTER",
+            "text": "SYSTEM OVERVIEW",
             "foreground": "#f4f7ff",
             "background": "#111f35"
           },
@@ -62,7 +62,7 @@
             "y": 398,
             "width": 202,
             "height": 106,
-            "text": "AURORA",
+            "text": "COLOR",
             "foreground": "#dffcff",
             "background": "#13364a",
             "action": {
@@ -206,12 +206,7 @@
     "primary": "#42efff",
     "secondary": "#9d5cff",
     "reactive": "#b5ffcb",
-    "per_key": {
-      "A": "#42efff",
-      "D": "#9d5cff",
-      "S": "#65e6ff",
-      "W": "#b5ffcb"
-    }
+    "per_key": {}
   },
   "switches": {
     "travel_mm": 3.2,
@@ -256,9 +251,9 @@
     }
   },
   "capabilities": {
-    "hall_keymap": "device-mapping-not-included",
+    "hall_keymap": "implemented-hardware-unverified",
     "rgb_position_mapping": "pending_hardware",
-    "analog_hid_output": "planned_unverified",
+    "analog_hid_output": "implemented-hardware-unverified",
     "device_io": false
   }
 }

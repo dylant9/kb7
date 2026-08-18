@@ -33,7 +33,8 @@ interaction with loader region boundaries.
 | `0x1770000` | `0x1970000` | 2 MiB | screen slot B |
 | `0x1970000` | `0x1c70000` | 3 MiB | custom asset/font slot A |
 | `0x1c70000` | `0x1f70000` | 3 MiB | custom asset/font slot B |
-| `0x1f70000` | `0x1fe0000` | 448 KiB | wear-levelled profiles/per-key config |
+| `0x1f70000` | `0x1fa8000` | 224 KiB | `KBP1` input/lighting profile slot A |
+| `0x1fa8000` | `0x1fe0000` | 224 KiB | `KBP1` input/lighting profile slot B |
 | `0x1fe0000` | `0x2000000` | 128 KiB | crash/diagnostic ring |
 
 All boundaries are 4-KiB sector aligned and slots are multiples of the 256-byte
@@ -52,13 +53,15 @@ Commit:
 1. Select the non-active/older slot; never erase the active slot.
 2. Erase the inactive slot sectors needed.
 3. Write WRITING header with generation `max+1` and final-state header CRC.
-4. Program payload in 256-byte pages; read back and CRC it.
+4. Program the payload in page-bounded chunks (the host protocol supplies at
+   most 36 bytes per WRITE); read back and CRC it.
 5. Clear the state word to VALID and read back the header.
-6. At boot, validate both slots and choose the newest valid generation using
-   wrap-safe signed subtraction. If neither validates, use built-in UI.
+6. At boot, validate both slots and choose the newest CRC-valid generation using
+   wrap-safe signed subtraction, then parse it semantically. If that parse fails,
+   try the other CRC-valid generation before falling back to built-in UI.
 
 The C implementation validates the complete payload before choosing a slot; a
-newer header with a corrupt payload cannot hide the older valid generation. The
+newer header with a corrupt or semantically invalid payload cannot hide the older valid generation. The
 simulated-NOR host test covers corruption fallback, wrap-safe selection, staged
 write failures, and preservation of the active slot when BEGIN erases its
 target.
@@ -68,6 +71,7 @@ a fragile active pointer. They are reserved for the larger asset-store manifest,
 which will need a compact index.
 
 Wear policy: ordinary UI boot is read-only. Writes occur only on explicit host
-commit. Profiles use append-only 4-KiB records and compact only after 75% usage.
-Crash records rotate sectors. Factory reset erases custom slot headers only and
-can never affect firmware or region 2.
+commit. Profiles use the same validated A/B generation and corrupt/invalid-newest
+fallback model as screens; they are not an append-only log. The crash-record
+area remains reserved for a future rotating-sector implementation. Factory
+reset erases custom slot headers only and can never affect firmware or region 2.

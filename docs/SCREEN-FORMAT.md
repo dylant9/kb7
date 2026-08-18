@@ -77,7 +77,7 @@ Widget types: `1 label`, `2 button`, `3 slider`, `4 toggle`, `5 gauge`.
 | 0x00 | none | no side effect |
 | 0x01 | navigate | `target_screen` |
 | 0x10 | RGB color | `arg1=0x00RRGGBB`; SNC packet builder updates active LEDs |
-| 0x11 | RGB effect | `arg0=effect`, future clean-room effect table |
+| 0x11 | RGB effect | `arg0=0..4`: static, gradient, aurora, reactive, heatmap |
 | 0x12 | brightness | current widget value 0..100; RGB and panel backlight |
 | 0x20 | profile | `arg0=profile` |
 | 0x21 | actuation | current value 0..255 in SNC-local Hall policy |
@@ -90,14 +90,14 @@ Actuation/RT deliberately do not send an invented MCU2 command.
 
 ## JSON authoring form
 
-`pc_app/samples/neon-control.json` is canonical. Colors use `#rrggbb`; the
+`pc_app/samples/offline-example.json` is canonical. Colors use `#rrggbb`; the
 compiler quantizes to RGB565. Unknown fields are ignored only when harmless;
 wrong types, duplicate IDs, out-of-bounds geometry, invalid ranges, unknown
 widget/action names, and missing boot screens are errors.
 
 ```sh
 cd pc_app
-PYTHONPATH=. python3 -m kb7studio.cli compile samples/neon-control.json neon.kbs
+PYTHONPATH=. python3 -m kb7studio.cli compile samples/offline-example.json example.kbs
 PYTHONPATH=. python3 -m kb7studio.cli inspect neon.kbs
 ```
 

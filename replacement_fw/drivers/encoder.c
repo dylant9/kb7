@@ -18,6 +18,7 @@ enum kb7_encoder_event kb7_encoder_poll(void) {
 #if KB7_ENABLE_ENCODER
     const uint8_t current = (uint8_t)((kb7_gpio_read(72U) ? 2U : 0U) |
                                       (kb7_gpio_read(73U) ? 1U : 0U));
+    if (current == (history & 3U)) return KB7_ENCODER_NONE;
     history = (uint8_t)((history << 2U) | current);
     if (history == 0x34U || history == 0x0bU) {
         return KB7_ENCODER_CW;

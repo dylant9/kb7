@@ -5,6 +5,11 @@ Method: three independent read-only source/artifact audits, reconciled with
 clean-room builds, ELF comparisons, static checks, and unit tests
 Hardware access: none
 
+> Historical baseline: this document records the defects found in the earlier
+> skeleton. Their current implementation status is in
+> `FIRMWARE-COMPLETION-2026-08-18.md`; do not interpret the old stub inventory
+> below as a description of the current tree.
+
 ## Verdict
 
 The audited independent replacement firmware was an engineering skeleton, not
@@ -26,6 +31,11 @@ hardware boundaries and host-side regression tests. See
 `AUDIT-REMEDIATION-2026-08-17.md` for the finding-by-finding status. This does
 not change the non-flashable verdict because the required hardware profiles and
 recovery validation remain unavailable.
+
+The full SNC7320 datasheet review on 2026-08-18 added a critical correction:
+AIRCR/software reset restarts PRAM, not mask ROM. The former mailbox-marker plus
+software-reset helper therefore did not prove entry to the preserved loader.
+The public helper now parks for external reset; see `BOOT-RECOVERY-MODEL.md`.
 
 ## Critical and high-severity findings
 
@@ -80,6 +90,10 @@ recovery validation remain unavailable.
     The recovery chord ran after unsafe clock code, fault handlers slept forever,
     and USB recovery was unavailable.
 
+13. **Software reset was incorrectly treated as loader entry.** The later
+    datasheet review proved that it restarts PRAM. A ROM-entering watchdog,
+    remap, external reset, or direct programmer path is still required.
+
 ## Release-pipeline findings
 
 - Auditors checked ELF structure and binary structure separately but did not
@@ -123,5 +137,6 @@ recovery validation remain unavailable.
    profile.
 5. Repair storage fallback, parser parity, host protocol conformance, and UI
    press/release/state handling.
-6. Prove an external recovery route and full backup/restore before any hardware
-   test of an independent core0.
+6. Prove an external recovery route and full backup/restore, then prove a
+   ROM-entering reset/loader route, before any hardware test of an independent
+   core0.

@@ -19,23 +19,33 @@ the contributor does not possess.
 - Tests (including independently authored host-side C harnesses) and original
   JSON examples.
 - Project-defined screen, profile, host-control, and storage formats.
+- Independently authored clean-room panel, RGB, USB-controller, Hall-routing
+  and input implementations expressed from interoperability facts; no vendor
+  source text or firmware bytes are included.
 - This provenance record and the source-code security audit.
 - An independently written datasheet audit and derived interoperability pin
   map; no Sonix PDF, diagram, or copied vendor table is included.
+- Original machine-readable SoC and package-pin facts with page-level
+  provenance, confidence classes, and unverified continuity fields.
 - Apache-2.0 license and project/trademark notice.
 
 No external scripts, fonts, images, packages, or vendored libraries are bundled.
 
 ## Sanitized in the public copy
 
-- The exact panel initialization stream and LCD-controller profile were replaced
-  by a fail-closed stub.
-- Recovered RGB topology/controller packets were replaced by a fail-closed stub.
-- The captured Hall-selector table was removed from the studio.
-- The USB VID/PID, descriptors, and unvalidated controller initialization were
-  replaced by a fail-closed transport stub.
-- Flash-image and stock-region bundle generation was removed; `make bundle`
-  deliberately fails.
+- No vendor implementation, decompiler listing, symbol names, extracted
+  descriptors, firmware bytes, captures or assets are published. The C source
+  is independently authored and tests project-owned behavior.
+- The USB identity is zero by default. No Turtle Beach or other third-party
+  VID/PID is appropriated, and controller attach remains behind an explicit
+  board-verification gate.
+- Per-key RGB names are not guessed: only stable controller positions and
+  packet framing are present until physical correlation is measured.
+- Flash mutation defaults off and is allow-listed to project-owned A/B stores.
+  The ordinary `make bundle` target deliberately fails.
+- A source-only bounded bundle constructor may be run only with owner-supplied,
+  hash-matching stock recovery inputs. It emits replacement payloads and a
+  flash plan, never redistributes those inputs or emits a full stock image.
 
 ## Excluded and retained only in the private workspace
 
@@ -48,7 +58,8 @@ No external scripts, fonts, images, packages, or vendored libraries are bundled.
 - USB/SPI/I2C captures, screenshots or assets extracted from vendor software,
   private raw pin-map evidence, ROM traces, and decompiler-level reports.
 - The stock-core patch experiments and their exact vendor function addresses.
-- Firmware repackers, manifests, flash plans, and incomplete flash prefixes.
+- Generated manifests, flash plans, prefixes and any package containing stock
+  bytes. The independently authored constructor source is included.
 - The separate `kb7-linux` tree, which currently says all rights reserved and
   has no redistribution license.
 
@@ -59,8 +70,10 @@ No external scripts, fonts, images, packages, or vendored libraries are bundled.
   secondary controller: zero exact windows matched. This is useful evidence
   against verbatim copying, not a legal conclusion.
 - The public-tree checker rejects symlinks, generated/build directories,
-  executable/archive/firmware extensions, binary magic, non-UTF-8 files, and
-  known private artifact names.
+  executable/archive/firmware extensions, binary magic, non-UTF-8 files, known
+  private artifact names, and conspicuously large base64/hex blocks. It is an
+  accident detector, not proof against deliberately concealed content; human
+  provenance and staged-diff review remain mandatory.
 - The browser source has no external URL, font, image, or package dependency.
 - Generated files are ignored and are not included in the publication manifest.
 

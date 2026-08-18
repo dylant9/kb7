@@ -1,0 +1,321 @@
+{
+  "schema": "kb7.snc7320.soc-facts",
+  "schema_version": 1,
+  "generated_on": "2026-08-18",
+  "source": {
+    "title": "SNC7320 Series 32-bit Dual-Core SoC Data Sheet",
+    "publisher": "Sonix Technology Co., Ltd.",
+    "revision": "2.1",
+    "date": "2022-06-01",
+    "pages": 94,
+    "sha256": "d360aca16c2695f12edf91d263b2994b36edf5ad6faf130547a9220dfaca94b4",
+    "pdf_included_in_repository": false,
+    "page_numbering": "PDF and printed footer page numbers coincide"
+  },
+  "scope": {
+    "document_type": "data_sheet",
+    "register_bitfields_published": false,
+    "missing_reference": "SNC7320_reg_vx.xx",
+    "rule": "A block base marked datasheet does not validate firmware-observed offsets or bit encodings inside that block."
+  },
+  "selected_device": {
+    "part": "SNC73200M1NLFG-000",
+    "selection_status": "conditional_on_complete_marking_confirmation",
+    "package": "LQFP128L",
+    "gpio_count": 80,
+    "sip_memory": "8 MiB OPI PSRAM",
+    "integrated_persistent_flash": false,
+    "evidence": "datasheet",
+    "source_pages": [10, 11, 83]
+  },
+  "architecture": {
+    "cores": [
+      {
+        "name": "Core 0",
+        "architecture": "ARMv7-M Cortex-M3",
+        "role": "master system core; controls operating mode and boots Core 1",
+        "maximum_mhz": 162
+      },
+      {
+        "name": "Core 1",
+        "architecture": "ARMv7-M Cortex-M3",
+        "role": "independent slave subsystem booted by Core 0",
+        "maximum_mhz": 162
+      }
+    ],
+    "shared_resources": ["AHB SRAM", "mailbox RAM", "peripherals", "external memory", "I-cache aperture"],
+    "icache_owner_limit": "one of Core 0 or Core 1 at a time",
+    "debug_port": "one SWD port",
+    "source_pages": [1, 29, 37, 40, 41]
+  },
+  "memory_regions": [
+    {
+      "name": "Core 0 PRAM after remap",
+      "start": "0x00000000",
+      "end": "0x0000ffff",
+      "physical_size_bytes": 65536,
+      "notes": "Boot ROM copies user code here before software reset."
+    },
+    {
+      "name": "Core 1 local ROM",
+      "start": "0x00000000",
+      "end": "0x0001ffff",
+      "physical_size_bytes": 131072,
+      "notes": "Local Core 1 view; described as containing DSP programs."
+    },
+    {
+      "name": "Core 0 boot ROM",
+      "start": "0x08000000",
+      "end": "0x0800ffff",
+      "physical_size_bytes": 65536
+    },
+    {
+      "name": "shared I-cache execution aperture",
+      "start": "0x10000000",
+      "end": "0x100fffff",
+      "mapped_size_bytes": 1048576,
+      "physical_cache_bytes": 16384,
+      "notes": "Not a private Core 1 flash region; controller supports one core at a time."
+    },
+    {
+      "name": "shared AHB SRAM",
+      "start": "0x18000000",
+      "end": "0x1803ffff",
+      "physical_size_bytes": 262144
+    },
+    {
+      "name": "shared mailbox RAM",
+      "start": "0x20000000",
+      "end": "0x20000fff",
+      "physical_size_bytes": 4096
+    },
+    {
+      "name": "DDR1 or OPI external-memory aperture",
+      "start": "0x30000000",
+      "end": "0x3fffffff",
+      "installed_on_selected_device": "8 MiB OPI PSRAM at 0x30000000..0x307fffff"
+    },
+    {
+      "name": "peripheral registers",
+      "start": "0x40000000",
+      "end": "0x4fffffff"
+    },
+    {
+      "name": "SPI NOR XIP aperture",
+      "start": "0x60000000",
+      "end": "0x6fffffff",
+      "maximum_addressable_bytes": 268435456
+    }
+  ],
+  "memory_source_pages": [35, 36, 37, 40, 41],
+  "mmio_blocks": [
+    {"name": "CT32B0", "base": "0x40000000", "source_pages": [36]},
+    {"name": "CT32B1", "base": "0x40001000", "source_pages": [36]},
+    {"name": "CT32B2", "base": "0x40002000", "source_pages": [36]},
+    {"name": "CT32B3", "base": "0x40003000", "source_pages": [36]},
+    {"name": "CT32B4", "base": "0x40004000", "source_pages": [36]},
+    {"name": "CT32B5", "base": "0x40005000", "source_pages": [36]},
+    {"name": "CT32B6", "base": "0x40006000", "source_pages": [36]},
+    {"name": "CT32B7", "base": "0x40007000", "source_pages": [36]},
+    {"name": "WDT", "base": "0x40008000", "source_pages": [36]},
+    {"name": "UART0", "base": "0x4000a000", "source_pages": [36]},
+    {"name": "UART1", "base": "0x4000b000", "source_pages": [36]},
+    {"name": "SPI0", "base": "0x4000e000", "source_pages": [36]},
+    {"name": "SPI1", "base": "0x4000f000", "source_pages": [36]},
+    {"name": "I2C0", "base": "0x40010000", "source_pages": [36]},
+    {"name": "I2C1", "base": "0x40011000", "source_pages": [36]},
+    {"name": "I2C2", "base": "0x40012000", "source_pages": [36]},
+    {"name": "GPIO0", "base": "0x40018000", "source_pages": [36]},
+    {"name": "GPIO1", "base": "0x40019000", "source_pages": [36]},
+    {"name": "GPIO2", "base": "0x4001a000", "source_pages": [36]},
+    {"name": "GPIO3", "base": "0x4001b000", "source_pages": [36]},
+    {"name": "GPIO4", "base": "0x4001c000", "source_pages": [36]},
+    {"name": "IDMA0", "base": "0x40020000", "source_pages": [36, 37]},
+    {"name": "IDMA1", "base": "0x40020010", "source_pages": [36, 37]},
+    {"name": "SFC_SPI_NOR", "base": "0x40022000", "source_pages": [36, 38]},
+    {"name": "SD0_NAND", "base": "0x40023000", "source_pages": [36, 41]},
+    {"name": "SD1_SDIO", "base": "0x40024000", "source_pages": [36, 60]},
+    {"name": "CIS", "base": "0x40025000", "source_pages": [36]},
+    {"name": "CSC", "base": "0x40026000", "source_pages": [36]},
+    {"name": "JPEG_ENCODER", "base": "0x40027000", "source_pages": [36]},
+    {"name": "JPEG_DECODER", "base": "0x40028000", "source_pages": [36]},
+    {"name": "FFT_FIR", "base": "0x4002a000", "source_pages": [36]},
+    {"name": "SPI0_DMA", "base": "0x4002b000", "source_pages": [36, 62]},
+    {"name": "SPI1_DMA", "base": "0x4002c000", "source_pages": [36, 62]},
+    {"name": "ICACHE", "base": "0x4002f000", "source_pages": [36, 40]},
+    {"name": "I2S0", "base": "0x40030000", "source_pages": [36]},
+    {"name": "I2S1", "base": "0x40031000", "source_pages": [36]},
+    {"name": "I2S2", "base": "0x40032000", "source_pages": [36]},
+    {"name": "I2S3", "base": "0x40033000", "source_pages": [36]},
+    {"name": "I2S4", "base": "0x40034000", "source_pages": [36]},
+    {"name": "CRC", "base": "0x40038000", "source_pages": [36]},
+    {"name": "SCRIPT", "base": "0x40039000", "source_pages": [36]},
+    {"name": "SAR_ADC", "base": "0x4003a000", "source_pages": [36]},
+    {"name": "DRAM_OPI", "base": "0x40040000", "source_pages": [36, 40]},
+    {"name": "PPU_TFT_8080", "base": "0x40050000", "source_pages": [36, 66, 67, 68, 69]},
+    {"name": "USB_DEVICE", "base": "0x40100000", "source_pages": [36, 62, 63, 65]},
+    {"name": "USB_HOST0", "base": "0x40200000", "source_pages": [36, 62, 63, 64]},
+    {"name": "USB_HOST1", "base": "0x40300000", "source_pages": [36, 62, 63, 64]},
+    {"name": "SYS0", "base": "0x45000000", "source_pages": [36, 43]},
+    {"name": "SYS1", "base": "0x45000100", "source_pages": [36, 43]},
+    {"name": "PMU", "base": "0x45000300", "source_pages": [36, 43]}
+  ],
+  "firmware_observed_unidentified_addresses": [
+    {
+      "address": "0x40051000",
+      "status": "not_named_by_data_sheet",
+      "rule": "Do not promote recovered descriptor/register semantics to manufacturer fact."
+    },
+    {"address": "0x40051800", "status": "not_named_by_data_sheet"},
+    {"address": "0x40052800", "status": "not_named_by_data_sheet"},
+    {"address": "0x40053000", "status": "not_named_by_data_sheet"},
+    {"address": "0x41000000", "status": "not_named_by_data_sheet"}
+  ],
+  "dma_channels": {
+    "datasheet_prose_count": 19,
+    "datasheet_table_row_count": 18,
+    "inconsistency": "Table 5-3 lists 18 rows and no I2S4 DMA entry.",
+    "source_page": 37,
+    "channels": [
+      {"name": "IDMA0", "base": "0x40020000", "opi_access": true},
+      {"name": "IDMA1", "base": "0x40020010", "opi_access": true},
+      {"name": "SFC", "base": "0x40022100", "opi_access": false},
+      {"name": "SD0_NAND", "base": "0x40023100", "opi_access": false},
+      {"name": "SDIO", "base": "0x40024100", "opi_access": false},
+      {"name": "CIS", "base": "0x40025100", "opi_access": true},
+      {"name": "CSC_IN", "base": "0x40026100", "opi_access": false},
+      {"name": "CSC_OUT", "base": "0x40026110", "opi_access": false},
+      {"name": "JPEG_ENC_IN", "base": "0x40027100", "opi_access": false},
+      {"name": "JPEG_ENC_OUT", "base": "0x40027110", "opi_access": true},
+      {"name": "JPEG_DEC_IN", "base": "0x40028100", "opi_access": true},
+      {"name": "JPEG_DEC_OUT", "base": "0x40028110", "opi_access": false},
+      {"name": "SPI0", "base": "0x4002b100", "opi_access": false},
+      {"name": "SPI1", "base": "0x4002c100", "opi_access": false},
+      {"name": "I2S0", "base": "0x40030100", "opi_access": false},
+      {"name": "I2S1", "base": "0x40031100", "opi_access": false},
+      {"name": "I2S2", "base": "0x40032100", "opi_access": false},
+      {"name": "I2S3", "base": "0x40033100", "opi_access": false}
+    ]
+  },
+  "interrupts": [
+    {"irq": 0, "vector_index": 16, "vector_offset": "0x040", "source": "Core 0 inter-core interrupt"},
+    {"irq": 1, "vector_index": 17, "vector_offset": "0x044", "source": "Core 1 inter-core interrupt"},
+    {"irq": 2, "vector_index": 18, "vector_offset": "0x048", "source": "reserved"},
+    {"irq": 3, "vector_index": 19, "vector_offset": "0x04c", "source": "Wakeup33"},
+    {"irq": 4, "vector_index": 20, "vector_offset": "0x050", "source": "PPU vertical blanking"},
+    {"irq": 5, "vector_index": 21, "vector_offset": "0x054", "source": "PPU horizontal blanking"},
+    {"irq": 6, "vector_index": 22, "vector_offset": "0x058", "source": "USB device"},
+    {"irq": 7, "vector_index": 23, "vector_offset": "0x05c", "source": "USB host 0"},
+    {"irq": 8, "vector_index": 24, "vector_offset": "0x060", "source": "USB host 1"},
+    {"irq": 9, "vector_index": 25, "vector_offset": "0x064", "source": "SAR ADC"},
+    {"irq": 10, "vector_index": 26, "vector_offset": "0x068", "source": "CIS Vsync"},
+    {"irq": 11, "vector_index": 27, "vector_offset": "0x06c", "source": "CIS DMA"},
+    {"irq": 12, "vector_index": 28, "vector_offset": "0x070", "source": "JPEG encoder end"},
+    {"irq": 13, "vector_index": 29, "vector_offset": "0x074", "source": "JPEG decoder DMA in"},
+    {"irq": 14, "vector_index": 30, "vector_offset": "0x078", "source": "JPEG decoder DMA out"},
+    {"irq": 15, "vector_index": 31, "vector_offset": "0x07c", "source": "SDIO"},
+    {"irq": 16, "vector_index": 32, "vector_offset": "0x080", "source": "SDIO DMA"},
+    {"irq": 17, "vector_index": 33, "vector_offset": "0x084", "source": "SD/NAND ECC"},
+    {"irq": 18, "vector_index": 34, "vector_offset": "0x088", "source": "SD/NAND DMA"},
+    {"irq": 19, "vector_index": 35, "vector_offset": "0x08c", "source": "IDMA0"},
+    {"irq": 20, "vector_index": 36, "vector_offset": "0x090", "source": "IDMA1"},
+    {"irq": 21, "vector_index": 37, "vector_offset": "0x094", "source": "I2S0 DMA"},
+    {"irq": 22, "vector_index": 38, "vector_offset": "0x098", "source": "I2S1 DMA"},
+    {"irq": 23, "vector_index": 39, "vector_offset": "0x09c", "source": "I2S2 DMA"},
+    {"irq": 24, "vector_index": 40, "vector_offset": "0x0a0", "source": "I2S3 DMA"},
+    {"irq": 25, "vector_index": 41, "vector_offset": "0x0a4", "source": "I2S4"},
+    {"irq": 26, "vector_index": 42, "vector_offset": "0x0a8", "source": "GPIO0"},
+    {"irq": 27, "vector_index": 43, "vector_offset": "0x0ac", "source": "GPIO1"},
+    {"irq": 28, "vector_index": 44, "vector_offset": "0x0b0", "source": "GPIO2"},
+    {"irq": 29, "vector_index": 45, "vector_offset": "0x0b4", "source": "GPIO3"},
+    {"irq": 30, "vector_index": 46, "vector_offset": "0x0b8", "source": "GPIO4"},
+    {"irq": 31, "vector_index": 47, "vector_offset": "0x0bc", "source": "I2C0"},
+    {"irq": 32, "vector_index": 48, "vector_offset": "0x0c0", "source": "I2C1"},
+    {"irq": 33, "vector_index": 49, "vector_offset": "0x0c4", "source": "I2C2"},
+    {"irq": 34, "vector_index": 50, "vector_offset": "0x0c8", "source": "SPI0"},
+    {"irq": 35, "vector_index": 51, "vector_offset": "0x0cc", "source": "SPI1"},
+    {"irq": 36, "vector_index": 52, "vector_offset": "0x0d0", "source": "UART0"},
+    {"irq": 37, "vector_index": 53, "vector_offset": "0x0d4", "source": "UART1"},
+    {"irq": 38, "vector_index": 54, "vector_offset": "0x0d8", "source": "CT32B0"},
+    {"irq": 39, "vector_index": 55, "vector_offset": "0x0dc", "source": "CT32B1"},
+    {"irq": 40, "vector_index": 56, "vector_offset": "0x0e0", "source": "CT32B2"},
+    {"irq": 41, "vector_index": 57, "vector_offset": "0x0e4", "source": "CT32B3"},
+    {"irq": 42, "vector_index": 58, "vector_offset": "0x0e8", "source": "CT32B4"},
+    {"irq": 43, "vector_index": 59, "vector_offset": "0x0ec", "source": "CT32B5"},
+    {"irq": 44, "vector_index": 60, "vector_offset": "0x0f0", "source": "CT32B6"},
+    {"irq": 45, "vector_index": 61, "vector_offset": "0x0f4", "source": "CT32B7"},
+    {"irq": 46, "vector_index": 62, "vector_offset": "0x0f8", "source": "SPI0 DMA"},
+    {"irq": 47, "vector_index": 63, "vector_offset": "0x0fc", "source": "SPI0 ECC"},
+    {"irq": 48, "vector_index": 64, "vector_offset": "0x100", "source": "SPI1 DMA"},
+    {"irq": 49, "vector_index": 65, "vector_offset": "0x104", "source": "SPI1 ECC"},
+    {"irq": 50, "vector_index": 66, "vector_offset": "0x108", "source": "CSC DMA in"},
+    {"irq": 51, "vector_index": 67, "vector_offset": "0x10c", "source": "CSC DMA out"},
+    {"irq": 52, "vector_index": 68, "vector_offset": "0x110", "source": "script"},
+    {"irq": 53, "vector_index": 69, "vector_offset": "0x114", "source": "CRC16"},
+    {"irq": 54, "vector_index": 70, "vector_offset": "0x118", "source": "USB device suspend/resume"},
+    {"irq": 55, "vector_index": 71, "vector_offset": "0x11c", "source": "JPEG encoder DMA in"},
+    {"irq": 56, "vector_index": 72, "vector_offset": "0x120", "source": "JPEG encoder DMA out"}
+  ],
+  "interrupt_source_pages": [31, 32],
+  "vector_requirements": {
+    "datasheet_last_vector_index": 72,
+    "datasheet_minimum_words_through_last_index": 73,
+    "stock_reserved_trailing_words": 6,
+    "public_table_words": 79,
+    "notes": "The public table preserves six stock-reserved words beyond the manufacturer-defined span."
+  },
+  "clock_limits": {
+    "boot_default": {"source": "IHRC", "mhz": 12, "tolerance_percent": 1.5},
+    "external_crystal_mhz": 12,
+    "system_pll_mhz": {"minimum": 276, "maximum": 324},
+    "system_clock_maximum_mhz": 162,
+    "dram_clock_maximum_mhz": 81,
+    "usb_pll_mhz": 480,
+    "sfc_maximum_mhz": 40.5,
+    "wdt_ilrc_khz_typical": 32,
+    "source_pages": [32, 33, 34, 38, 80]
+  },
+  "reset_and_boot": {
+    "rom_restart_sources": ["power_on", "LVR_LVD", "external_RSTN", "DPD_wake", "WDT"],
+    "pram_restart_sources": ["software_reset"],
+    "boot_sources": ["SPI_NOR", "SD0", "SD1", "SLC_NAND", "SPI_NAND"],
+    "no_identifying_mark_result": "USB_ISP",
+    "normal_flow": "ROM parses a load table, copies user code to PRAM at address zero, and software-resets into it.",
+    "source_pages": [43, 44]
+  },
+  "electrical": {
+    "vddio33_recommended_v": {"minimum": 2.93, "typical": 3.3, "maximum": 3.63},
+    "vddc_normal_recommended_v": {"minimum": 1.19, "typical": 1.22, "maximum": 1.26},
+    "vdd18_recommended_v": {"minimum": 1.75, "typical": 1.82, "maximum": 1.9},
+    "digital_input_vih_minimum_v": 2.0,
+    "digital_input_vil_maximum_v": 0.8,
+    "internal_pull_ohms": {"minimum": 30000, "typical": 40000, "maximum": 66000},
+    "power_sequence": "VDDIO33 must exceed 1.8 V before RSTN reaches 1.8 V.",
+    "source_pages": [79, 80, 81]
+  },
+  "display": {
+    "hardware": "PPU plus TFT-RGB and 8080 MCU interfaces",
+    "tft_format": "RGB565 only",
+    "documented_normal_maximum": "640x480",
+    "kb7_recovered_geometry": "480x800 active with 1920x800 padded/tiled descriptor geometry",
+    "status": "datasheet does not validate a naive linear KB7 mode; preserve recovered stock profile",
+    "source_pages": [36, 66, 67, 68, 69]
+  },
+  "usb": {
+    "device_base": "0x40100000",
+    "speeds": ["full", "high"],
+    "classes_named": ["HID", "MSC", "UVC bulk"],
+    "required_keyboard_features": ["EP0 control", "interrupt IN"],
+    "document_inconsistency": "Page 63 denies isochronous device transfers while page 65 lists isochronous endpoints.",
+    "source_pages": [62, 63, 65]
+  },
+  "known_document_issues": [
+    {"pages": [31], "issue": "SVCall offset is printed as 0x18; ARMv7-M requires 0x2c."},
+    {"pages": [37, 44], "issue": "PRAM is marked read-only in the memory table although ROM copies user code into it."},
+    {"pages": [37], "issue": "DMA prose claims 19 channels but Table 5-3 lists 18 rows."},
+    {"pages": [31, 32], "issue": "IRQ prose alternates between 56 and 57 sources; IRQ0..56 exists with IRQ2 reserved."},
+    {"pages": [23, 45], "issue": "All-pins pull-up note conflicts with inactive default GPIO pull description."},
+    {"pages": [63, 65], "issue": "USB device isochronous support is contradicted."},
+    {"pages": [79], "issue": "Some recommended maximum supplies exceed printed absolute maxima; do not design to those conflicting upper margins."}
+  ]
+}
