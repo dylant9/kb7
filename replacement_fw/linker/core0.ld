@@ -36,3 +36,4 @@ SECTIONS
 
 ASSERT(LOADADDR(.data) + SIZEOF(.data) <= ORIGIN(IMAGE) + LENGTH(IMAGE), "core0 image overflow")
 ASSERT(__bss_end__ <= ORIGIN(SRAM) + LENGTH(SRAM), "core0 SRAM overflow")
+ASSERT(SIZEOF(.isr_vector) == 79 * 4, "core0 vector table must contain 79 entries")

@@ -2,6 +2,7 @@
 #define KB7_DRIVERS_H
 
 #include "kb7/platform.h"
+#include "kb7/reports.h"
 
 enum kb7_gpio_direction { KB7_GPIO_INPUT = 0, KB7_GPIO_OUTPUT = 1 };
 enum kb7_gpio_pull { KB7_GPIO_FLOATING = 0, KB7_GPIO_PULL_UP = 1, KB7_GPIO_PULL_DOWN = 2 };
@@ -14,10 +15,13 @@ void kb7_gpio_write(uint8_t logical, bool high);
 bool kb7_gpio_read(uint8_t logical);
 
 void kb7_delay_cycles(volatile uint32_t cycles);
+bool kb7_delay_ms(uint32_t milliseconds);
 void kb7_backlight_init(void);
 void kb7_backlight_set(uint16_t duty);
 
 bool kb7_clock_init(void);
+uint32_t kb7_clock_control_for_state(uint32_t control, uint32_t clock_state);
+bool kb7_clock_rom_result_ok(uint32_t result);
 bool kb7_dram_init_and_train(void);
 bool kb7_dram_march_test(uintptr_t address, size_t bytes);
 
@@ -51,6 +55,8 @@ bool kb7_mcu2_init(void);
 enum kb7_mcu2_result kb7_mcu2_exchange(const uint8_t request[KB7_MCU2_FRAME_SIZE],
                                        uint8_t response[KB7_MCU2_FRAME_SIZE]);
 enum kb7_mcu2_result kb7_mcu2_read_normalized(uint8_t values[KB7_HALL_KEY_COUNT]);
+enum kb7_mcu2_result kb7_mcu2_decode_normalized(
+    const uint8_t response[KB7_MCU2_FRAME_SIZE], uint8_t values[KB7_HALL_KEY_COUNT]);
 
 struct kb7_hall_config {
     uint8_t actuation;
@@ -71,7 +77,10 @@ bool kb7_usb_init(void);
 void kb7_usb_poll(void);
 int32_t kb7_usb_send(uint8_t endpoint, const void *data, uint16_t length);
 void kb7_usb_keyboard_report(const uint8_t bits[19], uint8_t modifiers);
+void kb7_usb_keyboard_action(uint16_t usage, bool pressed);
 void kb7_usb_consumer_usage(uint16_t usage);
+void kb7_usb_consumer_action(uint16_t usage, bool pressed);
+void kb7_usb_consumer_pulse(uint16_t usage);
 
 void kb7_enter_loader(void) KB7_NORETURN;
 

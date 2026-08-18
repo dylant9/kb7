@@ -21,6 +21,11 @@ PYTHONPATH=. python3 -m kb7studio.cli profile-check samples/neon-control-profile
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
 ```
 
+The suite also host-compiles selected firmware modules. It checks exact
+Python/C parser parity, recovered clock and MCU2 semantics, UI/report behavior,
+and the A/B updater against a fixed-address simulated NOR device. No test opens
+a physical device.
+
 Device-specific selector and LED mappings are deliberately absent. Profiles
 record that boundary as `device-mapping-not-included`; simulator output is not a
 claim of working hardware integration.

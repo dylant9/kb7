@@ -5,6 +5,10 @@ static uintptr_t target;
 static const struct kb7_screen_store *screen_store;
 static kb7_action_handler_t handle_action;
 static uint16_t active_screen;
+static uint16_t active_widget;
+static int16_t widget_values[KB7_SCREEN_MAX_WIDGETS];
+
+#define KB7_NO_ACTIVE_WIDGET UINT16_C(0xffff)
 
 static void pixel(int16_t x, int16_t y, uint16_t color) {
     if (x >= 0 && y >= 0 && x < (int16_t)KB7_DISPLAY_WIDTH && y < (int16_t)KB7_DISPLAY_HEIGHT) {
@@ -60,14 +64,14 @@ static void text(int16_t x, int16_t y, const char *value, uint16_t length, uint1
     }
 }
 
-static void render_widget(const struct kb7_widget_record *widget) {
+static void render_widget(uint16_t index, const struct kb7_widget_record *widget) {
     rectangle(widget->x, widget->y, widget->width, widget->height, widget->background_rgb565);
     if (widget->type == KB7_WIDGET_BUTTON || widget->type == KB7_WIDGET_TOGGLE) {
         rectangle((int16_t)(widget->x + 2), (int16_t)(widget->y + 2),
                   (int16_t)(widget->width - 4), 2, widget->foreground_rgb565);
     } else if (widget->type == KB7_WIDGET_SLIDER || widget->type == KB7_WIDGET_GAUGE) {
         int32_t span = (int32_t)widget->maximum - widget->minimum;
-        int32_t value = (int32_t)widget->value - widget->minimum;
+        int32_t value = (int32_t)widget_values[index] - widget->minimum;
         int16_t fill = span > 0 ? (int16_t)((value * widget->width) / span) : 0;
         rectangle(widget->x, (int16_t)(widget->y + widget->height / 2 - 3), fill, 6,
                   widget->foreground_rgb565);
@@ -85,6 +89,16 @@ void kb7_ui_init(uintptr_t framebuffer, const struct kb7_screen_store *store,
     screen_store = store;
     handle_action = action_handler;
     active_screen = store != NULL && store->header != NULL ? store->header->boot_screen : 0U;
+    active_widget = KB7_NO_ACTIVE_WIDGET;
+    for (uint16_t index = 0U; index < KB7_SCREEN_MAX_WIDGETS; ++index) {
+        widget_values[index] = 0;
+    }
+    if (store != NULL && store->header != NULL) {
+        for (uint16_t index = 0U; index < store->header->widget_count; ++index) {
+            const struct kb7_widget_record *widget = kb7_screen_widget(store, index);
+            if (widget != NULL) widget_values[index] = widget->value;
+        }
+    }
 }
 
 void kb7_ui_render(void) {
@@ -103,13 +117,40 @@ void kb7_ui_render(void) {
     for (uint16_t index = 0U; index < screen->widget_count; ++index) {
         const struct kb7_widget_record *widget =
             kb7_screen_widget(screen_store, (uint16_t)(screen->first_widget + index));
-        if (widget != NULL) render_widget(widget);
+        if (widget != NULL) render_widget((uint16_t)(screen->first_widget + index), widget);
     }
     kb7_dsb();
 }
 
-void kb7_ui_touch(uint16_t x, uint16_t y, bool pressed) {
-    if (!pressed || screen_store == NULL || screen_store->header == NULL) return;
+static int16_t slider_value(const struct kb7_widget_record *widget, uint16_t x) {
+    if (x <= (uint16_t)widget->x) return widget->minimum;
+    const uint16_t right = (uint16_t)(widget->x + widget->width - 1);
+    if (x >= right) return widget->maximum;
+    const int32_t span = (int32_t)widget->maximum - widget->minimum;
+    const int32_t position = (int32_t)x - widget->x;
+    return (int16_t)(widget->minimum +
+                     (span * position + (widget->width - 1) / 2) / (widget->width - 1));
+}
+
+void kb7_ui_touch(uint16_t x, uint16_t y, enum kb7_ui_phase phase) {
+    if (screen_store == NULL || screen_store->header == NULL) return;
+    if (phase != KB7_UI_DOWN) {
+        if (active_widget == KB7_NO_ACTIVE_WIDGET) return;
+        const struct kb7_widget_record *widget = kb7_screen_widget(screen_store, active_widget);
+        if (widget == NULL) {
+            active_widget = KB7_NO_ACTIVE_WIDGET;
+            return;
+        }
+        if (widget->type == KB7_WIDGET_SLIDER) {
+            widget_values[active_widget] = slider_value(widget, x);
+            kb7_ui_render();
+        }
+        if (handle_action != NULL) {
+            handle_action(widget, widget_values[active_widget], phase);
+        }
+        if (phase == KB7_UI_UP) active_widget = KB7_NO_ACTIVE_WIDGET;
+        return;
+    }
     const struct kb7_screen_record *screen = kb7_screen_find(screen_store, active_screen);
     if (screen == NULL) return;
     for (uint16_t index = screen->widget_count; index != 0U; --index) {
@@ -118,18 +159,34 @@ void kb7_ui_touch(uint16_t x, uint16_t y, bool pressed) {
         if (widget != NULL && x >= (uint16_t)widget->x && y >= (uint16_t)widget->y &&
             x < (uint16_t)(widget->x + widget->width) &&
             y < (uint16_t)(widget->y + widget->height)) {
-            if (widget->action == KB7_ACTION_NAVIGATE) kb7_ui_navigate(widget->target_screen);
-            if (handle_action != NULL) handle_action(widget, widget->value);
+            active_widget = (uint16_t)(screen->first_widget + index - 1U);
+            if (widget->type == KB7_WIDGET_SLIDER) {
+                widget_values[active_widget] = slider_value(widget, x);
+                kb7_ui_render();
+            } else if (widget->type == KB7_WIDGET_TOGGLE) {
+                widget_values[active_widget] = widget_values[active_widget] == widget->maximum
+                                                   ? widget->minimum : widget->maximum;
+                kb7_ui_render();
+            }
+            if (widget->action == KB7_ACTION_NAVIGATE) {
+                active_widget = KB7_NO_ACTIVE_WIDGET;
+                (void)kb7_ui_navigate(widget->target_screen);
+                return;
+            }
+            if (handle_action != NULL) {
+                handle_action(widget, widget_values[active_widget], phase);
+            }
             return;
         }
     }
 }
 
-void kb7_ui_navigate(uint16_t screen_id) {
-    if (kb7_screen_find(screen_store, screen_id) != NULL) {
-        active_screen = screen_id;
-        kb7_ui_render();
-    }
+bool kb7_ui_navigate(uint16_t screen_id) {
+    if (screen_store == NULL || kb7_screen_find(screen_store, screen_id) == NULL) return false;
+    active_widget = KB7_NO_ACTIVE_WIDGET;
+    active_screen = screen_id;
+    kb7_ui_render();
+    return true;
 }
 
 uint16_t kb7_ui_active_screen(void) { return active_screen; }

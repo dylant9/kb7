@@ -47,9 +47,9 @@ byte, enabling deterministic retry.
 | 0x12 | COMMIT; exact length and whole CRC must match, then atomic slot finalize |
 | 0x13 | ABORT; discard only inactive transaction |
 | 0x14 | READ active store in chunks |
-| 0x15 | SELECT active/boot screen |
-| 0x16 | FACTORY RESET custom screen store; built-in screen remains |
-| 0x40 | device→host widget event |
+| 0x15 | SELECT active screen for this runtime (`offset=u16 screen ID`) |
+| 0x16 | FACTORY RESET custom screen store; requires flags `a5`, transfer ID `0x4b423752`, payload prefix `RESETKB7` |
+| 0x40 | device→host widget event; flags are down=0, move=1, up=2 |
 | 0x7e | enter loader; additionally requires a second confirmation token/session |
 
 Statuses: `0 OK`, `1 BAD_VERSION`, `2 BAD_CRC`, `3 BAD_LENGTH`, `4 BAD_STATE`,
@@ -65,6 +65,11 @@ verify --header state VALID (one-way bit clear)--> idle/new active generation
 receiving --ABORT/reset/timeout--> idle/old slot untouched
 any bad offset/id --> error response, state unchanged
 ```
+
+COMMIT also parses the complete screen object before setting the slot VALID and
+then reads back and revalidates the finalized slot. READ returns up to 36 bytes
+from the fully validated active slot and reports the next offset and total size.
+SELECT is deliberately runtime-only in v1; it does not mutate flash.
 
 Chunks are strictly ordered. A duplicate receives `BAD_STATE` plus the expected
 offset; the host can resume from that offset. Transfer IDs prevent delayed packets

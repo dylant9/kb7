@@ -1,4 +1,5 @@
 #include "kb7/drivers.h"
+#include "kb7/config.h"
 #include "kb7/host_protocol.h"
 #include "kb7/host_server.h"
 #include "kb7/regs.h"
@@ -16,11 +17,13 @@ static struct kb7_screen_store screens;
 static uint8_t active_profile;
 static struct kb7_host_server host_server;
 
-static void send_host_event(const struct kb7_widget_record *widget, int16_t value) {
+static void send_host_event(const struct kb7_widget_record *widget, int16_t value,
+                            enum kb7_ui_phase phase) {
     struct kb7_host_report report;
     kb7_memset(&report, 0, sizeof(report));
     report.kind = KB7_HOST_EVENT;
     report.opcode = KB7_HOST_WIDGET_EVENT;
+    report.flags = (uint8_t)phase;
     report.sequence = widget->id;
     report.offset = (uint16_t)value;
     report.total_length = kb7_ui_active_screen();
@@ -28,7 +31,24 @@ static void send_host_event(const struct kb7_widget_record *widget, int16_t valu
     (void)kb7_runtime()->usb_send(2U, &report, sizeof(report));
 }
 
-static void action(const struct kb7_widget_record *widget, int16_t value) {
+static void action(const struct kb7_widget_record *widget, int16_t value,
+                   enum kb7_ui_phase phase) {
+    if (widget->action == KB7_ACTION_HID_KEY) {
+        if (phase == KB7_UI_MOVE) return;
+        kb7_usb_keyboard_action(widget->action_arg0, phase != KB7_UI_UP);
+        return;
+    }
+    if (widget->action == KB7_ACTION_MEDIA_KEY) {
+        if (phase == KB7_UI_MOVE) return;
+        kb7_usb_consumer_action(widget->action_arg0, phase != KB7_UI_UP);
+        return;
+    }
+    if (widget->action == KB7_ACTION_HOST_EVENT) {
+        send_host_event(widget, value, phase);
+        return;
+    }
+    if (phase == KB7_UI_UP ||
+        (phase == KB7_UI_MOVE && widget->type != KB7_WIDGET_SLIDER)) return;
     switch (widget->action) {
     case KB7_ACTION_RGB_COLOR: {
         const struct kb7_rgb color = {
@@ -37,14 +57,16 @@ static void action(const struct kb7_widget_record *widget, int16_t value) {
             (uint8_t)widget->action_arg1,
         };
         for (size_t index = 0U; index < KB7_RGB_POSITION_COUNT; ++index) rgb_colors[index] = color;
-        kb7_rgb_show(rgb_colors);
+        if (KB7_ENABLE_RGB) kb7_rgb_show(rgb_colors);
         break;
     }
     case KB7_ACTION_BRIGHTNESS: {
         uint16_t percent = value < 0 ? 0U : (uint16_t)value;
         if (percent > 100U) percent = 100U;
-        kb7_rgb_set_brightness((uint8_t)percent);
-        kb7_backlight_set((uint16_t)((percent * 1023U) / 100U));
+        if (KB7_ENABLE_RGB) kb7_rgb_set_brightness((uint8_t)percent);
+        if (KB7_ENABLE_DISPLAY) {
+            kb7_backlight_set((uint16_t)((percent * 1023U) / 100U));
+        }
         break;
     }
     case KB7_ACTION_PROFILE:
@@ -57,19 +79,6 @@ static void action(const struct kb7_widget_record *widget, int16_t value) {
         hall_config.rapid_trigger = value != 0;
         hall_config.rapid_press_delta = (uint8_t)widget->action_arg0;
         hall_config.rapid_release_delta = (uint8_t)widget->action_arg1;
-        break;
-    case KB7_ACTION_HID_KEY: {
-        uint8_t keys[19] = {0};
-        const uint8_t usage = (uint8_t)widget->action_arg0;
-        if (usage < 152U) keys[usage >> 3U] = (uint8_t)KB7_BIT(usage & 7U);
-        kb7_usb_keyboard_report(keys, 0U);
-        break;
-    }
-    case KB7_ACTION_MEDIA_KEY:
-        kb7_usb_consumer_usage(widget->action_arg0);
-        break;
-    case KB7_ACTION_HOST_EVENT:
-        send_host_event(widget, value);
         break;
     default:
         break;
@@ -88,10 +97,10 @@ static bool load_screens(void) {
 
 static void send_analog_compatibility(const uint8_t values[KB7_HALL_KEY_COUNT]) {
     for (uint8_t page = 0U; page < 2U; ++page) {
-        uint8_t report[64] = {0};
+        uint8_t report[KB7_ANALOG_REPORT_BYTES] = {0};
         const uint8_t start = (uint8_t)(page * 60U);
         const uint8_t count = page == 0U ? 60U : 22U;
-        report[0] = 0x03U;
+        report[0] = KB7_REPORT_ID_ANALOG;
         report[1] = 0xfaU;
         report[2] = page;
         report[3] = count;
@@ -104,12 +113,20 @@ static void process_hall(void) {
     uint8_t values[KB7_HALL_KEY_COUNT];
     if (kb7_mcu2_read_normalized(values) != KB7_MCU2_OK) return;
     uint8_t keys[19] = {0};
+    uint8_t modifiers = 0U;
     for (size_t key = 0U; key < KB7_HALL_KEY_COUNT; ++key) {
         if (kb7_hall_update(&hall_state[key], values[key], &hall_config)) {
-            keys[key >> 3U] |= (uint8_t)KB7_BIT(key & 7U);
+            struct kb7_hid_binding binding;
+            if (kb7_keymap_lookup((uint8_t)key, &binding)) {
+                modifiers |= binding.modifier_mask;
+                if (binding.usage < KB7_KEYBOARD_USAGE_BITS) {
+                    keys[binding.usage >> 3U] |=
+                        (uint8_t)KB7_BIT(binding.usage & 7U);
+                }
+            }
         }
     }
-    kb7_usb_keyboard_report(keys, 0U);
+    kb7_usb_keyboard_report(keys, modifiers);
     send_analog_compatibility(values);
 }
 
@@ -119,25 +136,27 @@ void kb7_application_main(void) {
         api->size != sizeof(*api)) {
         for (;;) kb7_wfi();
     }
-    kb7_backlight_init();
-    kb7_backlight_set(180U);
-    kb7_encoder_init();
+    if (KB7_ENABLE_ENCODER) kb7_encoder_init();
     kb7_host_server_init(&host_server);
     kb7_hall_reset(hall_state);
-    const bool rgb_ready = kb7_rgb_init();
-    const bool touch_ready = kb7_touch_init();
-    const bool mcu2_ready = kb7_mcu2_init();
+    const bool rgb_ready = KB7_ENABLE_RGB && kb7_rgb_init();
+    const bool mcu2_ready = KB7_ENABLE_MCU2 && kb7_mcu2_init();
     const bool screen_valid = load_screens();
     const bool dram_ready = (api->boot_flags & KB7_BOOT_DRAM_READY) != 0U;
-    if (dram_ready) {
+    bool display_ready = false;
+    if (KB7_ENABLE_DISPLAY && dram_ready) {
         kb7_lcdc_fill(KB7_FRAMEBUFFER_A, 0x0841U);
         kb7_panel_init();
         if (kb7_lcdc_init(KB7_FRAMEBUFFER_A)) {
+            display_ready = true;
+            kb7_backlight_init();
+            kb7_backlight_set(180U);
             kb7_ui_init(KB7_FRAMEBUFFER_A, screen_valid ? &screens : NULL, action);
             kb7_ui_render();
             kb7_backlight_set(820U);
         }
     }
+    const bool touch_ready = KB7_ENABLE_TOUCH && display_ready && kb7_touch_init();
     if (rgb_ready) {
         for (size_t index = 0U; index < KB7_RGB_POSITION_COUNT; ++index) {
             rgb_colors[index] = (struct kb7_rgb){18U, 35U, 74U};
@@ -147,6 +166,8 @@ void kb7_application_main(void) {
 
     uint32_t next_hall = 0U;
     bool touch_down = false;
+    uint16_t last_x = 0U;
+    uint16_t last_y = 0U;
     for (;;) {
         api->usb_poll();
         const uint32_t now = api->milliseconds();
@@ -154,15 +175,30 @@ void kb7_application_main(void) {
             process_hall();
             next_hall = now + 5U;
         }
-        const enum kb7_encoder_event encoder = kb7_encoder_poll();
-        if (encoder == KB7_ENCODER_CW) kb7_usb_consumer_usage(0x00e9U);
-        if (encoder == KB7_ENCODER_CCW) kb7_usb_consumer_usage(0x00eaU);
+        const enum kb7_encoder_event encoder = KB7_ENABLE_ENCODER
+                                                   ? kb7_encoder_poll() : KB7_ENCODER_NONE;
+        if (encoder == KB7_ENCODER_CW) {
+            kb7_usb_consumer_pulse(0x00e9U);
+        }
+        if (encoder == KB7_ENCODER_CCW) {
+            kb7_usb_consumer_pulse(0x00eaU);
+        }
         if (touch_ready && dram_ready) {
             struct kb7_touch_frame frame;
             if (kb7_touch_read(&frame)) {
                 const bool down = frame.count != 0U;
-                if (down && !touch_down) kb7_ui_touch(frame.points[0].x, frame.points[0].y, true);
+                if (down) {
+                    last_x = frame.points[0].x;
+                    last_y = frame.points[0].y;
+                    kb7_ui_touch(last_x, last_y, touch_down ? KB7_UI_MOVE : KB7_UI_DOWN);
+                } else if (touch_down) {
+                    kb7_ui_touch(last_x, last_y, KB7_UI_UP);
+                }
                 touch_down = down;
+            } else if (touch_down) {
+                /* A lost frame must not leave a touchscreen HID action held. */
+                kb7_ui_touch(last_x, last_y, KB7_UI_UP);
+                touch_down = false;
             }
         }
     }

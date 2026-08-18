@@ -24,6 +24,20 @@ void kb7_usb_keyboard_report(const uint8_t bits[19], uint8_t modifiers) {
     (void)modifiers;
 }
 
+void kb7_usb_keyboard_action(uint16_t usage, bool pressed) {
+    (void)usage;
+    (void)pressed;
+}
+
 void kb7_usb_consumer_usage(uint16_t usage) {
+    (void)usage;
+}
+
+void kb7_usb_consumer_action(uint16_t usage, bool pressed) {
+    (void)usage;
+    (void)pressed;
+}
+
+void kb7_usb_consumer_pulse(uint16_t usage) {
     (void)usage;
 }

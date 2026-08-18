@@ -57,6 +57,12 @@ Commit:
 6. At boot, validate both slots and choose the newest valid generation using
    wrap-safe signed subtraction. If neither validates, use built-in UI.
 
+The C implementation validates the complete payload before choosing a slot; a
+newer header with a corrupt payload cannot hide the older valid generation. The
+simulated-NOR host test covers corruption fallback, wrap-safe selection, staged
+write failures, and preservation of the active slot when BEGIN erases its
+target.
+
 The two superblocks are not needed for screen selection—generation headers avoid
 a fragile active pointer. They are reserved for the larger asset-store manifest,
 which will need a compact index.

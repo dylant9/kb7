@@ -1,6 +1,6 @@
 # Public-source provenance review
 
-Review date: 2026-08-17
+Review date: 2026-08-17; remediation additions reviewed 2026-08-18
 Scope: this repository directory only
 
 ## Decision
@@ -16,9 +16,12 @@ the contributor does not possess.
 
 - Independently authored C firmware architecture and application logic.
 - Independently authored Python/JavaScript/HTML/CSS offline tooling.
-- Tests and original JSON examples.
+- Tests (including independently authored host-side C harnesses) and original
+  JSON examples.
 - Project-defined screen, profile, host-control, and storage formats.
 - This provenance record and the source-code security audit.
+- An independently written datasheet audit and derived interoperability pin
+  map; no Sonix PDF, diagram, or copied vendor table is included.
 - Apache-2.0 license and project/trademark notice.
 
 No external scripts, fonts, images, packages, or vendored libraries are bundled.
@@ -38,10 +41,12 @@ No external scripts, fonts, images, packages, or vendored libraries are bundled.
 
 - All Turtle Beach/Sonix/MCU vendor firmware, loaders, manifests, asset regions,
   installers, DLLs, and archives.
+- Third-party datasheet/manual PDF files, whose redistribution terms are not
+  granted by this repository.
 - ELF/object/raw/padded binaries, maps, disassemblies, Ghidra projects, and
   decompiler output.
 - USB/SPI/I2C captures, screenshots or assets extracted from vendor software,
-  private pin maps, ROM traces, and detailed reverse-engineering reports.
+  private raw pin-map evidence, ROM traces, and decompiler-level reports.
 - The stock-core patch experiments and their exact vendor function addresses.
 - Firmware repackers, manifests, flash plans, and incomplete flash prefixes.
 - The separate `kb7-linux` tree, which currently says all rights reserved and
@@ -86,6 +91,7 @@ Publish only this directory—not its parent workspace. Run:
 
 ```sh
 python3 tools/check_public_tree.py .
+python3 tools/audit_firmware_source.py .
 git status --short --ignored
 ```
 

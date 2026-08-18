@@ -65,16 +65,33 @@ class AtomicSlots:
         return (struct.pack("<I", generation), payload) if crc32(payload) == expected_crc else None
 
     def active(self) -> bytes | None:
-        candidates = [value for value in (self._slot(0), self._slot(1)) if value is not None]
-        return max(candidates, key=lambda value: struct.unpack("<I", value[0])[0])[1] if candidates else None
+        slots = [self._slot(0), self._slot(1)]
+        if slots[0] is None:
+            return slots[1][1] if slots[1] is not None else None
+        if slots[1] is None:
+            return slots[0][1]
+        left = struct.unpack("<I", slots[0][0])[0]
+        right = struct.unpack("<I", slots[1][0])[0]
+        return slots[0][1] if 0 < ((left - right) & 0xFFFFFFFF) < 0x80000000 else slots[1][1]
 
     def commit(self, payload: bytes, fail_after: str | None = None) -> None:
         if not payload or len(payload) > self.slot_size - HEADER.size:
             raise ValueError("payload does not fit slot")
         valid = [self._slot(0), self._slot(1)]
         generations = [struct.unpack("<I", value[0])[0] if value else 0 for value in valid]
-        target = 0 if generations[0] <= generations[1] else 1
-        generation = max(generations) + 1
+        if valid[0] is None and valid[1] is None:
+            active, target, generation = None, 0, 1
+        elif valid[0] is None:
+            active, target = 1, 0
+            generation = (generations[1] + 1) & 0xFFFFFFFF
+        elif valid[1] is None:
+            active, target = 0, 1
+            generation = (generations[0] + 1) & 0xFFFFFFFF
+        else:
+            active = 0 if 0 < ((generations[0] - generations[1]) & 0xFFFFFFFF) < 0x80000000 else 1
+            target = 1 - active
+            generation = (generations[active] + 1) & 0xFFFFFFFF
+        assert active != target
         base = target * self.slot_size
         self.flash[base:base + self.slot_size] = b"\xff" * self.slot_size
         if fail_after == "erase": raise PowerLoss

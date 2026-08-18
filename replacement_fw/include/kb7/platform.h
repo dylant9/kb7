@@ -11,14 +11,24 @@
 #define KB7_PACKED __attribute__((packed))
 #define KB7_NORETURN __attribute__((noreturn))
 
+#ifdef KB7_HOST_TEST
+static inline void kb7_dmb(void) { __asm__ volatile("" ::: "memory"); }
+static inline void kb7_dsb(void) { __asm__ volatile("" ::: "memory"); }
+static inline void kb7_isb(void) { __asm__ volatile("" ::: "memory"); }
+static inline void kb7_wfi(void) { __asm__ volatile("" ::: "memory"); }
+#else
 static inline void kb7_dmb(void) { __asm__ volatile("dmb" ::: "memory"); }
 static inline void kb7_dsb(void) { __asm__ volatile("dsb" ::: "memory"); }
 static inline void kb7_isb(void) { __asm__ volatile("isb" ::: "memory"); }
 static inline void kb7_wfi(void) { __asm__ volatile("wfi"); }
+#endif
 
 void *kb7_memcpy(void *destination, const void *source, size_t length);
 void *kb7_memset(void *destination, int value, size_t length);
 int kb7_memcmp(const void *left, const void *right, size_t length);
 uint32_t kb7_crc32(const void *data, size_t length);
+uint32_t kb7_crc32_begin(void);
+uint32_t kb7_crc32_extend(uint32_t state, const void *data, size_t length);
+uint32_t kb7_crc32_finish(uint32_t state);
 
 #endif

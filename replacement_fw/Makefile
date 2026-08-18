@@ -3,11 +3,13 @@ CC := $(CROSS)gcc
 OBJDUMP := $(CROSS)objdump
 READELF := $(CROSS)readelf
 SIZE := $(CROSS)size
+NM := $(CROSS)nm
 
-CFLAGS := -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -std=gnu11 -Os -g3 \
+CFLAGS := -mcpu=cortex-m3 -mthumb -mfloat-abi=soft -std=gnu11 -Os -g3 \
 	-ffreestanding -fno-builtin -fno-common -fno-stack-protector \
 	-fdata-sections -ffunction-sections -fno-unwind-tables \
-	-fno-asynchronous-unwind-tables -Wall -Wextra -Werror -MMD -MP -Iinclude
+	-fno-asynchronous-unwind-tables -Wall -Wextra -Werror -MMD -MP -Iinclude \
+	$(PROFILE_DEFINES) $(EXTRA_CFLAGS)
 LDFLAGS := -nostdlib -Wl,--build-id=none,--gc-sections
 
 COMMON := common/memory.c common/crc32.c
@@ -16,12 +18,12 @@ CORE0_SRC := core0/startup.c core0/main.c core0/usb.c $(COMMON) \
 CORE1_SRC := core1/startup.c core1/main.c core1/storage.c core1/host_server.c core1/usb_client.c $(COMMON) \
 	common/host_protocol.c drivers/gpio.c drivers/timer.c drivers/lcd.c drivers/touch.c \
 	drivers/rgb.c drivers/mcu2.c drivers/hall_policy.c drivers/encoder.c \
-	ui/screen_parser.c ui/renderer.c
+	drivers/keymap.c ui/screen_parser.c ui/renderer.c
 CORE0_OBJ := $(patsubst %.c,build/core0/%.o,$(CORE0_SRC))
 CORE1_OBJ := $(patsubst %.c,build/core1/%.o,$(CORE1_SRC))
 DEPS := $(CORE0_OBJ:.o=.d) $(CORE1_OBJ:.o=.d)
 
-.PHONY: all clean verify bundle
+.PHONY: all clean verify audit-profile bundle
 all: build/core0.elf build/core1.elf verify
 
 build/core0/%.o: %.c
@@ -47,7 +49,14 @@ verify: build/core0.elf build/core1.elf
 	for image in core0 core1; do \
 		$(READELF) -r build/$$image.elf | grep -q 'There are no relocations'; \
 		$(SIZE) build/$$image.elf; \
-	done
+	done; \
+	test "$$($(NM) -S build/core0.elf | awk '$$4 == "vectors" { print $$2 }')" = 0000013c
+
+audit-profile:
+	$(MAKE) clean
+	$(MAKE) all PROFILE_DEFINES='-DKB7_ENABLE_UNVERIFIED_DRAM_INIT=1 \
+		-DKB7_ENABLE_DISPLAY=1 -DKB7_ENABLE_TOUCH=1 -DKB7_ENABLE_RGB=1 \
+		-DKB7_ENABLE_MCU2=1 -DKB7_ENABLE_ENCODER=1'
 
 bundle:
 	@echo "Flash-image generation is intentionally unavailable in the public source tree." >&2

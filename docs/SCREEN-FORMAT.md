@@ -5,7 +5,9 @@
 The format is compact, deterministic, little-endian, versioned, length-bounded
 and CRC-protected. It contains no pointers. Firmware validates every range and
 count before rendering, and falls back to a compiled safe screen on any error.
-The PC compiler and C parser share golden layout tests.
+The PC compiler and C parser share golden layout tests. Their acceptance
+behavior is also compared over every truncation and a deterministic mutation
+corpus in `test_c_parser.py`.
 
 Limits in version 1: 16 screens, 128 widgets, 480×800 geometry, UTF-8 string
 pool. The clean-room device font renders ASCII letters/numbers and fallback
@@ -37,7 +39,7 @@ pool. Non-canonical gaps/overlaps are rejected to keep the parser surface small.
 ## Screen record — 16 bytes
 
 `u16 id, u16 first_widget, u16 widget_count, u16 background_rgb565,
-u32 name_offset, u16 name_length, u16 flags`.
+u32 name_offset, u16 name_length, u16 flags`. Flags are zero in v1.
 
 String offsets are relative to the start of the string pool. Widget ranges index
 the global widget array and must fit it exactly.
@@ -60,6 +62,11 @@ the global widget array and must fit it exactly.
 | 0x20 | u32 | text offset |
 | 0x24 | u16 | text length |
 | 0x26 | u16 | reserved zero |
+
+Widget and action flags are zero in v1. Non-navigation actions require a zero
+target screen. Argument widths and widget ranges are checked against each
+action's behavior (for example brightness 0–100, actuation 0–255, Rapid Trigger
+0/1 with byte-sized deltas, and HID bitmap/modifier usages only).
 
 Widget types: `1 label`, `2 button`, `3 slider`, `4 toggle`, `5 gauge`.
 

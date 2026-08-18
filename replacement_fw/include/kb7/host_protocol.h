@@ -2,8 +2,9 @@
 #define KB7_HOST_PROTOCOL_H
 
 #include "kb7/platform.h"
+#include "kb7/reports.h"
 
-#define KB7_VENDOR_REPORT_ID 0x5cU
+#define KB7_VENDOR_REPORT_ID KB7_REPORT_ID_VENDOR
 #define KB7_HOST_PROTOCOL_VERSION 1U
 #define KB7_HOST_REPORT_SIZE 64U
 #define KB7_HOST_PAYLOAD_SIZE 36U
@@ -49,6 +50,15 @@ struct KB7_PACKED kb7_host_report {
     uint32_t frame_crc32;
 };
 
+enum kb7_host_validation {
+    KB7_HOST_FRAME_VALID = 0,
+    KB7_HOST_FRAME_BAD_ID,
+    KB7_HOST_FRAME_BAD_VERSION,
+    KB7_HOST_FRAME_BAD_PAYLOAD_CRC,
+    KB7_HOST_FRAME_BAD_FRAME_CRC,
+};
+
+enum kb7_host_validation kb7_host_report_validate(const struct kb7_host_report *report);
 bool kb7_host_report_valid(const struct kb7_host_report *report);
 void kb7_host_report_finalize(struct kb7_host_report *report);
 

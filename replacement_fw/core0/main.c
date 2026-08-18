@@ -33,12 +33,14 @@ void core0_main(void) {
     state->usb_events = 0U;
     state->last_error = 0U;
 
-    if (kb7_clock_init()) {
-        state->boot_flags |= KB7_BOOT_CLOCK_READY;
-    }
     if (loader_combo_held()) {
         kb7_enter_loader();
     }
+    if (!kb7_clock_init()) {
+        state->last_error = UINT32_C(0xc10c0006);
+        kb7_enter_loader();
+    }
+    state->boot_flags |= KB7_BOOT_CLOCK_READY;
     if (kb7_dram_init_and_train()) {
         state->boot_flags |= KB7_BOOT_DRAM_READY;
     }

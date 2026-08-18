@@ -390,6 +390,20 @@ function applyField(path, value, widget) {
     const property = path.split(".").pop();
     const numeric = ["x", "y", "width", "height", "value", "minimum", "maximum", "target_screen", "arg0", "arg1"];
     target[property] = numeric.includes(property) ? Number(value) : value;
+    if (path === "action.type") {
+      target.flags = 0;
+      target.target_screen = 0;
+      target.arg0 = 0;
+      target.arg1 = 0;
+      if (value === "brightness") {
+        widget.minimum = 0; widget.maximum = 100;
+      } else if (value === "actuation") {
+        widget.minimum = 0; widget.maximum = 255;
+      } else if (value === "rapid_trigger") {
+        widget.minimum = 0; widget.maximum = 1;
+      }
+      widget.value = clamp(widget.value, widget.minimum, widget.maximum);
+    }
     if (["x", "y", "width", "height"].includes(property)) {
       widget.width = clamp(widget.width, 1, 480);
       widget.height = clamp(widget.height, 1, 800);
@@ -770,19 +784,51 @@ function rgb888(value) {
   return `#${[red, green, blue].map(component => component.toString(16).padStart(2, "0")).join("")}`;
 }
 
-function validateScreens() {
-  if (doc.format !== "kb7-screen-v1" || !doc.screens.length || doc.screens.length > 16) throw Error("Invalid screen document");
+function validateAction(widget, screenIds, minimum, maximum) {
+  const action = widget.action || {type: "none"};
+  const actionType = action.type || "none";
+  const target = action.target_screen || 0;
+  const arg0 = action.arg0 || 0;
+  const arg1 = action.arg1 || 0;
+  if (!ACTIONS[actionType] && actionType !== "none") throw Error(`Invalid action on widget ${widget.id}`);
+  if (![target, arg0, arg1].every(Number.isInteger) || target < 0 || target > 0xffff || arg0 < 0 || arg0 > 0xffff || arg1 < 0 || arg1 > 0xffffffff || (action.flags || 0) !== 0) throw Error(`Invalid action fields on widget ${widget.id}`);
+  if (actionType !== "navigate" && target !== 0) throw Error(`Only navigation may target a screen (${widget.id})`);
+  let valid = true;
+  if (["none", "navigate"].includes(actionType)) valid = arg0 === 0 && arg1 === 0;
+  else if (actionType === "rgb_color") valid = arg0 === 0 && arg1 <= 0xffffff;
+  else if (["rgb_effect", "profile"].includes(actionType)) valid = arg0 <= 0xff && arg1 === 0;
+  else if (actionType === "brightness") valid = minimum >= 0 && maximum <= 100 && arg0 === 0 && arg1 === 0;
+  else if (actionType === "actuation") valid = minimum >= 0 && maximum <= 0xff && arg0 === 0 && arg1 === 0;
+  else if (actionType === "rapid_trigger") valid = minimum >= 0 && maximum <= 1 && arg0 <= 0xff && arg1 <= 0xff;
+  else if (actionType === "hid_key") valid = (arg0 < 152 || (arg0 >= 0xe0 && arg0 <= 0xe7)) && arg1 === 0;
+  else if (actionType === "media_key") valid = arg1 === 0;
+  if (!valid || (actionType === "navigate" && !screenIds.has(target))) throw Error(`Invalid action arguments on widget ${widget.id}`);
+}
+
+function validateScreens(documentValue = doc) {
+  if (documentValue.format !== "kb7-screen-v1" || !Array.isArray(documentValue.screens) || !documentValue.screens.length || documentValue.screens.length > 16 || (documentValue.flags || 0) !== 0) throw Error("Invalid screen document");
   const screenIds = new Set();
   const widgetIds = new Set();
-  for (const item of doc.screens) {
-    if (screenIds.has(item.id)) throw Error("Duplicate screen ID");
+  const encoder = new TextEncoder();
+  const colorPattern = /^#[0-9a-f]{6}$/i;
+  for (const item of documentValue.screens) {
+    const name = item.name ?? "";
+    if (!Number.isInteger(item.id) || item.id < 0 || item.id > 0xffff || screenIds.has(item.id) || (item.flags || 0) !== 0 || typeof name !== "string" || encoder.encode(name).length > 0xffff || !colorPattern.test(item.background || "#08111f") || !Array.isArray(item.widgets)) throw Error("Invalid or duplicate screen");
     screenIds.add(item.id);
+  }
+  for (const item of documentValue.screens) {
     for (const widget of item.widgets) {
-      if (widgetIds.has(widget.id) || !TYPES[widget.type] || widget.x < 0 || widget.y < 0 || widget.width < 1 || widget.height < 1 || widget.x + widget.width > 480 || widget.y + widget.height > 800) throw Error(`Invalid widget ${widget.id}`);
+      const minimum = widget.minimum ?? 0;
+      const maximum = widget.maximum ?? 100;
+      const value = widget.value ?? minimum;
+      const textValue = widget.text ?? "";
+      const numbers = [widget.id, widget.x, widget.y, widget.width, widget.height, minimum, maximum, value];
+      if (!numbers.every(Number.isInteger) || widget.id < 0 || widget.id > 0xffff || widgetIds.has(widget.id) || !TYPES[widget.type] || (widget.flags || 0) !== 0 || widget.x < 0 || widget.y < 0 || widget.width < 1 || widget.height < 1 || widget.x + widget.width > 480 || widget.y + widget.height > 800 || minimum < -32768 || maximum > 32767 || minimum > maximum || value < minimum || value > maximum || typeof textValue !== "string" || encoder.encode(textValue).length > 0xffff || !colorPattern.test(widget.foreground || "#f5f7ff") || !colorPattern.test(widget.background || "#17243a")) throw Error(`Invalid widget ${widget.id}`);
       widgetIds.add(widget.id);
+      validateAction(widget, screenIds, minimum, maximum);
     }
   }
-  if (!screenIds.has(doc.boot_screen) || widgetIds.size > 128) throw Error("Invalid boot screen/object count");
+  if (!Number.isInteger(documentValue.boot_screen) || !screenIds.has(documentValue.boot_screen) || widgetIds.size > 128) throw Error("Invalid boot screen/object count");
 }
 
 function validateProfile() {
@@ -822,7 +868,7 @@ function compileScreens() {
     return [offset, bytes.length];
   };
   for (const item of doc.screens) {
-    const name = addString(item.name);
+    const name = addString(item.name || "");
     screens.push({...item, first, count: item.widgets.length, name});
     for (const widget of item.widgets) widgets.push({...widget, encodedText: addString(widget.text)});
     first += item.widgets.length;
@@ -839,7 +885,7 @@ function compileScreens() {
     view.setUint16(offset, item.id, true);
     view.setUint16(offset + 2, item.first, true);
     view.setUint16(offset + 4, item.count, true);
-    view.setUint16(offset + 6, rgb565(item.background), true);
+    view.setUint16(offset + 6, rgb565(item.background || "#08111f"), true);
     view.setUint32(offset + 8, item.name[0], true);
     view.setUint16(offset + 12, item.name[1], true);
     offset += 16;
@@ -851,11 +897,11 @@ function compileScreens() {
     view.setUint8(offset + 2, TYPES[widget.type]);
     view.setUint8(offset + 3, widget.flags || 0);
     [widget.x, widget.y, widget.width, widget.height].forEach((value, index) => view.setInt16(offset + 4 + index * 2, value, true));
-    view.setUint16(offset + 12, rgb565(widget.foreground), true);
-    view.setUint16(offset + 14, rgb565(widget.background), true);
+    view.setUint16(offset + 12, rgb565(widget.foreground || "#f5f7ff"), true);
+    view.setUint16(offset + 14, rgb565(widget.background || "#17243a"), true);
     view.setInt16(offset + 16, widget.minimum ?? 0, true);
     view.setInt16(offset + 18, widget.maximum ?? 100, true);
-    view.setInt16(offset + 20, widget.value ?? 0, true);
+    view.setInt16(offset + 20, widget.value ?? widget.minimum ?? 0, true);
     view.setUint16(offset + 22, action.target_screen || 0, true);
     view.setUint8(offset + 24, ACTIONS[action.type || "none"]);
     view.setUint8(offset + 25, action.flags || 0);
@@ -896,37 +942,52 @@ function parseBinary(bytes) {
   const widgetsOffset = view.getUint32(28, true);
   const stringsOffset = view.getUint32(32, true);
   const stringLength = view.getUint32(36, true);
-  if (screenCount < 1 || screenCount > 16 || widgetCount > 128 || screensOffset !== 48 || widgetsOffset !== screensOffset + screenCount * 16 || stringsOffset !== widgetsOffset + widgetCount * 40 || stringsOffset + stringLength !== bytes.length) throw Error("Invalid KBS layout");
+  if (screenCount < 1 || screenCount > 16 || widgetCount > 128 || view.getUint16(22, true) !== 0 || view.getUint32(40, true) !== 0 || view.getUint32(44, true) !== 0 || screensOffset !== 48 || widgetsOffset !== screensOffset + screenCount * 16 || stringsOffset !== widgetsOffset + widgetCount * 40 || stringsOffset + stringLength !== bytes.length) throw Error("Invalid KBS layout");
   const decoder = new TextDecoder("utf-8", {fatal: true});
-  const string = (offset, length) => decoder.decode(bytes.slice(stringsOffset + offset, stringsOffset + offset + length));
+  decoder.decode(bytes.slice(stringsOffset));
+  const string = (offset, length) => {
+    if (offset > stringLength || length > stringLength - offset) throw Error("String outside KBS pool");
+    return decoder.decode(bytes.slice(stringsOffset + offset, stringsOffset + offset + length));
+  };
   const widgets = [];
+  const widgetIds = new Set();
   for (let index = 0; index < widgetCount; index += 1) {
     const offset = widgetsOffset + index * 40;
     const type = TYPE_NAMES[view.getUint8(offset + 2)];
     const action = ACTION_NAMES[view.getUint8(offset + 24)];
-    if (!type || !action) throw Error("Unsupported opcode");
+    const id = view.getUint16(offset, true);
+    if (!type || !action || widgetIds.has(id) || view.getUint8(offset + 3) !== 0 || view.getUint8(offset + 25) !== 0 || view.getUint16(offset + 38, true) !== 0) throw Error("Unsupported/duplicate widget or reserved field");
+    widgetIds.add(id);
     widgets.push({
-      id: view.getUint16(offset, true), type, flags: view.getUint8(offset + 3),
+      id, type, flags: 0,
       x: view.getInt16(offset + 4, true), y: view.getInt16(offset + 6, true),
       width: view.getInt16(offset + 8, true), height: view.getInt16(offset + 10, true),
       foreground: rgb888(view.getUint16(offset + 12, true)), background: rgb888(view.getUint16(offset + 14, true)),
       minimum: view.getInt16(offset + 16, true), maximum: view.getInt16(offset + 18, true), value: view.getInt16(offset + 20, true),
       text: string(view.getUint32(offset + 32, true), view.getUint16(offset + 36, true)),
-      action: {type: action, flags: view.getUint8(offset + 25), target_screen: view.getUint16(offset + 22, true), arg0: view.getUint16(offset + 26, true), arg1: view.getUint32(offset + 28, true)},
+      action: {type: action, flags: 0, target_screen: view.getUint16(offset + 22, true), arg0: view.getUint16(offset + 26, true), arg1: view.getUint32(offset + 28, true)},
     });
   }
   const screens = [];
+  const screenIds = new Set();
+  let nextWidget = 0;
   for (let index = 0; index < screenCount; index += 1) {
     const offset = screensOffset + index * 16;
     const first = view.getUint16(offset + 2, true);
     const count = view.getUint16(offset + 4, true);
-    if (first + count > widgetCount) throw Error("Bad screen widget range");
+    const id = view.getUint16(offset, true);
+    if (screenIds.has(id) || view.getUint16(offset + 14, true) !== 0 || first !== nextWidget || first + count > widgetCount) throw Error("Bad screen widget range/ID/flags");
+    screenIds.add(id);
     screens.push({
-      id: view.getUint16(offset, true), name: string(view.getUint32(offset + 8, true), view.getUint16(offset + 12, true)),
-      background: rgb888(view.getUint16(offset + 6, true)), flags: view.getUint16(offset + 14, true), widgets: widgets.slice(first, first + count),
+      id, name: string(view.getUint32(offset + 8, true), view.getUint16(offset + 12, true)),
+      background: rgb888(view.getUint16(offset + 6, true)), flags: 0, widgets: widgets.slice(first, first + count),
     });
+    nextWidget += count;
   }
-  return {format: "kb7-screen-v1", boot_screen: boot, flags: view.getUint16(22, true), screens};
+  if (nextWidget !== widgetCount || !screenIds.has(boot)) throw Error("Invalid boot screen/widget partition");
+  const result = {format: "kb7-screen-v1", boot_screen: boot, flags: 0, screens};
+  validateScreens(result);
+  return result;
 }
 
 function download(name, data, mimeType) {

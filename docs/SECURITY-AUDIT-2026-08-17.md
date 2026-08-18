@@ -21,6 +21,12 @@ bundle generation was disabled; and the panel, RGB, and USB hardware profiles
 were replaced by fail-closed stubs. The remaining source is still not approved
 for device installation.
 
+The actionable source findings have since been incorporated with fail-closed
+hardware boundaries and host-side regression tests. See
+`AUDIT-REMEDIATION-2026-08-17.md` for the finding-by-finding status. This does
+not change the non-flashable verdict because the required hardware profiles and
+recovery validation remain unavailable.
+
 ## Critical and high-severity findings
 
 1. **Clock ROM return semantics were inverted.** `drivers/clock.c` treated two

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from kb7studio.storage import AtomicSlots, PowerLoss
+from kb7studio.storage import HEADER, AtomicSlots, PowerLoss, make_header
 
 
 class StorageTests(unittest.TestCase):
@@ -27,6 +27,15 @@ class StorageTests(unittest.TestCase):
         slots.commit(b"two")
         slots.flash[4096 + 64] ^= 1
         self.assertEqual(slots.active(), b"one")
+
+    def test_generation_selection_is_wrap_safe(self) -> None:
+        slots = AtomicSlots(4096)
+        old, new = b"before-wrap", b"after-wrap"
+        slots._program(0, make_header(0x3FFFFFFF, 0xFFFFFFFF, old))
+        slots._program(HEADER.size, old)
+        slots._program(4096, make_header(0x3FFFFFFF, 0, new))
+        slots._program(4096 + HEADER.size, new)
+        self.assertEqual(slots.active(), new)
 
 
 if __name__ == "__main__":

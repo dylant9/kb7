@@ -28,6 +28,7 @@ struct KB7_PACKED kb7_slot_header {
 
 struct kb7_slot_choice { uint32_t offset; struct kb7_slot_header header; bool valid; };
 bool kb7_storage_header_valid(const struct kb7_slot_header *header);
+struct kb7_slot_choice kb7_storage_read_slot(uint32_t offset);
 struct kb7_slot_choice kb7_storage_select(void);
 
 #endif

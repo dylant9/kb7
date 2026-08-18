@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import unittest
 
-from kb7studio.protocol import BAD_CRC, BAD_STATE, OK, OfflineReceiver, ProtocolError, Report, transfer_reports
+from kb7studio.protocol import (BAD_CRC, BAD_STATE, COMMAND, FACTORY_RESET, OK, READ,
+                                RESET_TOKEN, SELECT, OfflineReceiver, ProtocolError, Report,
+                                transfer_reports)
 
 
 class ProtocolTests(unittest.TestCase):
@@ -27,12 +29,38 @@ class ProtocolTests(unittest.TestCase):
 
     def test_out_of_order_chunk_does_not_replace_committed(self) -> None:
         receiver = OfflineReceiver()
-        for report in transfer_reports(b"stable"):
+        stable = b"stable" * 10
+        for report in transfer_reports(stable):
             receiver.process(report)
         reports = transfer_reports(b"replacement" * 20, 2)
         receiver.process(reports[0])
         self.assertEqual(receiver.process(reports[2]).status, BAD_STATE)
-        self.assertEqual(receiver.committed, b"stable")
+        self.assertEqual(receiver.committed, stable)
+
+    def test_read_select_and_confirmed_factory_reset(self) -> None:
+        receiver = OfflineReceiver()
+        stored = b"stored-screen" * 5
+        for report in transfer_reports(stored, 7):
+            self.assertEqual(receiver.process(report).status, OK)
+        read = receiver.process(Report(COMMAND, READ, offset=3))
+        self.assertEqual(read.payload, stored[3:3 + 36])
+        self.assertEqual(read.total_length, len(stored))
+        self.assertEqual(receiver.process(Report(COMMAND, SELECT, offset=42)).status, OK)
+        self.assertEqual(receiver.selected_screen, 42)
+        denied = receiver.process(Report(COMMAND, FACTORY_RESET))
+        self.assertEqual(denied.status, BAD_STATE)
+        reset = Report(COMMAND, FACTORY_RESET, transfer_id=RESET_TOKEN,
+                       payload=b"RESETKB7", flags=0xA5)
+        self.assertEqual(receiver.process(reset).status, OK)
+        self.assertEqual(receiver.committed, b"")
+
+    def test_begin_does_not_replace_an_active_transfer(self) -> None:
+        receiver = OfflineReceiver()
+        reports = transfer_reports(b"first transfer" * 4, 10)
+        self.assertEqual(receiver.process(reports[0]).status, OK)
+        replacement = transfer_reports(b"second transfer" * 4, 11)[0]
+        self.assertEqual(receiver.process(replacement).status, BAD_STATE)
+        self.assertEqual(receiver.transfer_id, 10)
 
 
 if __name__ == "__main__":

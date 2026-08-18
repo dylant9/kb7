@@ -2,6 +2,7 @@
 
 check: test studio-check firmware-check
 	python3 tools/check_public_tree.py .
+	python3 tools/audit_firmware_source.py .
 
 test:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=pc_app python3 -m unittest discover -s pc_app/tests -v
@@ -11,4 +12,5 @@ studio-check:
 
 firmware-check:
 	$(MAKE) -C replacement_fw clean all
+	$(MAKE) -C replacement_fw audit-profile
 	$(MAKE) -C replacement_fw clean

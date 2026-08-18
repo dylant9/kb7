@@ -11,12 +11,13 @@ Flash-image generation is disabled.
 
 ## Repository contents
 
-- `replacement_fw/` — freestanding Cortex-M4 source that can be compiled to ELF
+- `replacement_fw/` — freestanding Cortex-M3 source that can be compiled to ELF
   files for static inspection. Hardware-sensitive public drivers fail closed.
 - `pc_app/` — dependency-free browser editor plus Python validators, compiler,
   protocol model, storage model, samples, and tests. It performs no device I/O.
 - `docs/` — project-owned screen/profile/control/storage formats, the full
-  security audit, and the public-source provenance review.
+  security audit, remediation matrix, report schemas, and public-source
+  provenance review.
 - `tools/check_public_tree.py` — rejects compiled/vendor artifacts, archive and
   executable formats, symlinks, build directories, and known private filenames.
 
@@ -53,10 +54,14 @@ deliberately fails: no flash image can be produced from the public tree.
 
 Read [OPEN-SOURCE-REVIEW.md](docs/OPEN-SOURCE-REVIEW.md) before publication and
 [SECURITY-AUDIT-2026-08-17.md](docs/SECURITY-AUDIT-2026-08-17.md) before changing
-any hardware-facing code. Run this immediately before every commit or release:
+any hardware-facing code, then review
+[AUDIT-REMEDIATION-2026-08-17.md](docs/AUDIT-REMEDIATION-2026-08-17.md) and the
+later [SNC7320 datasheet audit](docs/SOC-DATASHEET-AUDIT-2026-08-18.md). Run
+this immediately before every commit or release:
 
 ```sh
 python3 tools/check_public_tree.py .
+python3 tools/audit_firmware_source.py .
 ```
 
 Only this repository directory is intended for publication. Never add files

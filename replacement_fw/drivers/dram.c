@@ -1,4 +1,5 @@
 #include "kb7/drivers.h"
+#include "kb7/config.h"
 #include "kb7/regs.h"
 
 /*
@@ -7,10 +8,6 @@
  * therefore leaves the block disabled unless explicitly enabled for a staged
  * hardware experiment.
  */
-#ifndef KB7_ENABLE_UNVERIFIED_DRAM_INIT
-#define KB7_ENABLE_UNVERIFIED_DRAM_INIT 0
-#endif
-
 static uint32_t pattern(size_t index, uint32_t phase) {
     static const uint32_t fixed[] = {
         UINT32_C(0x00000000), UINT32_C(0xffffffff),
@@ -50,10 +47,11 @@ bool kb7_dram_init_and_train(void) {
     KB7_MMIO32(SNC_DRAM_BASE + 0x1cU) = UINT32_C(0x00030306);
     KB7_MMIO32(SNC_DRAM_BASE + 0x5cU) |= 1U;
     uint32_t timeout = UINT32_C(4000000);
-    while ((KB7_MMIO32(SNC_DRAM_BASE + 0x60U) & 1U) == 0U && timeout-- != 0U) {
-    }
-    if (timeout == 0U) {
-        return false;
+    while ((KB7_MMIO32(SNC_DRAM_BASE + 0x60U) & 1U) == 0U) {
+        if (timeout == 0U) {
+            return false;
+        }
+        --timeout;
     }
     return kb7_dram_march_test(KB7_FRAMEBUFFER_A, UINT32_C(0x10000));
 #else

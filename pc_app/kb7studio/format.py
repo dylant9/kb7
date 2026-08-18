@@ -26,6 +26,7 @@ ACTIONS = {
 }
 REVERSE_WIDGET_TYPES = {value: key for key, value in WIDGET_TYPES.items()}
 REVERSE_ACTIONS = {value: key for key, value in ACTIONS.items()}
+KEYBOARD_USAGE_BITS = 152
 
 
 class ScreenFormatError(ValueError):
@@ -74,6 +75,32 @@ def _append_string(pool: bytearray, value: Any, name: str) -> tuple[int, int]:
     return offset, len(encoded)
 
 
+def _validate_action_fields(action: int, target: int, arg0: int, arg1: int,
+                            minimum: int, maximum: int) -> None:
+    if action != ACTIONS["navigate"] and target != 0:
+        raise ScreenFormatError("only navigate may set target_screen")
+    if action in (ACTIONS["none"], ACTIONS["navigate"]):
+        valid = arg0 == 0 and arg1 == 0
+    elif action == ACTIONS["rgb_color"]:
+        valid = arg0 == 0 and arg1 <= 0xFFFFFF
+    elif action in (ACTIONS["rgb_effect"], ACTIONS["profile"]):
+        valid = arg0 <= 0xFF and arg1 == 0
+    elif action == ACTIONS["brightness"]:
+        valid = minimum >= 0 and maximum <= 100 and arg0 == 0 and arg1 == 0
+    elif action == ACTIONS["actuation"]:
+        valid = minimum >= 0 and maximum <= 0xFF and arg0 == 0 and arg1 == 0
+    elif action == ACTIONS["rapid_trigger"]:
+        valid = minimum >= 0 and maximum <= 1 and arg0 <= 0xFF and arg1 <= 0xFF
+    elif action == ACTIONS["hid_key"]:
+        valid = (arg0 < KEYBOARD_USAGE_BITS or 0xE0 <= arg0 <= 0xE7) and arg1 == 0
+    elif action == ACTIONS["media_key"]:
+        valid = arg1 == 0
+    else:  # host_event
+        valid = True
+    if not valid:
+        raise ScreenFormatError("action arguments or value range are invalid")
+
+
 def compile_document(document: dict[str, Any]) -> bytes:
     if not isinstance(document, dict) or document.get("format") != "kb7-screen-v1":
         raise ScreenFormatError("document format must be 'kb7-screen-v1'")
@@ -81,11 +108,15 @@ def compile_document(document: dict[str, Any]) -> bytes:
     if not isinstance(screens, list) or not 1 <= len(screens) <= MAX_SCREENS:
         raise ScreenFormatError(f"screens must contain 1..{MAX_SCREENS} entries")
     boot = _integer(document.get("boot_screen"), "boot_screen", 0, 0xFFFF)
+    header_flags = _integer(document.get("flags", 0), "flags", 0, 0xFFFF)
+    if header_flags != 0:
+        raise ScreenFormatError("header flags must be zero in version 1")
     strings = bytearray()
     screen_blobs: list[bytes] = []
     widget_blobs: list[bytes] = []
     screen_ids: set[int] = set()
     widget_ids: set[int] = set()
+    navigation_targets: list[int] = []
     first_widget = 0
     for screen_index, screen in enumerate(screens):
         if not isinstance(screen, dict):
@@ -100,9 +131,12 @@ def compile_document(document: dict[str, Any]) -> bytes:
             raise ScreenFormatError("screen.widgets must be a list")
         if len(widget_blobs) + len(widgets) > MAX_WIDGETS:
             raise ScreenFormatError(f"more than {MAX_WIDGETS} widgets")
+        screen_flags = _integer(screen.get("flags", 0), "screen.flags", 0, 0xFFFF)
+        if screen_flags != 0:
+            raise ScreenFormatError("screen flags must be zero in version 1")
         screen_blobs.append(SCREEN.pack(
             screen_id, first_widget, len(widgets), rgb565(screen.get("background", "#08111f")),
-            name_offset, name_length, _integer(screen.get("flags", 0), "screen.flags", 0, 0xFFFF),
+            name_offset, name_length, screen_flags,
         ))
         for widget_index, widget in enumerate(widgets):
             if not isinstance(widget, dict):
@@ -131,19 +165,32 @@ def compile_document(document: dict[str, Any]) -> bytes:
             value = _integer(widget.get("value", minimum), "widget.value", -32768, 32767)
             if minimum > maximum or not minimum <= value <= maximum:
                 raise ScreenFormatError(f"widget {widget_id} has invalid value range")
+            widget_flags = _integer(widget.get("flags", 0), "widget.flags", 0, 255)
+            if widget_flags != 0:
+                raise ScreenFormatError("widget flags must be zero in version 1")
+            target_screen = _integer(action.get("target_screen", 0), "action.target_screen", 0, 0xFFFF)
+            action_code = ACTIONS[action.get("type", "none")]
+            action_flags = _integer(action.get("flags", 0), "action.flags", 0, 255)
+            if action_flags != 0:
+                raise ScreenFormatError("action flags must be zero in version 1")
+            arg0 = _integer(action.get("arg0", 0), "action.arg0", 0, 0xFFFF)
+            arg1 = _integer(action.get("arg1", 0), "action.arg1", 0, 0xFFFFFFFF)
+            _validate_action_fields(action_code, target_screen, arg0, arg1, minimum, maximum)
+            if action.get("type", "none") == "navigate":
+                navigation_targets.append(target_screen)
             widget_blobs.append(WIDGET.pack(
-                widget_id, WIDGET_TYPES[kind_name], _integer(widget.get("flags", 0), "widget.flags", 0, 255),
+                widget_id, WIDGET_TYPES[kind_name], widget_flags,
                 x, y, width, height, rgb565(widget.get("foreground", "#f5f7ff")),
                 rgb565(widget.get("background", "#17243a")), minimum, maximum, value,
-                _integer(action.get("target_screen", 0), "action.target_screen", 0, 0xFFFF),
-                ACTIONS[action.get("type", "none")], _integer(action.get("flags", 0), "action.flags", 0, 255),
-                _integer(action.get("arg0", 0), "action.arg0", 0, 0xFFFF),
-                _integer(action.get("arg1", 0), "action.arg1", 0, 0xFFFFFFFF),
+                target_screen,
+                action_code, action_flags, arg0, arg1,
                 text_offset, text_length, 0,
             ))
         first_widget += len(widgets)
     if boot not in screen_ids:
         raise ScreenFormatError("boot_screen does not name a screen")
+    if any(target not in screen_ids for target in navigation_targets):
+        raise ScreenFormatError("navigation target does not name a screen")
     screens_offset = HEADER.size
     widgets_offset = screens_offset + len(screen_blobs) * SCREEN.size
     strings_offset = widgets_offset + len(widget_blobs) * WIDGET.size
@@ -151,7 +198,7 @@ def compile_document(document: dict[str, Any]) -> bytes:
     total_length = HEADER.size + len(body)
     header = HEADER.pack(
         MAGIC, VERSION, HEADER.size, total_length, crc32(body), len(screen_blobs), boot,
-        len(widget_blobs), _integer(document.get("flags", 0), "flags", 0, 0xFFFF),
+        len(widget_blobs), 0,
         screens_offset, widgets_offset, strings_offset, len(strings), 0, 0,
     )
     return header + body
@@ -176,9 +223,15 @@ def parse_binary(blob: bytes) -> dict[str, Any]:
         raise ScreenFormatError("non-canonical record layout")
     if strings_offset != widgets_offset + widget_count * WIDGET.size or strings_offset + strings_length != total:
         raise ScreenFormatError("invalid string layout")
+    if flags != 0 or features != 0 or reserved != 0:
+        raise ScreenFormatError("reserved header fields must be zero")
     if crc32(blob[header_length:]) != body_crc:
         raise ScreenFormatError("body CRC mismatch")
     strings = blob[strings_offset:]
+    try:
+        strings.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ScreenFormatError("invalid UTF-8 string pool") from exc
 
     def text(offset: int, length: int) -> str:
         if offset > len(strings) or length > len(strings) - offset:
@@ -189,15 +242,24 @@ def parse_binary(blob: bytes) -> dict[str, Any]:
             raise ScreenFormatError("invalid UTF-8") from exc
 
     raw_widgets = []
+    widget_ids: set[int] = set()
     for index in range(widget_count):
         item = WIDGET.unpack_from(blob, widgets_offset + index * WIDGET.size)
         (widget_id, widget_type, widget_flags, x, y, width, height, foreground, background,
          minimum, maximum, value, target, action, action_flags, arg0, arg1, text_offset,
-         text_length, _widget_reserved) = item
+         text_length, widget_reserved) = item
         if widget_type not in REVERSE_WIDGET_TYPES or action not in REVERSE_ACTIONS:
             raise ScreenFormatError("unknown widget/action opcode")
+        if widget_flags != 0 or action_flags != 0 or widget_reserved != 0:
+            raise ScreenFormatError("widget flags/reserved fields must be zero")
+        if widget_id in widget_ids:
+            raise ScreenFormatError("duplicate widget id")
+        widget_ids.add(widget_id)
         if width <= 0 or height <= 0 or x < 0 or y < 0 or x + width > 480 or y + height > 800:
             raise ScreenFormatError("widget geometry outside display")
+        if minimum > maximum or not minimum <= value <= maximum:
+            raise ScreenFormatError("widget value outside range")
+        _validate_action_fields(action, target, arg0, arg1, minimum, maximum)
         raw_widgets.append({
             "id": widget_id, "type": REVERSE_WIDGET_TYPES[widget_type], "flags": widget_flags,
             "x": x, "y": y, "width": width, "height": height,
@@ -209,17 +271,24 @@ def parse_binary(blob: bytes) -> dict[str, Any]:
         })
     screens = []
     screen_ids = set()
+    next_widget = 0
     for index in range(screen_count):
         screen_id, first, count, background, name_offset, name_length, screen_flags = SCREEN.unpack_from(
             blob, screens_offset + index * SCREEN.size)
-        if screen_id in screen_ids or first + count > len(raw_widgets):
+        if (screen_flags != 0 or screen_id in screen_ids or first != next_widget or
+                first + count > len(raw_widgets)):
             raise ScreenFormatError("invalid/duplicate screen record")
         screen_ids.add(screen_id)
         screens.append({"id": screen_id, "name": text(name_offset, name_length),
                         "background": rgb888(background), "flags": screen_flags,
                         "widgets": raw_widgets[first:first + count]})
-    if boot not in screen_ids or features != 0 or reserved != 0:
-        raise ScreenFormatError("invalid boot screen or reserved fields")
+        next_widget += count
+    if next_widget != len(raw_widgets) or boot not in screen_ids:
+        raise ScreenFormatError("invalid boot screen or widget partition")
+    for widget in raw_widgets:
+        action = widget["action"]
+        if action["type"] == "navigate" and action["target_screen"] not in screen_ids:
+            raise ScreenFormatError("navigation target does not name a screen")
     return {"format": "kb7-screen-v1", "boot_screen": boot, "flags": flags, "screens": screens}
 
 
