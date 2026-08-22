@@ -46,6 +46,12 @@ There the aligned **address itself** is shifted right by 9 and passed as the
 builder's address argument; the `F6 15`/`F6 19` cases serialize it directly.
 The count argument is zero and neither erase case writes a count field.
 
+The complete companion SDK package was then checked for a downstream rewrite.
+The updater's active SCSI submission path copies the finished 16-byte CDB
+verbatim, an accompanying standalone transport does the same, and the SDK
+program/erase entry points only schedule the plugin operation. No lower layer
+rescales the address, changes the count units, or supplies an erase length.
+
 ## Corrections to the Phase-0 model
 
 The earlier write-path model made several safety-critical mistakes:
@@ -56,7 +62,8 @@ The earlier write-path model made several safety-critical mistakes:
 3. The eight apparent command builders are switch branches in one shared
    function, not independent functions.
 4. The flash-type selector is not the current three-/four-byte NOR address-mode
-   bit.
+   bit. The registered NOR operator defaults it to zero; a separate
+   configuration handler can change it.
 5. A separate scalar is wait-timing state, not a flash address-unit table.
 6. `F6 19` is not selected simply because an address exceeds 16 MiB.
 

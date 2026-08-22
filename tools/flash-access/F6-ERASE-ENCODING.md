@@ -53,6 +53,25 @@ listing, or bulk decompilation is included here; the independently written
 data-flow relationships needed to reproduce the interoperability result are
 recorded below.
 
+### Companion-package cross-layer check
+
+A second pass used the complete companion SDK package rather than the command
+builder in isolation. It closed a possible gap in the original proof:
+
+- the package manifest assigns both the generic command-builder service and the
+  NOR-flash operator to the implementation analysed here;
+- the active submission path copies the completed 16-byte CDB verbatim into the
+  operating system's SCSI pass-through structure;
+- an accompanying standalone SCSI transport independently performs the same
+  fixed 16-byte copy and does not parse or rescale address/count fields; and
+- the exported SDK program/erase entry points store operation parameters and
+  schedule plugin work, but do not contain a second `F6` encoder.
+
+The builder output is therefore the CDB delivered to the device. There is no
+lower transport layer that could turn the recovered block index back into a
+byte address or add an erase count. The other packaged mode-switch and HID
+components contain no competing `F6 05`/`06`/`15`/`17`/`18`/`19` builder.
+
 ## Calibration: re-deriving the known `F6 06` program format
 
 This trace was calibrated against the destructive hardware result before the
@@ -116,9 +135,11 @@ progress value. It is the exact value passed as the builder's address argument.
 
 The earlier notes conflated two independent controls.
 
-An internal flash-type selector defaults to zero. In the erase routines it
-selects the 4-KiB/`F6 15` path when zero and the 128-KiB/`F6 19` path when
-nonzero. It is **not** the three-/four-byte NOR address-mode state.
+The service instance registered as the NOR-flash operator initializes an
+internal flash-type selector to zero. In the erase routines it selects the
+4-KiB/`F6 15` path when zero and the 128-KiB/`F6 19` path when nonzero. A
+separate flash-type configuration handler can set it nonzero, so `F6 19` is
+reachable. The selector is **not** the three-/four-byte NOR address-mode state.
 
 Four-byte NOR addressing is handled independently. The higher-level
 orchestrator compares `start + length` with `0x61000000`, emitting `F6 17` when
@@ -152,20 +173,24 @@ Proven from the updater's register and stack data flow:
 - neither erase CDB carries a count;
 - one command is issued per host-loop erase unit;
 - `F6 17` selection is independent of `F6 15`/`F6 19` selection;
-- the constructor defaults the flash-type selector to zero;
+- the registered NOR operator defaults the flash-type selector to zero, and a
+  separate configuration path can change it;
 - the separately traced state is timing data, not an address-unit table.
+- both available SCSI submission implementations copy the completed CDB
+  unchanged, with no lower-layer unit conversion.
 
-Inferred from the known MX25L25645G target and the named flash-type control:
+Inferred from the known MX25L25645G target and the zero-selector NOR default:
 
-- the official KB7 configuration should leave the selector at zero and use the
-  `F6 15` 4-KiB path. The static analysis did not execute the complete updater
-  configuration or prove that no external event ever changes it.
+- the normal KB7 configuration should leave the selector at zero and use the
+  `F6 15` 4-KiB path. Static analysis proves the default and the available
+  setter, but cannot prove which optional flash-type choice an operator would
+  make at runtime.
 
 Not proven on hardware:
 
 - that the loader's erase handler implements these statically recovered
   commands correctly;
-- the device-side purpose of the alternate `F6 19`/128-KiB mode.
+- the exact device-side purpose of the alternate `F6 19`/128-KiB mode.
 
 ## Tooling and write-path verdict
 

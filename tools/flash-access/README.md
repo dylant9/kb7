@@ -107,9 +107,11 @@ Calibrated data-flow analysis of the updater proved:
 
 The erase field is a **512-byte-block index**, unlike read/program. The
 shifted value was traced into the builder's address argument and then into the
-CDB bytes. See [F6-ERASE-ENCODING.md](F6-ERASE-ENCODING.md) for the complete
-proof and [F6-WRITE-ENCODING.md](F6-WRITE-ENCODING.md) for the final command
-summary.
+CDB bytes. A complete companion-SDK review also confirmed that both available
+SCSI submission paths copy that 16-byte CDB unchanged and that no lower layer
+rescales its fields. See [F6-ERASE-ENCODING.md](F6-ERASE-ENCODING.md) for the
+complete proof and [F6-WRITE-ENCODING.md](F6-WRITE-ENCODING.md) for the final
+command summary.
 
 `F6 19` is not the automatic “above 16 MiB” form. A separate internal
 flash-type selector chooses that path. The updater emits `F6 17` independently
