@@ -1,0 +1,3 @@
+00000000:009fffff keepout_low
+00a00000:00a0ffff repair
+00a10000:01ffffff keepout_high

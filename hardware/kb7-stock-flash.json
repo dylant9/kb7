@@ -171,5 +171,5 @@
     ["profile_a", "0x01c00000", "0x01c38000"],
     ["profile_b", "0x01c38000", "0x01c70000"]
   ],
-  "evidence_boundary": "Raw images and logs are private owner-supplied artifacts; this file contains independently derived factual metadata only."
+  "evidence_boundary": "Raw images and logs are owner-supplied inputs and are not included; this file contains independently derived factual metadata only."
 }

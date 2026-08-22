@@ -14,6 +14,9 @@ panel sequence, RGB controller protocol, Hall routing model and USB controller
 stack. It still excludes vendor code/binaries, decompiler output, raw captures,
 stock patch tooling, assigned USB identity and every generated binary.
 
+This is public, inspection-oriented source. Do not commit locally built images,
+stock inputs, captures, or proprietary analysis artifacts to this directory.
+
 ## Current status — 2026-08-22
 
 All substantial software-owned functions supported by the available evidence
@@ -49,7 +52,10 @@ findings have regression-tested repairs, described in
 profiles, generic non-GPIO pinmux, logical-key→LED correlation and hardware
 validation remain unresolved. External stock repair has succeeded once, but a
 repeatable exact rollback procedure is still required. The repository has no
-USB flashing utility. Do not install these ELFs.
+USB flashing utility. Separate read-only USB diagnostics and the proven
+external-SPI recovery notes live in
+[`../tools/flash-access/`](../tools/flash-access/README.md); neither is an
+installation route for these ELFs. Do not install them.
 
 The compatibility function named `kb7_enter_loader()` does not claim an
 autonomous loader transition. The datasheet establishes that AIRCR/software

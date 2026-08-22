@@ -30,7 +30,8 @@ output, PCB captures, or copied vendor tables.
 
 This proves one external repair path, not a repeatable bit-identical full-chip
 restore and not the safety of installing the replacement firmware. Raw backups,
-programmer logs and repair images remain private.
+programmer logs and repair images are intentionally not published or included
+in this public repository.
 
 Every factual item identifies its evidence class and source page. Page numbers
 refer to Sonix *SNC7320 Series Data Sheet*, revision 2.1 (1 June 2022), whose
@@ -42,7 +43,7 @@ Evidence classes:
 
 - `datasheet`: explicitly stated by the manufacturer;
 - `firmware_recovery`: independently recovered from lawfully held reference
-  firmware, summarized without copied code or private addresses;
+  firmware, summarized without copied code or vendor implementation addresses;
 - `user_observation`: reported marking or PCB label;
 - `inference`: a joined conclusion that still requires measurement; and
 - `unverified`: a field reserved for a physical result that has not been

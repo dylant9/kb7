@@ -15,6 +15,15 @@ SPEC.loader.exec_module(MODULE)
 
 
 class PublicTreeTests(unittest.TestCase):
+    def test_local_paths_and_excluded_analysis_names_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "notes.md").write_text(
+                'cd "$HOME/' + 'dev/kb7"\nsource: ISPTool' + 'Main.dll\n')
+            result = MODULE.inspect(root)
+            self.assertFalse(result["passed"])
+            self.assertEqual(len(result["failures"]), 2)
+
     def test_large_plainly_encoded_binary_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

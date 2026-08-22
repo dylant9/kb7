@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Catch direct or plainly encoded private/binary material in a public tree.
+"""Catch direct or plainly encoded prohibited/binary material in a public tree.
 
 This is a publication accident detector, not a proof against deliberate data
 concealment. Human provenance review remains mandatory.
@@ -28,11 +28,20 @@ DENIED_NAMES = {
     "KB7_V1.24-core0.bin",
     "KB7_V1.24-core1.bin",
     "KB7_V1.24-loader.bin",
+    "kb7-isp-write.py",
 }
 DENIED_TEXT = (
     "Ghidra " + "decompiler output",
     "Turtle Beach " + "Swarm II Installer",
     "AP_AT423_" + "V1.15.bin",
+    "ISPTool" + "Main.dll",
+    "nor_write_" + "emitter.py",
+    "kb7-REPAIR-" + "full32M.bin",
+    "private " + "repo",
+    "private " + "workspace",
+    "private " + "RE " + "archive",
+    "$HOME/" + "dev/kb7",
+    str(Path("/") / "root" / ".codex" / "attachments"),
 )
 MAGICS = {
     b"\x7fELF": "ELF",
@@ -61,7 +70,7 @@ def inspect(root: Path) -> dict[str, object]:
             continue
         checked += 1
         if path.name in DENIED_NAMES:
-            failures.append(f"known private filename: {relative}")
+            failures.append(f"prohibited artifact filename: {relative}")
         if path.suffix.lower() in DENIED_SUFFIXES:
             failures.append(f"denied extension: {relative}")
         if any(part.lower() in DENIED_PARTS for part in relative.parts[:-1]):
@@ -78,7 +87,7 @@ def inspect(root: Path) -> dict[str, object]:
         text_bytes += len(data)
         for marker in DENIED_TEXT:
             if marker in text:
-                failures.append(f"private marker {marker!r}: {relative}")
+                failures.append(f"prohibited content marker {marker!r}: {relative}")
         for description, pattern in ENCODED_BLOCKS.items():
             if pattern.search(text):
                 failures.append(f"{description}: {relative}")
