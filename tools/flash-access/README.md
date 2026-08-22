@@ -93,8 +93,14 @@ endpoint fails above 4 KB per transfer, so keep reads at ≤ 0x1000.
 | `F6 01` | Read status | 1 byte; bit 0 = WIP |
 | `F6 05` | **NOR read** | `CDB[3:7]` = BE32 **raw byte address** (`0x60000000` + offset); `CDB[7:9]` = BE16 count in **512-byte blocks** |
 | `F6 06` | **NOR program** | `CDB[3:7]` = BE32 **raw byte address** (`0x60000000` + offset in the official path); `CDB[7:9]` = BE16 count in **512-byte blocks** |
-| `F6 17` | Enter 4-byte addressing | no operands; required above 16 MB |
+| `F6 17` | Enter 4-byte addressing | no operands |
 | `F6 F1` | Device descriptor | 36 bytes |
+
+Static tracing of the vendor orchestration additionally establishes that it
+selects `F6 17` when the program or erase range crosses the absolute
+`0x61000000` boundary, and `F6 18` (no operands) when the range remains below
+it. The corrected validation sequence uses `F6 18`, but that command has not
+yet been exercised on hardware.
 
 ### Erase encoding: resolved statically, not validated on hardware
 
@@ -114,9 +120,12 @@ complete proof and [F6-WRITE-ENCODING.md](F6-WRITE-ENCODING.md) for the final
 command summary.
 
 `F6 19` is not the automatic “above 16 MiB” form. A separate internal
-flash-type selector chooses that path. The updater emits `F6 17` independently
-when the NOR address range crosses `0x61000000`, and normal KB7 NOR erase
-remains `F6 15`. A 16-bit index in 512-byte units covers the entire 32-MiB chip.
+flash-type selector chooses that path. For both program and erase, the updater
+emits `F6 17` when the NOR operation range crosses `0x61000000` and `F6 18`
+otherwise. This address-mode choice neither changes the interpretation of the
+`F6 15` block index nor reads or modifies the flash-type selector. Normal KB7
+NOR erase therefore remains `F6 15` in either address mode. A 16-bit index in
+512-byte units covers the entire 32-MiB chip.
 
 ### The disproven Phase-0 program model
 
@@ -142,7 +151,7 @@ the same argument trace to erase. In the program path the `>> 9` is applied to
 the transfer **size**; in the erase path it is applied to the aligned
 **address**.
 
-### ⚠️ USB writing is NOT validated — do not use it
+### ⚠️ USB writing is NOT validated — laboratory experiment only
 
 **If you have found this repository and want to flash a KB7: use the SPI path.**
 The USB write path is an active research effort, not a working feature. Treat
@@ -157,9 +166,12 @@ and core0. Recovery required a full-chip SPI rewrite.
 
 `kb7-isp-write2.py` exists to settle the one remaining unknown — whether the
 loader's erase handler implements the statically recovered `F6 15` encoding. It
-is **dry-run by default**, confined to an unused scratch sector, and refuses to
-erase unless a programmed marker makes the result observable. It is a validation
-experiment, not a flashing tool.
+is **dry-run by default**, derives an unused scratch sector from the connected
+manifest, requires exact full-chip pre/post images, and refuses to erase unless
+a separately verified program stage left its bound marker and authorization
+state. It is a validation experiment, not a flashing tool. See
+[WRITE-TEST-PLAN.md](WRITE-TEST-PLAN.md) before considering its explicit
+`--commit` mode.
 
 Even with the encoding statically resolved, no erase test is non-destructive
 under every remaining implementation failure: `F6 15`'s field is 16 bits, so a
@@ -203,12 +215,21 @@ default after writing; add `-N` to verify only the written region.
 | `kb7-enter-isp.py` | Switch a running keyboard into ISP mode | volatile; asks before sending |
 | `kb7-isp-verify.py` | Read flash **through the SoC's own controller** and verify region CRCs | **read-only** — mutating opcodes are unrepresentable |
 | `kb7-isp-repeat.py` | Re-read one region N times across chunk sizes to measure read repeatability | read-only |
+| `kb7-isp-write2.py` | Two-stage marker-program/sector-erase validation experiment | **destructive; dry-run by default; not a firmware flasher** |
+| `WRITE-TEST-PLAN.md` | Exact experimental sequence, remaining failure modes and SPI recovery procedure | documentation only |
 | `F6-ERASE-ENCODING.md` | Calibrated static proof of the erase address units and CDB layouts | documentation only |
 | `F6-WRITE-ENCODING.md` | Final program/erase investigation record and safety verdict | documentation only |
 
 `kb7-isp-verify.py` is the useful one: it exercises the same flash read path the
 bootloader uses at boot, so it can distinguish "the chip is bad" from "the SoC's
 read of the chip is bad" — a distinction the SPI programmer cannot make.
+
+`kb7-isp-write2.py` is deliberately not a general writer. It accepts only the
+reviewed marker-program and sector-erase experiment, opens no USB device in its
+default dry run, and requires an explicit `--commit` for either destructive
+stage. Its guards bound host-side mistakes; they cannot make an incorrect or
+faulty loader handler safe. For ordinary or production writes, continue to use
+the proven external-SPI procedure. This project remains `flash_approved=false`.
 
 ---
 

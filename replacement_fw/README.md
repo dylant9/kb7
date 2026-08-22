@@ -52,9 +52,10 @@ findings have regression-tested repairs, described in
 profiles, generic non-GPIO pinmux, logical-key→LED correlation and hardware
 validation remain unresolved. External stock repair has succeeded once, but a
 repeatable exact rollback procedure is still required. The repository has no
-USB flashing utility. Separate read-only USB diagnostics and the proven
-external-SPI recovery notes live in
-[`../tools/flash-access/`](../tools/flash-access/README.md); neither is an
+supported USB flashing utility. Separate read-only USB diagnostics, a guarded
+two-stage destructive validation experiment and the proven external-SPI
+recovery notes live in
+[`../tools/flash-access/`](../tools/flash-access/README.md); none is an
 installation route for these ELFs. Do not install them.
 
 The compatibility function named `kb7_enter_loader()` does not claim an

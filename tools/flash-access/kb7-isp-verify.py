@@ -25,6 +25,7 @@ add a udev rule for 10f5:5037).
 Usage:
     sudo python3 kb7-isp-verify.py                # verify CRCs (reads ~22MB)
     sudo python3 kb7-isp-verify.py -o dump.bin    # also save what it read
+    sudo python3 kb7-isp-verify.py --full-chip -o full-32m.bin
 """
 
 import argparse
@@ -35,6 +36,7 @@ import zlib
 
 VID, PID = 0x10F5, 0x5037
 FLASH_BASE = 0x60000000
+FLASH_SIZE = 0x02000000
 BLOCK = 512
 # 4 KiB per F6 05 command (8 blocks). This matches the Phase-0 test vector
 # (F6 05 .. 00 08); larger chunks make the device's bulk-IN endpoint fail with
@@ -46,7 +48,9 @@ SUB_IDENTIFY, SUB_STATUS, SUB_READ, SUB_EN4B, SUB_DESC = 0x00, 0x01, 0x05, 0x17,
 _ALLOWED = {SUB_IDENTIFY, SUB_STATUS, SUB_READ, SUB_EN4B, SUB_DESC}
 
 # ---- minimal libusb-1.0 ctypes binding --------------------------------------
-lib = ct.CDLL("libusb-1.0.so.0")
+# Load lazily so command builders and transport validators remain testable on
+# offline hosts that do not have libusb installed.
+lib = None
 
 
 class _EP(ct.Structure):
@@ -79,23 +83,58 @@ class _CFG(ct.Structure):
                 ("extra", ct.POINTER(ct.c_ubyte)), ("extra_length", ct.c_int)]
 
 
-lib.libusb_open_device_with_vid_pid.restype = ct.c_void_p
-lib.libusb_open_device_with_vid_pid.argtypes = [ct.c_void_p, ct.c_uint16, ct.c_uint16]
-lib.libusb_get_device.restype = ct.c_void_p
-lib.libusb_get_device.argtypes = [ct.c_void_p]
-lib.libusb_get_active_config_descriptor.argtypes = [ct.c_void_p, ct.POINTER(ct.POINTER(_CFG))]
-lib.libusb_bulk_transfer.argtypes = [ct.c_void_p, ct.c_ubyte, ct.POINTER(ct.c_ubyte),
-                                     ct.c_int, ct.POINTER(ct.c_int), ct.c_uint]
-for fn in ("libusb_kernel_driver_active", "libusb_detach_kernel_driver",
-           "libusb_attach_kernel_driver", "libusb_claim_interface",
-           "libusb_release_interface"):
-    getattr(lib, fn).argtypes = [ct.c_void_p, ct.c_int]
-lib.libusb_clear_halt.argtypes = [ct.c_void_p, ct.c_ubyte]
-lib.libusb_close.argtypes = [ct.c_void_p]
+def _load_libusb():
+    global lib
+    if lib is not None:
+        return lib
+
+    api = ct.CDLL("libusb-1.0.so.0")
+    api.libusb_open_device_with_vid_pid.restype = ct.c_void_p
+    api.libusb_open_device_with_vid_pid.argtypes = [
+        ct.c_void_p, ct.c_uint16, ct.c_uint16]
+    api.libusb_get_device.restype = ct.c_void_p
+    api.libusb_get_device.argtypes = [ct.c_void_p]
+    api.libusb_get_active_config_descriptor.argtypes = [
+        ct.c_void_p, ct.POINTER(ct.POINTER(_CFG))]
+    api.libusb_bulk_transfer.argtypes = [
+        ct.c_void_p, ct.c_ubyte, ct.POINTER(ct.c_ubyte),
+        ct.c_int, ct.POINTER(ct.c_int), ct.c_uint]
+    for fn in ("libusb_kernel_driver_active", "libusb_detach_kernel_driver",
+               "libusb_attach_kernel_driver", "libusb_claim_interface",
+               "libusb_release_interface"):
+        getattr(api, fn).argtypes = [ct.c_void_p, ct.c_int]
+    api.libusb_clear_halt.argtypes = [ct.c_void_p, ct.c_ubyte]
+    api.libusb_close.argtypes = [ct.c_void_p]
+    api.libusb_get_bus_number.argtypes = [ct.c_void_p]
+    api.libusb_get_bus_number.restype = ct.c_uint8
+    api.libusb_get_port_numbers.argtypes = [
+        ct.c_void_p, ct.POINTER(ct.c_uint8), ct.c_int]
+    api.libusb_get_port_numbers.restype = ct.c_int
+    lib = api
+    return api
+
+
+def parse_csw(raw, expected_tag):
+    """Validate a complete USB mass-storage CSW and fail closed."""
+    if len(raw) != 13:
+        raise RuntimeError(f"short CSW: got {len(raw)}/13 bytes")
+    sig, tag, residue, status = struct.unpack("<IIIB", raw)
+    if sig != 0x53425355:
+        raise RuntimeError(f"bad CSW signature 0x{sig:08x}")
+    if tag != expected_tag:
+        raise RuntimeError(f"CSW tag mismatch ({tag} != {expected_tag})")
+    if residue != 0:
+        raise RuntimeError(f"unexpected CSW residue {residue}")
+    if status != 0:
+        raise RuntimeError(f"command failed with CSW status {status}")
+    return status, residue
 
 
 class Device:
+    clear_halt_on_error = True
+
     def __init__(self):
+        _load_libusb()
         self.ctx = ct.c_void_p()
         if lib.libusb_init(ct.byref(self.ctx)) != 0:
             raise RuntimeError("libusb_init failed")
@@ -105,6 +144,13 @@ class Device:
                 f"device {VID:04x}:{PID:04x} not found.\n"
                 "  The keyboard must be in ISP/bootloader mode.\n"
                 "  Check with: lsusb | grep 10f5")
+        usb_device = lib.libusb_get_device(self.h)
+        ports = (ct.c_uint8 * 8)()
+        port_count = lib.libusb_get_port_numbers(usb_device, ports, len(ports))
+        if port_count <= 0:
+            raise RuntimeError("could not determine a stable USB topology path")
+        port_path = ".".join(str(ports[i]) for i in range(port_count))
+        self.device_path = f"{lib.libusb_get_bus_number(usb_device)}-{port_path}"
         self.iface, self.ep_in, self.ep_out, self.reattach = self._find_msc()
         if lib.libusb_kernel_driver_active(self.h, self.iface) == 1:
             lib.libusb_detach_kernel_driver(self.h, self.iface)
@@ -142,33 +188,48 @@ class Device:
                                       ct.cast(buf, ct.POINTER(ct.c_ubyte)),
                                       length, ct.byref(n), timeout)
         if rc != 0:
-            # A failed bulk transfer usually leaves the endpoint halted; clear it
-            # so the next command has a chance rather than cascading failures.
-            lib.libusb_clear_halt(self.h, ct.c_ubyte(ep))
+            # The read-only reliability tool can opt to keep using the session
+            # after a failed pass.  The destructive writer overrides this flag:
+            # after a transport anomaly it must close without any recovery
+            # traffic or another command in the uncertain BOT session.
+            if self.clear_halt_on_error:
+                lib.libusb_clear_halt(self.h, ct.c_ubyte(ep))
             raise RuntimeError(
                 f"bulk transfer failed on ep 0x{ep:02x}: rc={rc}"
                 f"{' (LIBUSB_ERROR_IO)' if rc == -1 else ''}, len={length}")
         return n.value
 
+    def _xfer_exact(self, ep, buf, length, phase, timeout=8000):
+        transferred = self._xfer(ep, buf, length, timeout)
+        if transferred != length:
+            raise RuntimeError(
+                f"short {phase} transfer on ep 0x{ep:02x}: "
+                f"got {transferred}/{length}")
+
     def cmd(self, cdb, data_len=0):
         """Raw Bulk-Only Transport. data-IN only (we never send data OUT)."""
-        assert len(cdb) == 16 and cdb[0] == 0xF6
-        if cdb[1] not in _ALLOWED:
-            raise ValueError(f"subcode 0x{cdb[1]:02x} is not in the read-only whitelist")
+        return self._command(cdb, data_len, _ALLOWED)
+
+    def _command(self, cdb, data_len, allowed):
+        if len(cdb) != 16 or cdb[0] != 0xF6:
+            raise ValueError("CDB must be exactly 16 bytes and start with F6")
+        if cdb[1] not in allowed:
+            raise ValueError(f"subcode 0x{cdb[1]:02x} is not in the command whitelist")
+        if data_len < 0:
+            raise ValueError("data length cannot be negative")
         self.tag = (self.tag + 1) & 0xFFFFFFFF
         cbw = struct.pack("<IIIBBB", 0x43425355, self.tag, data_len,
                           0x80 if data_len else 0x00, 0, 16) + cdb
-        self._xfer(self.ep_out, ct.create_string_buffer(cbw, 31), 31)
+        self._xfer_exact(
+            self.ep_out, ct.create_string_buffer(cbw, 31), 31, "CBW")
         out = b""
         if data_len:
             b = ct.create_string_buffer(data_len)
-            got = self._xfer(self.ep_in, b, data_len)
-            out = bytes(b.raw[:got])
+            self._xfer_exact(self.ep_in, b, data_len, "data-IN")
+            out = bytes(b.raw[:data_len])
         csw = ct.create_string_buffer(13)
-        self._xfer(self.ep_in, csw, 13)
-        sig, tag, residue, status = struct.unpack("<IIIB", bytes(csw.raw[:13]))
-        if sig != 0x53425355:
-            raise RuntimeError("bad CSW signature")
+        self._xfer_exact(self.ep_in, csw, 13, "CSW")
+        status, residue = parse_csw(bytes(csw.raw[:13]), self.tag)
         return out, status, residue
 
     def close(self):
@@ -189,6 +250,8 @@ def cdb_simple(sub):
 def cdb_read(offset, nbytes):
     if nbytes % BLOCK or not (0 < nbytes <= 0xFFFF * BLOCK):
         raise ValueError("read length must be a positive multiple of 512")
+    if offset < 0 or offset + nbytes > FLASH_SIZE:
+        raise ValueError("read lies outside the 32-MiB flash")
     addr = FLASH_BASE + offset            # raw byte address (READ encoding)
     return (bytes([0xF6, SUB_READ, 0x00]) + struct.pack(">I", addr)
             + struct.pack(">H", nbytes // BLOCK) + bytes(7))
@@ -203,6 +266,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("-o", "--out", help="also write what was read to this file")
+    ap.add_argument("--full-chip", action="store_true",
+                    help="read all 32 MiB (required when capturing a write-test baseline)")
     ap.add_argument("--chunk", type=lambda s: int(s, 0), default=CHUNK,
                     help=f"bytes per F6 05 command (default 0x{CHUNK:x}); "
                          "must be a multiple of 512. Lower it if you see "
@@ -243,7 +308,8 @@ def main():
         for i, ent in ((0, 0x20), (1, 0x30), (2, 0x40)):
             load, store, length, crc = struct.unpack_from("<IIII", man, ent)
             regions.append((i, store - FLASH_BASE, length, crc))
-        end = max(off + ln for _, off, ln, _ in regions)
+        region_end = max(off + ln for _, off, ln, _ in regions)
+        end = FLASH_SIZE if args.full_chip else region_end
         print(f"  need 0x{end:x} bytes ({end/1e6:.1f} MB) to cover all regions\n")
 
         data = bytearray(head)

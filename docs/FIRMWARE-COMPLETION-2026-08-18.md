@@ -198,8 +198,9 @@ These are not honest candidates for further offline coding:
    enabling its board-profile gate.
 9. Turn the successful external repair into a repeatable reset/programmer
    recovery runbook before any combined image is written. Autonomous software
-   loader entry remains intentionally unavailable, and no open-source USB
-   writer is included.
+   loader entry remains intentionally unavailable. The narrow two-stage USB
+   write-path experiment is not a supported flasher and does not install these
+   replacement images; external SPI remains the required recovery route.
 
 ## Build and test profiles
 

@@ -69,12 +69,17 @@ The earlier write-path model made several safety-critical mistakes:
 
 Four-byte addressing is asserted independently. The higher-level updater
 compares the end address with `0x61000000` and emits `F6 17` when it crosses
-that boundary. The normal NOR erase can still use `F6 15`: its 16-bit field is
-in 512-byte units and therefore covers the KB7's complete 32-MiB flash.
+that boundary, or `F6 18` when the range remains below it. This is done for
+both program and erase. It does not change the interpretation of the `F6 15`
+block index and has no interaction with the separate flash-type selector that
+chooses `F6 15` versus `F6 19`. The normal NOR erase can therefore still use
+`F6 15` in either address mode: its 16-bit field is in 512-byte units and covers
+the KB7's complete 32-MiB flash.
 
-## Why the USB write recommendation remains “no”
+## Why USB is still not the supported write path
 
-**Use USB ISP for reads only. Use the ESP32/flashrom SPI path for writes.**
+**Use the ESP32/flashrom SPI path for ordinary, recovery and production
+writes.**
 
 The recovered layout is now precise, but the loader's erase implementation has
 not been exercised safely on hardware. No no-op or bounded query can validate
@@ -85,12 +90,17 @@ chain after a host-side guard validated the intended rather than encoded
 address. The SPI path is proven on this board and supports explicit flashrom
 layouts and read-back verification.
 
-No hardware-capable USB mutation tool or command emitter is included in the
-public branch.
+The branch now contains `kb7-isp-write2.py`, a deliberately narrow,
+dry-run-by-default two-stage validation utility. It can emit only the reviewed
+marker-program and sector-erase experiment after explicit `--commit` and
+fail-closed preconditions. It is not a supported USB flasher and does not make
+replacement firmware flash-approved.
 
 ## No non-destructive erase test
 
-None is proposed. Static analysis resolves byte-address versus block-index
-encoding. The remaining question is whether the target performs the destructive
-operation correctly, and testing that necessarily changes flash. It is not
-non-destructive under every remaining interpretation or implementation failure.
+None exists. Static analysis resolves byte-address versus block-index encoding.
+The remaining question is whether the target performs the destructive operation
+correctly, and testing that necessarily changes flash. The bounded experiment
+in [WRITE-TEST-PLAN.md](WRITE-TEST-PLAN.md) accepts that risk; it does not make
+the test non-destructive under every remaining interpretation or implementation
+failure.

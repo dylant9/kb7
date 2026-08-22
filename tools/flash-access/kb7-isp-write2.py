@@ -1,297 +1,766 @@
 #!/usr/bin/env python3
-"""
-KB7 USB-ISP write-path validation, v2 -- DRY-RUN BY DEFAULT.
+"""KB7 USB-ISP write-path validation -- destructive, dry-run by default.
 
-Goal: prove the F6 write path on hardware so firmware can be flashed over USB
-without opening the case. This is the intended long-term flashing route (much
-faster than SPI, and non-invasive for end users).
+This is a two-stage laboratory experiment, not a firmware flasher:
 
-=============================================================================
-ENCODINGS USED HERE, AND WHERE THEY COME FROM
-=============================================================================
+1. ``program`` writes one 512-byte marker into a manifest-derived scratch
+   sector and verifies the exact expected 32-MiB image.
+2. ``erase`` is unlocked only by that verified result. It issues the vendor's
+   sector-erase path for the marked target and again requires an exact 32-MiB
+   image match.
 
-F6 06 PROGRAM  -- CONFIRMED ON HARDWARE (destructively, 2026-08-23)
-    CDB[3:7] = BE32 raw byte address
-    CDB[7:9] = BE16 count in 512-BYTE BLOCKS
-  Evidence: sent address 0x470 / count 0x0100; device wrote 128 KiB starting at
-  byte 0x470. Last damaged byte 0x2046f = 0x470 + 0x100*512 - 1. Both fields
-  are therefore known, not inferred.
+Both stages require an exact 32-MiB owner-supplied baseline which is compared
+with a fresh full-chip USB read before any mutation. The program and erase
+encodings are recovered, but the erase handler has not been exercised on this
+loader. If it interprets F6 15 differently, it can erase the boot chain. Keep a
+tested SPI programmer and two matching full-chip backups available.
 
-F6 15 ERASE    -- STATIC ANALYSIS ONLY, NOT YET HARDWARE-CONFIRMED
-    CDB[3:5] = BE16 (aligned_address >> 9)   i.e. a 512-BYTE-BLOCK INDEX
-    no count field; one CDB erases one 4 KiB sector
-  Source: tools/flash-access/F6-ERASE-ENCODING.md (radare2 data-flow analysis,
-  independently calibrated by re-deriving the F6 06 answer above from the
-  binary alone). A second, independent objdump reading of the same routine also
-  showed `shr $0x9` applied to the sector-aligned ADDRESS, agreeing.
+Examples (the first invocation is dry-run only):
 
-  *** THIS IS THE ONE UNPROVEN THING THIS SCRIPT TESTS. ***
-
-  Failure mode if wrong: F6 15's field is only 16 bits, so under a raw-byte-
-  address misreading the maximum reachable address is 0xFFFF -- entirely within
-  header (0x0-0x1000) and bootloader (0x1000-0x10000). There is NO partial
-  failure: it either lands correctly, or it damages the boot chain. Recovery is
-  a full-chip SPI rewrite from your own known-good backup image (~30 min).
-
-ADDRESS BASE -- reviewer please sanity-check this choice.
-  Reads use an absolute 0x60000000-based address and work. The one confirmed
-  program used a BARE offset (0x470) and wrote to offset 0x470. Both are
-  consistent with the device masking to chip size, in which case the two forms
-  are equivalent. We send ABSOLUTE (0x60000000 + offset) to match both the read
-  path and the vendor tool's own behaviour. Set ABS_BASE = 0 to send bare
-  offsets instead.
-
-=============================================================================
-SAFETY MODEL
-=============================================================================
-  * Target is hard-limited to the scratch gap [0x8d000, 0x100000): 474,776
-    bytes of 0xFF lying between the end of region 1 (0x8c168) and the start of
-    region 2 (0x100000). It is covered by NO manifest region, so it contributes
-    to no CRC, and the firmware demonstrably never writes there.
-  * Default target 0x8e000 has erased sectors on both sides.
-  * Stage 2 (erase) REFUSES to run unless stage 1 (program) has verifiably
-    succeeded -- otherwise an erase proves nothing, because the sector is
-    already 0xFF and a no-op is indistinguishable from a miss.
-  * After every write the ENTIRE image range is re-read and diffed against a
-    baseline. Host-side guards cannot prevent device-side misaddressing; a full
-    diff DETECTS it and reports where it landed.
-  * Nothing is sent without --commit.
-
-Usage:
-  sudo python3 kb7-isp-write2.py --stage program --baseline spd-4M.bin
-  sudo python3 kb7-isp-write2.py --stage program --baseline spd-4M.bin --commit
-  sudo python3 kb7-isp-write2.py --stage erase   --baseline spd-4M.bin --commit
+  sudo python3 kb7-isp-write2.py --stage program \
+      --baseline <full-chip-backup.bin>
+  sudo python3 kb7-isp-write2.py --stage program \
+      --baseline <full-chip-backup.bin> --commit
+  sudo python3 kb7-isp-write2.py --stage erase \
+      --baseline <full-chip-backup.bin> --commit
 """
 
 import argparse
 import ctypes as ct
+from dataclasses import dataclass
+import hashlib
+import hmac
 import importlib.util
 import json
 import os
 import struct
 import sys
+import tempfile
+import time
+
 
 _spec = importlib.util.spec_from_file_location(
-    "kb7isp", os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                           "kb7-isp-verify.py"))
-_m = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_m)
-Device, cdb_read, cdb_simple = _m.Device, _m.cdb_read, _m.cdb_simple
-SUB_EN4B, SUB_STATUS, BLOCK = _m.SUB_EN4B, _m.SUB_STATUS, _m.BLOCK
+    "kb7isp_verify",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                 "kb7-isp-verify.py"))
+_verify = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_verify)
 
-SCRATCH_LO, SCRATCH_HI = 0x8D000, 0x100000
+Device = _verify.Device
+cdb_read = _verify.cdb_read
+cdb_simple = _verify.cdb_simple
+parse_csw = _verify.parse_csw
+fwin = _verify.fwin
+
+FLASH_BASE = _verify.FLASH_BASE
+FLASH_SIZE = _verify.FLASH_SIZE
+BLOCK = _verify.BLOCK
+CHUNK = _verify.CHUNK
 SECTOR = 0x1000
-IMAGE_END = 0x156AF8C
-SUB_PROGRAM, SUB_ERASE = 0x06, 0x15
-ABS_BASE = 0x60000000          # see ADDRESS BASE note above; set 0 for bare
-STATE = os.path.expanduser("~/.kb7-isp-write2-state.json")
+ADDRESS_MODE_BOUNDARY = 0x61000000
 
-# The verify module is deliberately read-only; declare the mutating opcodes here.
-_m._ALLOWED = _m._ALLOWED | {SUB_PROGRAM, SUB_ERASE}
+SUB_IDENTIFY = _verify.SUB_IDENTIFY
+SUB_STATUS = _verify.SUB_STATUS
+SUB_READ = _verify.SUB_READ
+SUB_EN4B = _verify.SUB_EN4B
+SUB_DESC = _verify.SUB_DESC
+SUB_PROGRAM = 0x06
+SUB_ERASE = 0x15
+SUB_EX4B = 0x18
 
-# 512-byte marker. Mostly 0xFF, clearing at most 2 bits per byte: if a program
-# ever lands somewhere unintended it damages a few bits rather than a page,
-# while staying trivially detectable in a diff.
+MANIFEST_OFFSET = 0x10000
+MANIFEST_SIZE = 0x1000
+FIXED_BOOT_END = MANIFEST_OFFSET + MANIFEST_SIZE
+BOOT_CONFIGURATION_OFFSET = 0x200
+BOOT_CONFIGURATION_MAGIC = b"SN_BCFG\x00"
+MANIFEST_PREFIX = b"SN_FWIN\x00v1.0.00\x00"
+HEADER_MAGIC = b"SNC7320A"
+LOADER_IDENT_PREFIX = b"\x01\x01"
+LOADER_DESCRIPTOR_MARKER = b"v0.001 test!"
+EXPECTED_LOADS = (0x00000000, 0x10000000, 0x60100000, 0x18000000)
+MANIFEST_ENTRIES = (0x20, 0x30, 0x40, 0x50)
+
+STATE_SCHEMA = "kb7-isp-write2-state-v2"
+STATE_READY = "program_verified"
+STATE_ERASE_STARTED = "erase_started"
+DEFAULT_STATE = os.path.expanduser("~/.kb7-isp-write2-state.json")
+
+# One block, mostly 0xff. No byte clears more than two bits.
 MARKER = bytes((0xFF ^ ((i * 7 + 1) & 0x03)) for i in range(BLOCK))
 
 
-def guard(offset, length, what):
-    if not (SCRATCH_LO <= offset and offset + length <= SCRATCH_HI):
-        raise ValueError(f"REFUSED: {what} 0x{offset:x}..0x{offset+length:x} "
-                         f"outside scratch [0x{SCRATCH_LO:x},0x{SCRATCH_HI:x})")
-    if what == "erase" and offset % SECTOR:
-        raise ValueError(f"REFUSED: erase 0x{offset:x} not sector-aligned")
-    if what == "program" and offset % BLOCK:
-        raise ValueError(f"REFUSED: program 0x{offset:x} not block-aligned")
+class SafetyError(RuntimeError):
+    """A fail-closed precondition or verification failure."""
+
+
+class MutationResultUnknown(SafetyError):
+    """A command may have mutated flash but could not be verified."""
+
+
+@dataclass(frozen=True)
+class Region:
+    index: int
+    load: int
+    store: int
+    offset: int
+    length: int
+    checksum: int
+
+    @property
+    def end(self):
+        return self.offset + self.length
+
+
+@dataclass(frozen=True)
+class ManifestInfo:
+    sha256: str
+    regions: tuple
+    scratch_lo: int
+    scratch_hi: int
+
+
+def sha256_bytes(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+def load_baseline(path):
+    """Read one immutable, exact-size baseline or refuse it."""
+    with open(path, "rb") as stream:
+        size = os.fstat(stream.fileno()).st_size
+        if size != FLASH_SIZE:
+            raise SafetyError(
+                f"baseline must be exactly {FLASH_SIZE} bytes (32 MiB); got {size}")
+        data = stream.read()
+    if len(data) != FLASH_SIZE:
+        raise SafetyError(
+            f"baseline changed or was short while reading: got {len(data)} bytes")
+    return data
+
+
+def _align_up(value, alignment):
+    return (value + alignment - 1) & ~(alignment - 1)
+
+
+def _align_down(value, alignment):
+    return value & ~(alignment - 1)
+
+
+def _ranges_overlap(a_lo, a_hi, b_lo, b_hi):
+    return a_lo < b_hi and b_lo < a_hi
+
+
+def parse_manifest(image):
+    """Validate the KB7 header, manifest mappings, and every declared CRC."""
+    if len(image) != FLASH_SIZE:
+        raise SafetyError(
+            f"manifest source must be an exact 32-MiB image; got {len(image)} bytes")
+    if image[:len(HEADER_MAGIC)] != HEADER_MAGIC:
+        raise SafetyError("unexpected flash header; expected SNC7320A")
+
+    boot_configuration = image[
+        BOOT_CONFIGURATION_OFFSET:BOOT_CONFIGURATION_OFFSET + 16]
+    if boot_configuration[:8] != BOOT_CONFIGURATION_MAGIC:
+        raise SafetyError("unexpected SN_BCFG boot configuration")
+    primary_manifest, secondary_manifest = struct.unpack_from(
+        "<II", boot_configuration, 8)
+    if primary_manifest != FLASH_BASE + MANIFEST_OFFSET or secondary_manifest != 0:
+        raise SafetyError("boot configuration does not select the expected manifest")
+
+    manifest = image[MANIFEST_OFFSET:MANIFEST_OFFSET + MANIFEST_SIZE]
+    if manifest[:len(MANIFEST_PREFIX)] != MANIFEST_PREFIX:
+        raise SafetyError("unexpected SN_FWIN manifest magic or version")
+
+    first_store, marker, generation, reserved = struct.unpack_from(
+        "<IIII", manifest, 0x10)
+    if marker != 0xFFFFFFFF or generation != 1 or reserved != 0xFFFFFFFF:
+        raise SafetyError("unexpected SN_FWIN manifest header fields")
+
+    regions = []
+    zero_mapping = None
+    for index, (entry_offset, expected_load) in enumerate(
+            zip(MANIFEST_ENTRIES, EXPECTED_LOADS)):
+        load, store, length, checksum = struct.unpack_from(
+            "<IIII", manifest, entry_offset)
+        if load != expected_load:
+            raise SafetyError(
+                f"manifest mapping {index} has unexpected load address 0x{load:08x}")
+        if not (FLASH_BASE <= store <= FLASH_BASE + FLASH_SIZE):
+            raise SafetyError(
+                f"manifest mapping {index} store address is outside flash")
+        offset = store - FLASH_BASE
+
+        if index == 3:
+            if length != 0 or checksum != 0:
+                raise SafetyError("manifest zero-length SRAM mapping is malformed")
+            zero_mapping = (load, store)
+            continue
+
+        if length == 0:
+            raise SafetyError(f"manifest region {index} is empty")
+        if offset < FIXED_BOOT_END or offset + length > FLASH_SIZE:
+            raise SafetyError(f"manifest region {index} lies outside its flash window")
+        if offset % BLOCK:
+            raise SafetyError(f"manifest region {index} store address is unaligned")
+        calculated = fwin(image[offset:offset + length])
+        if calculated != checksum:
+            raise SafetyError(
+                f"manifest region {index} checksum mismatch: "
+                f"declared 0x{checksum:08x}, calculated 0x{calculated:08x}")
+        regions.append(Region(index, load, store, offset, length, checksum))
+
+    if first_store != regions[0].store:
+        raise SafetyError("manifest first-store field does not match region 0")
+    if zero_mapping is None or zero_mapping[1] != regions[1].store:
+        raise SafetyError("manifest zero-length SRAM mapping has an unexpected store")
+
+    ordered = sorted(regions, key=lambda item: item.offset)
+    for left, right in zip(ordered, ordered[1:]):
+        if left.end > right.offset:
+            raise SafetyError(
+                f"manifest regions {left.index} and {right.index} overlap")
+
+    app = next((region for region in regions if region.load == 0x10000000), None)
+    assets = next((region for region in regions if region.load == 0x60100000), None)
+    if app is None or assets is None or app.end > assets.offset:
+        raise SafetyError("cannot derive the application-to-assets scratch gap")
+    scratch_lo = _align_up(app.end, SECTOR)
+    scratch_hi = _align_down(assets.offset, SECTOR)
+    if scratch_hi - scratch_lo < SECTOR:
+        raise SafetyError("manifest exposes no complete scratch sector")
+
+    return ManifestInfo(
+        sha256=sha256_bytes(manifest),
+        regions=tuple(regions),
+        scratch_lo=scratch_lo,
+        scratch_hi=scratch_hi)
+
+
+def validate_target(manifest, baseline, offset):
+    """Require one wholly erased sector in the manifest-derived scratch gap."""
+    if offset % SECTOR:
+        raise SafetyError("the coupled program/erase target must be sector-aligned")
+    end = offset + SECTOR
+    if offset < 0 or end > FLASH_SIZE:
+        raise SafetyError("target sector lies outside the 32-MiB flash")
+    if not (manifest.scratch_lo <= offset and end <= manifest.scratch_hi):
+        raise SafetyError(
+            f"target 0x{offset:x}..0x{end:x} is outside manifest-derived scratch "
+            f"[0x{manifest.scratch_lo:x},0x{manifest.scratch_hi:x})")
+    if _ranges_overlap(offset, end, 0, FIXED_BOOT_END):
+        raise SafetyError("target overlaps the header, loader, or manifest")
+    for region in manifest.regions:
+        if _ranges_overlap(offset, end, region.offset, region.end):
+            raise SafetyError(f"target overlaps manifest region {region.index}")
+    sector = baseline[offset:end]
+    if sector != b"\xff" * SECTOR:
+        first = next(i for i, value in enumerate(sector) if value != 0xFF)
+        raise SafetyError(
+            f"entire target sector must be erased; first programmed byte is "
+            f"0x{offset + first:x}")
+
+
+def _validate_flash_range(offset, length):
+    if offset < 0 or length <= 0 or offset + length > FLASH_SIZE:
+        raise ValueError("operation lies outside the 32-MiB flash")
 
 
 def cdb_program(offset, nbytes):
-    """F6 06: BE32 raw byte address, BE16 count in 512-byte blocks."""
-    guard(offset, nbytes, "program")
-    if nbytes % BLOCK:
-        raise ValueError("program length must be a multiple of 512")
+    """F6 06: BE32 absolute raw address, BE16 count of 512-byte blocks."""
+    _validate_flash_range(offset, nbytes)
+    if offset % BLOCK or nbytes % BLOCK:
+        raise ValueError("program offset and length must be 512-byte aligned")
+    count = nbytes // BLOCK
+    if count > 0xFFFF:
+        raise ValueError("program block count does not fit the CDB")
+    address = FLASH_BASE + offset
+    if address > 0xFFFFFFFF:
+        raise ValueError("program address does not fit the CDB")
     return (bytes([0xF6, SUB_PROGRAM, 0x00])
-            + struct.pack(">I", ABS_BASE + offset)
-            + struct.pack(">H", nbytes // BLOCK) + bytes(7))
+            + struct.pack(">I", address)
+            + struct.pack(">H", count)
+            + bytes(7))
 
 
 def cdb_erase(offset):
-    """F6 15: BE16 512-byte-block index of the sector-aligned address. No count."""
-    guard(offset, SECTOR, "erase")
-    idx = ((ABS_BASE + offset) >> 9) & 0xFFFF
-    return bytes([0xF6, SUB_ERASE, 0x00]) + struct.pack(">H", idx) + bytes(11)
+    """F6 15: BE16 512-byte block index; vendor 4-KiB path, no count."""
+    _validate_flash_range(offset, SECTOR)
+    if offset % SECTOR:
+        raise ValueError("erase offset must be sector-aligned")
+    index = offset >> 9
+    if index > 0xFFFF:
+        raise ValueError("erase block index does not fit F6 15")
+    return (bytes([0xF6, SUB_ERASE, 0x00])
+            + struct.pack(">H", index)
+            + bytes(11))
 
 
-def cmd_out(dev, cdb, data):
-    """BOT with a data-OUT phase. The only writing primitive in this file."""
-    if cdb[1] != SUB_PROGRAM:
-        raise ValueError("cmd_out is only for F6 06")
-    dev.tag = (dev.tag + 1) & 0xFFFFFFFF
-    cbw = struct.pack("<IIIBBB", 0x43425355, dev.tag, len(data), 0x00, 0, 16) + cdb
-    dev._xfer(dev.ep_out, ct.create_string_buffer(cbw, 31), 31)
-    dev._xfer(dev.ep_out, ct.create_string_buffer(bytes(data), len(data)), len(data))
-    csw = ct.create_string_buffer(13)
-    dev._xfer(dev.ep_in, csw, 13)
-    sig, tag, residue, status = struct.unpack("<IIIB", bytes(csw.raw[:13]))
-    if sig != 0x53425355 or tag != dev.tag:
-        raise RuntimeError(f"CSW desync (sig 0x{sig:08x} tag {tag} != {dev.tag})")
-    return status
+def address_mode_subcode(offset, length):
+    """Mirror the vendor's strict absolute-end boundary decision."""
+    _validate_flash_range(offset, length)
+    absolute_end = FLASH_BASE + offset + length
+    return SUB_EN4B if absolute_end > ADDRESS_MODE_BOUNDARY else SUB_EX4B
 
 
-def read_range(dev, offset, length, chunk=0x1000):
-    out = b""
-    while len(out) < length:
-        n = min(chunk, length - len(out))
-        d, st, _ = dev.cmd(cdb_read(offset + len(out), n), n)
-        if st != 0 or len(d) != n:
-            raise RuntimeError(f"read failed at 0x{offset+len(out):x}")
-        out += d
-    return out
+class WriteDevice(Device):
+    """Strict BOT transport with only the two reviewed mutation subcodes added."""
+
+    clear_halt_on_error = False
+
+    # F6 06 is deliberately absent: it can only be sent through program(),
+    # which enforces the data-OUT length against the encoded block count.
+    _WRITE_ALLOWED = frozenset(
+        set(_verify._ALLOWED) | {SUB_ERASE, SUB_EX4B})
+
+    def cmd(self, cdb, data_len=0):
+        return self._command(cdb, data_len, self._WRITE_ALLOWED)
+
+    def program(self, cdb, data):
+        if len(cdb) != 16 or cdb[0] != 0xF6 or cdb[1] != SUB_PROGRAM:
+            raise ValueError("program requires one reviewed 16-byte F6 06 CDB")
+        expected = int.from_bytes(cdb[7:9], "big") * BLOCK
+        if expected != len(data):
+            raise ValueError(
+                f"program data length {len(data)} does not match CDB length {expected}")
+        self.tag = (self.tag + 1) & 0xFFFFFFFF
+        cbw = (struct.pack(
+            "<IIIBBB", 0x43425355, self.tag, len(data), 0x00, 0, 16) + cdb)
+        self._xfer_exact(
+            self.ep_out, ct.create_string_buffer(cbw, 31), 31, "CBW")
+        self._xfer_exact(
+            self.ep_out, ct.create_string_buffer(bytes(data), len(data)),
+            len(data), "data-OUT")
+        csw = ct.create_string_buffer(13)
+        self._xfer_exact(self.ep_in, csw, 13, "CSW")
+        return parse_csw(bytes(csw.raw[:13]), self.tag)
 
 
-def poll_ready(dev, tries=200):
-    for _ in range(tries):
-        s, _st, _ = dev.cmd(cdb_simple(SUB_STATUS), 1)
-        if s and not (s[0] & 0x01):
-            return True
-    return False
+def set_address_mode_for_range(dev, offset, length):
+    subcode = address_mode_subcode(offset, length)
+    dev.cmd(cdb_simple(subcode))
+    return subcode
 
 
-def full_diff(dev, baseline_path, intended_lo, intended_hi, chunk=0x1000):
-    """Re-read the image range and report every byte differing from baseline."""
-    base = open(baseline_path, "rb").read()
-    end = min(len(base), IMAGE_END)
-    print(f"  full-image verification: re-reading 0x{end:x} bytes ...")
-    cur = bytearray()
-    while len(cur) < end:
-        n = min(chunk, end - len(cur))
-        n = ((n + BLOCK - 1) // BLOCK) * BLOCK
-        d, st, _ = dev.cmd(cdb_read(len(cur), n), n)
-        if st != 0:
-            raise RuntimeError(f"verify read failed at 0x{len(cur):x}")
-        cur += d
-        if len(cur) % 0x200000 < chunk:
-            print(f"\r    {100.0*len(cur)/end:5.1f}%", end="", flush=True)
-    print("\r    100.0%")
-    diff = [i for i in range(end) if cur[i] != base[i]]
-    stray = [d for d in diff if not (intended_lo <= d < intended_hi)]
-    print(f"  bytes differing from baseline: {len(diff)}")
-    if stray:
-        print(f"  *** {len(stray)} STRAY CHANGES OUTSIDE THE TARGET ***")
-        cl, s, p = [], stray[0], stray[0]
-        for x in stray[1:]:
-            if x - p > 256:
-                cl.append((s, p)); s = x
-            p = x
-        cl.append((s, p))
-        for a, b in cl[:10]:
-            print(f"      0x{a:08x}-0x{b:08x}")
-        return False, bytes(cur)
-    print("  no stray changes anywhere in the image range.")
-    return True, bytes(cur)
+def read_range(dev, offset, length, chunk=CHUNK, progress=False):
+    _validate_flash_range(offset, length)
+    if offset % BLOCK or length % BLOCK:
+        raise ValueError("read offset and length must be 512-byte aligned")
+    if chunk <= 0 or chunk % BLOCK or chunk > 0x1000:
+        raise ValueError("read chunk must be a 512-byte multiple no larger than 4 KiB")
+
+    output = bytearray()
+    next_report = 0x200000
+    while len(output) < length:
+        count = min(chunk, length - len(output))
+        data, _status, _residue = dev.cmd(
+            cdb_read(offset + len(output), count), count)
+        if len(data) != count:
+            raise RuntimeError(
+                f"short verification read at 0x{offset + len(output):x}: "
+                f"got {len(data)}/{count}")
+        output.extend(data)
+        if progress and len(output) >= next_report:
+            print(f"\r    {100.0 * len(output) / length:5.1f}%", end="", flush=True)
+            next_report += 0x200000
+    if progress:
+        print("\r    100.0%")
+    if len(output) != length:
+        raise RuntimeError("verification read returned an unexpected total length")
+    return bytes(output)
 
 
-def load_state():
+def capture_full_chip(dev, progress=True, read_full_fn=None):
+    mode = set_address_mode_for_range(dev, 0, FLASH_SIZE)
+    if mode != SUB_EN4B:
+        raise AssertionError("full-chip capture did not select F6 17")
+    if read_full_fn is None:
+        return read_range(dev, 0, FLASH_SIZE, progress=progress)
+    data = read_full_fn(dev)
+    if len(data) != FLASH_SIZE:
+        raise RuntimeError(
+            f"short full-chip capture: got {len(data)}/{FLASH_SIZE}")
+    return bytes(data)
+
+
+def poll_ready(dev, timeout=30.0, interval=0.02,
+               clock=time.monotonic, sleeper=time.sleep):
+    deadline = clock() + timeout
+    while True:
+        status, _csw_status, _residue = dev.cmd(cdb_simple(SUB_STATUS), 1)
+        if len(status) != 1:
+            raise RuntimeError(f"status command returned {len(status)} bytes, expected 1")
+        if not (status[0] & 0x01):
+            return
+        if clock() >= deadline:
+            raise RuntimeError(f"flash remained busy for more than {timeout:.1f} seconds")
+        sleeper(interval)
+
+
+def query_loader_identity(dev):
+    identify, _status, _residue = dev.cmd(cdb_simple(SUB_IDENTIFY), 8)
+    descriptor, _status, _residue = dev.cmd(cdb_simple(SUB_DESC), 36)
+    if len(identify) != 8 or not identify.startswith(LOADER_IDENT_PREFIX):
+        raise SafetyError("unexpected F6 00 loader identity")
+    if len(descriptor) != 36 or LOADER_DESCRIPTOR_MARKER not in descriptor:
+        raise SafetyError("unexpected F6 F1 loader descriptor")
+    device_path = getattr(dev, "device_path", "")
+    if not device_path:
+        raise SafetyError("USB topology path is unavailable; device binding is impossible")
+    return {
+        "device_path": device_path,
+        "identify_hex": identify.hex(),
+        "descriptor_sha256": sha256_bytes(descriptor),
+        "loader_fingerprint_sha256": sha256_bytes(identify + descriptor),
+    }
+
+
+def image_with_marker(baseline, offset):
+    image = bytearray(baseline)
+    image[offset:offset + len(MARKER)] = MARKER
+    return bytes(image)
+
+
+def difference_summary(expected, actual, limit=8):
+    if len(expected) != len(actual):
+        return abs(len(expected) - len(actual)), [(0, max(len(expected), len(actual)) - 1)]
+    count = 0
+    ranges = []
+    start = previous = None
+    for index, (wanted, got) in enumerate(zip(expected, actual)):
+        if wanted == got:
+            continue
+        count += 1
+        if start is None:
+            start = previous = index
+        elif index == previous + 1:
+            previous = index
+        else:
+            if len(ranges) < limit:
+                ranges.append((start, previous))
+            start = previous = index
+    if start is not None and len(ranges) < limit:
+        ranges.append((start, previous))
+    return count, ranges
+
+
+def require_exact_image(label, expected, actual):
+    if len(expected) != FLASH_SIZE or len(actual) != FLASH_SIZE:
+        raise SafetyError(
+            f"{label} requires two exact 32-MiB images; got "
+            f"{len(expected)} and {len(actual)} bytes")
+    expected_hash = sha256_bytes(expected)
+    actual_hash = sha256_bytes(actual)
+    if not hmac.compare_digest(expected_hash, actual_hash) or expected != actual:
+        count, ranges = difference_summary(expected, actual)
+        locations = ", ".join(
+            f"0x{start:x}-0x{end:x}" for start, end in ranges)
+        raise SafetyError(
+            f"{label} mismatch: {count} differing bytes; first ranges: "
+            f"{locations or 'unavailable'}; expected {expected_hash}, got {actual_hash}")
+    return actual_hash
+
+
+def _state_fields(identity, manifest, baseline_hash, offset, programmed_hash, status):
+    return {
+        "schema": STATE_SCHEMA,
+        "status": status,
+        "offset": offset,
+        "sector_size": SECTOR,
+        "marker_length": len(MARKER),
+        "device_path": identity["device_path"],
+        "identify_hex": identity["identify_hex"],
+        "descriptor_sha256": identity["descriptor_sha256"],
+        "loader_fingerprint_sha256": identity["loader_fingerprint_sha256"],
+        "manifest_sha256": manifest.sha256,
+        "baseline_sha256": baseline_hash,
+        "marker_sha256": sha256_bytes(MARKER),
+        "programmed_image_sha256": programmed_hash,
+    }
+
+
+def _static_state_fields(manifest, baseline_hash, offset, programmed_hash):
+    return {
+        "schema": STATE_SCHEMA,
+        "status": STATE_READY,
+        "offset": offset,
+        "sector_size": SECTOR,
+        "marker_length": len(MARKER),
+        "manifest_sha256": manifest.sha256,
+        "baseline_sha256": baseline_hash,
+        "marker_sha256": sha256_bytes(MARKER),
+        "programmed_image_sha256": programmed_hash,
+    }
+
+
+def load_state(path):
+    if os.path.islink(path):
+        raise SafetyError("state file may not be a symbolic link")
     try:
-        return json.load(open(STATE))
+        with open(path, "r", encoding="utf-8") as stream:
+            if os.fstat(stream.fileno()).st_size > 16384:
+                raise SafetyError("state file is unexpectedly large")
+            state = json.load(stream)
+    except FileNotFoundError as exc:
+        raise SafetyError("no verified program-stage state; run stage program first") from exc
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise SafetyError(f"cannot read a valid stage state: {exc}") from exc
+    if not isinstance(state, dict):
+        raise SafetyError("stage state is not a JSON object")
+    return state
+
+
+def validate_state(state, expected):
+    if set(state) != set(expected):
+        missing = sorted(set(expected) - set(state))
+        extra = sorted(set(state) - set(expected))
+        raise SafetyError(f"stage state fields differ (missing={missing}, extra={extra})")
+    for key, wanted in expected.items():
+        got = state[key]
+        if isinstance(wanted, str):
+            if not isinstance(got, str) or not hmac.compare_digest(got, wanted):
+                raise SafetyError(f"stage state {key} does not match this experiment")
+        elif got != wanted or type(got) is not type(wanted):
+            raise SafetyError(f"stage state {key} does not match this experiment")
+
+
+def validate_static_state(state, manifest, baseline_hash, offset, programmed_hash):
+    expected = _static_state_fields(
+        manifest, baseline_hash, offset, programmed_hash)
+    required_keys = set(expected) | {
+        "device_path",
+        "identify_hex",
+        "descriptor_sha256",
+        "loader_fingerprint_sha256",
+    }
+    if set(state) != required_keys:
+        missing = sorted(required_keys - set(state))
+        extra = sorted(set(state) - required_keys)
+        raise SafetyError(
+            f"stage state fields differ (missing={missing}, extra={extra})")
+    for key, wanted in expected.items():
+        got = state[key]
+        if isinstance(wanted, str):
+            if not isinstance(got, str) or not hmac.compare_digest(got, wanted):
+                raise SafetyError(f"stage state {key} does not match this experiment")
+        elif got != wanted or type(got) is not type(wanted):
+            raise SafetyError(f"stage state {key} does not match this experiment")
+
+    device_path = state["device_path"]
+    if not isinstance(device_path, str) or not device_path or len(device_path) > 256:
+        raise SafetyError("stage state device_path is malformed")
+    path_parts = device_path.split("-", 1)
+    if (len(path_parts) != 2 or not path_parts[0].isdigit()
+            or not path_parts[1]
+            or any(not part.isdigit() for part in path_parts[1].split("."))):
+        raise SafetyError("stage state device_path is malformed")
+
+    hexadecimal_fields = {
+        "identify_hex": 16,
+        "descriptor_sha256": 64,
+        "loader_fingerprint_sha256": 64,
+    }
+    for key, length in hexadecimal_fields.items():
+        value = state[key]
+        if (not isinstance(value, str) or len(value) != length
+                or any(character not in "0123456789abcdef" for character in value)):
+            raise SafetyError(f"stage state {key} is malformed")
+
+
+def write_state_atomic(path, state):
+    directory = os.path.dirname(os.path.abspath(path)) or "."
+    os.makedirs(directory, mode=0o700, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(
+        prefix=".kb7-isp-write2-state.", dir=directory, text=True)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            json.dump(state, stream, sort_keys=True, indent=2)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
     except Exception:
-        return {}
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+def clear_state(path):
+    try:
+        os.unlink(path)
+    except FileNotFoundError:
+        pass
+
+
+def _paths_are_same(first, second):
+    if os.path.abspath(first) == os.path.abspath(second):
+        return True
+    try:
+        return os.path.samefile(first, second)
+    except (FileNotFoundError, OSError):
+        return False
+
+
+def execute_stage(stage, offset, baseline, baseline_manifest, state_path,
+                  progress=True, device_factory=WriteDevice, read_full_fn=None):
+    """Execute one committed stage. All callers must validate baseline first."""
+    if stage not in ("program", "erase"):
+        raise ValueError("stage must be program or erase")
+    if len(baseline) != FLASH_SIZE:
+        raise SafetyError("committed stage requires an exact 32-MiB baseline")
+    validate_target(baseline_manifest, baseline, offset)
+    baseline_hash = sha256_bytes(baseline)
+    programmed = image_with_marker(baseline, offset)
+    programmed_hash = sha256_bytes(programmed)
+    saved_state = None
+    if stage == "erase":
+        saved_state = load_state(state_path)
+        validate_static_state(
+            saved_state, baseline_manifest, baseline_hash, offset, programmed_hash)
+
+    dev = device_factory()
+    mutation_attempted = False
+    try:
+        identity = query_loader_identity(dev)
+        print(f"connected : {identity['device_path']} (loader identity accepted)")
+
+        print("preflight : reading all 32 MiB through the SoC ...")
+        before = capture_full_chip(
+            dev, progress=progress, read_full_fn=read_full_fn)
+        expected_before = baseline if stage == "program" else programmed
+        before_hash = require_exact_image(
+            "fresh pre-mutation device image", expected_before, before)
+        print(f"preflight : exact expected image, sha256 {before_hash}")
+
+        live_manifest = parse_manifest(before)
+        if not hmac.compare_digest(live_manifest.sha256, baseline_manifest.sha256):
+            raise SafetyError("connected manifest differs from the baseline manifest")
+        validate_target(live_manifest, baseline, offset)
+
+        if stage == "erase":
+            expected_state = _state_fields(
+                identity, live_manifest, baseline_hash, offset,
+                programmed_hash, STATE_READY)
+            validate_state(saved_state, expected_state)
+            expected_sector = bytearray(b"\xff" * SECTOR)
+            expected_sector[:len(MARKER)] = MARKER
+            if before[offset:offset + SECTOR] != bytes(expected_sector):
+                raise SafetyError(
+                    "erase precondition failed: sector is not exactly marker plus 0xff")
+        else:
+            # A ready state from an older run must never authorize this new run.
+            clear_state(state_path)
+
+        mutation_length = len(MARKER) if stage == "program" else SECTOR
+        mode = set_address_mode_for_range(dev, offset, mutation_length)
+        if mode != SUB_EX4B:
+            raise SafetyError("sub-16-MiB mutation did not select vendor F6 18 mode")
+        print("mode      : F6 18 (vendor sub-16-MiB path)")
+
+        if stage == "program":
+            command = cdb_program(offset, len(MARKER))
+            mutation_attempted = True
+            dev.program(command, MARKER)
+        else:
+            command = cdb_erase(offset)
+            started_state = dict(saved_state)
+            started_state["status"] = STATE_ERASE_STARTED
+            write_state_atomic(state_path, started_state)
+            mutation_attempted = True
+            dev.cmd(command)
+
+        poll_ready(dev)
+        print("postflight: reading all 32 MiB through the SoC ...")
+        after = capture_full_chip(
+            dev, progress=progress, read_full_fn=read_full_fn)
+        expected_after = programmed if stage == "program" else baseline
+        after_hash = require_exact_image(
+            "post-mutation full-chip image", expected_after, after)
+        print(f"postflight: exact expected image, sha256 {after_hash}")
+
+        if stage == "program":
+            ready_state = _state_fields(
+                identity, live_manifest, baseline_hash, offset,
+                programmed_hash, STATE_READY)
+            write_state_atomic(state_path, ready_state)
+            print("PASS: marker programmed exactly; erase stage is now authorized.")
+        else:
+            clear_state(state_path)
+            print("PASS: marker removed at the encoded target; exact baseline restored.")
+        return 0
+    except KeyboardInterrupt as exc:
+        if mutation_attempted:
+            raise MutationResultUnknown(
+                "operator interruption occurred after the mutation began") from exc
+        raise
+    except Exception as exc:
+        if mutation_attempted and not isinstance(exc, MutationResultUnknown):
+            raise MutationResultUnknown(
+                f"mutation may have occurred, but verification did not complete: {exc}") from exc
+        raise
+    finally:
+        dev.close()
+
+
+def _print_plan(stage, offset, baseline_hash, manifest):
+    mutation_length = len(MARKER) if stage == "program" else SECTOR
+    mode = address_mode_subcode(offset, mutation_length)
+    command = (cdb_program(offset, len(MARKER))
+               if stage == "program" else cdb_erase(offset))
+    print(f"stage     : {stage}")
+    print(f"target    : 0x{offset:08x}")
+    print(f"scratch   : [0x{manifest.scratch_lo:x},0x{manifest.scratch_hi:x}) from manifest")
+    print(f"baseline  : sha256 {baseline_hash}")
+    print("pre/post  : F6 17, exact 32-MiB read")
+    print(f"mutation  : F6 {mode:02x}, then {command.hex(' ')}")
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--stage", choices=("program", "erase"), required=True)
-    ap.add_argument("--offset", type=lambda s: int(s, 0), default=0x8E000)
-    ap.add_argument("--baseline", required=True)
-    ap.add_argument("--commit", action="store_true")
-    args = ap.parse_args()
-    off = args.offset
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--stage", choices=("program", "erase"), required=True)
+    parser.add_argument("--offset", type=lambda value: int(value, 0), default=0x8E000)
+    parser.add_argument("--baseline", required=True,
+                        help="exact 32-MiB baseline captured from this keyboard")
+    parser.add_argument("--state-file", default=DEFAULT_STATE,
+                        help=f"stage authorization file (default: {DEFAULT_STATE})")
+    parser.add_argument("--commit", action="store_true",
+                        help="actually send the reviewed mutation command")
+    args = parser.parse_args()
 
-    if args.stage == "program":
-        cdb = cdb_program(off, len(MARKER))
-        what = f"program {len(MARKER)} B ({len(MARKER)//BLOCK} block) at 0x{off:x}"
-        lo, hi = off, off + len(MARKER)
-    else:
-        cdb = cdb_erase(off)
-        what = f"erase {SECTOR} B sector at 0x{off:x}"
-        lo, hi = off & ~(SECTOR - 1), (off & ~(SECTOR - 1)) + SECTOR
-
-    print(f"stage     : {args.stage}")
-    print(f"target    : 0x{off:08x}   scratch [0x{SCRATCH_LO:x},0x{SCRATCH_HI:x})")
-    print(f"CDB       : {cdb.hex(' ')}")
-    print(f"action    : {what}")
-    print(f"encoded   : addr field 0x{int.from_bytes(cdb[3:7] if args.stage=='program' else cdb[3:5],'big'):x}"
-          f"   (ABS_BASE=0x{ABS_BASE:x})")
-    if args.stage == "erase":
-        print("  NOTE: erase encoding is static-analysis only. If wrong, the")
-        print("        16-bit field can only reach 0x0000-0xffff = header+loader.")
-        print("        Recovery: full-chip SPI rewrite from your known-good backup image.")
-
-    if not args.commit:
-        print("\nDRY RUN — nothing sent. Re-run with --commit.")
-        return 0
-
-    st_ = load_state()
-    if args.stage == "erase" and st_.get("programmed_at") != off:
-        print(f"\nABORT: no verified marker at 0x{off:x}. Run --stage program first.")
-        print("       Erasing an already-0xFF sector proves nothing: a correct")
-        print("       erase and a total miss look identical.")
-        return 1
-
-    dev = Device()
     try:
-        _, s, _ = dev.cmd(cdb_simple(SUB_EN4B))
-        print(f"\nF6 17 enter 4-byte addressing: status {s}")
-        sec = off & ~(SECTOR - 1)
-        before = read_range(dev, sec, SECTOR)
+        if _paths_are_same(args.baseline, args.state_file):
+            raise SafetyError("baseline and state file must be different paths")
+        baseline = load_baseline(args.baseline)
+        manifest = parse_manifest(baseline)
+        validate_target(manifest, baseline, args.offset)
+        baseline_hash = sha256_bytes(baseline)
+        programmed_hash = sha256_bytes(image_with_marker(baseline, args.offset))
 
-        if args.stage == "program":
-            page = before[off - sec:off - sec + len(MARKER)]
-            if page != b"\xff" * len(MARKER):
-                print(f"ABORT: target not erased ({page[:8].hex(' ')})")
-                return 1
-            print("  precondition OK: target is fully erased")
-            s = cmd_out(dev, cdb, MARKER)
-            print(f"  F6 06 program: CSW status {s}")
-        else:
-            if before[off - sec:off - sec + len(MARKER)] != MARKER:
-                print("ABORT: expected marker not present; refusing to erase.")
-                return 1
-            print("  precondition OK: marker present, so erase is observable")
-            _, s, _ = dev.cmd(cdb)
-            print(f"  F6 15 erase: CSW status {s}")
-        poll_ready(dev)
+        if args.stage == "erase":
+            state = load_state(args.state_file)
+            validate_static_state(
+                state, manifest, baseline_hash, args.offset, programmed_hash)
 
-        after = read_range(dev, sec, SECTOR)
-        if args.stage == "program":
-            got = after[off - sec:off - sec + len(MARKER)]
-            ok = got == MARKER
-            print(f"  read-back: {'MARKER PRESENT' if ok else 'MISMATCH'}")
-        else:
-            ok = after == b"\xff" * SECTOR
-            print(f"  sector now: {'ALL 0xFF (erased)' if ok else 'NOT erased'}")
+        _print_plan(args.stage, args.offset, baseline_hash, manifest)
+        if not args.commit:
+            print("\nDRY RUN -- baseline, manifest, target, and state checks only.")
+            print("No USB device was opened and nothing was sent or changed.")
+            return 0
 
-        clean, _ = full_diff(dev, args.baseline, lo, hi)
-        print("\n--- verdict ---")
-        if ok and clean:
-            print(f"PASS: {args.stage} landed exactly where computed; nothing else")
-            print("      in the image range changed.")
-            if args.stage == "program":
-                json.dump({"programmed_at": off}, open(STATE, "w"))
-                print("      Stage 2 (erase) is now unlocked.")
-            else:
-                json.dump({}, open(STATE, "w"))
-                print("      *** F6 15 ERASE ENCODING IS NOW HARDWARE-CONFIRMED. ***")
-        elif not clean:
-            print("FAIL: wrote somewhere unintended (stray list above).")
-            print("      Recover: full-chip SPI write from your known-good backup image.")
-        else:
-            print(f"INCONCLUSIVE: nothing strayed, but the {args.stage} did not")
-            print("      take effect. Device may have rejected the command.")
-        return 0 if (ok and clean) else 2
-    finally:
-        dev.close()
+        print("\nCOMMIT REQUESTED -- this operation can require full-chip SPI recovery.")
+        return execute_stage(
+            args.stage, args.offset, baseline, manifest, args.state_file)
+    except MutationResultUnknown as exc:
+        print(f"\nUNKNOWN RESULT: {exc}", file=sys.stderr)
+        print("Do not retry over USB. Read the chip externally and recover with the",
+              file=sys.stderr)
+        print("verified full-chip SPI procedure if any byte differs.", file=sys.stderr)
+        return 3
+    except (SafetyError, RuntimeError, ValueError, OSError) as exc:
+        print(f"\nABORT: {exc}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

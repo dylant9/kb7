@@ -146,9 +146,15 @@ orchestrator compares `start + length` with `0x61000000`, emitting `F6 17` when
 the range crosses that boundary and `F6 18` otherwise. That logic neither reads
 nor changes the flash-type selector.
 
+This decision is made around both the NOR program and NOR erase operations. A
+program or erase wholly below 16 MiB therefore receives `F6 18`, not `F6 17`,
+before its mutation command. The address-mode command does not rescale or
+reinterpret the 16-bit block index carried by `F6 15`.
+
 Thus:
 
 - entering four-byte NOR mode with `F6 17` does **not** select `F6 19`;
+- leaving four-byte NOR mode with `F6 18` does **not** select `F6 15`;
 - the normal KB7 NOR erase remains `F6 15` above 16 MiB;
 - a 16-bit index in 512-byte units covers exactly 32 MiB. The final 4-KiB
   sector begins at offset `0x01fff000`, whose index is `0xfff8`, so `F6 15`
@@ -172,7 +178,8 @@ Proven from the updater's register and stack data flow:
 - the two-byte and four-byte field widths and byte order shown above;
 - neither erase CDB carries a count;
 - one command is issued per host-loop erase unit;
-- `F6 17` selection is independent of `F6 15`/`F6 19` selection;
+- `F6 17`/`F6 18` selection is independent of `F6 15`/`F6 19` selection and
+  does not change how the erase index is interpreted;
 - the registered NOR operator defaults the flash-type selector to zero, and a
   separate configuration path can change it;
 - the separately traced state is timing data, not an address-unit table.
@@ -194,10 +201,13 @@ Not proven on hardware:
 
 ## Tooling and write-path verdict
 
-An earlier command emitter was based on two disproven `F6 06` fields. No USB
-mutation tool or command emitter is included in this source-only branch.
+An earlier command emitter was based on two disproven `F6 06` fields. This
+branch now includes `kb7-isp-write2.py`, a narrow, dry-run-by-default laboratory
+utility for a coupled marker-program and sector-erase experiment. It is not a
+general USB writer or a supported firmware installation path.
 
-**Keep USB ISP read-only and use the proven SPI/flashrom path for every write.**
+**Use the proven SPI/flashrom path for ordinary, recovery and production
+writes.**
 
 Static analysis now settles the CDB layout, but it does not make an initial
 erase experiment safe. The erase handler itself has never been validated on
@@ -211,4 +221,7 @@ There is no erase test that is non-destructive under every remaining uncertainty
 Now that the address-unit ambiguity is resolved, the remaining uncertainty is
 whether the target implements the recovered destructive command as expected;
 any command capable of answering that question necessarily erases a sector or
-block. No hardware erase test is proposed.
+block. [WRITE-TEST-PLAN.md](WRITE-TEST-PLAN.md) therefore documents an
+explicitly destructive, two-stage validation experiment whose recovery
+assumption is a working external-SPI path and byte-exact backup. The experiment
+remains unrun and does not change `flash_approved=false`.

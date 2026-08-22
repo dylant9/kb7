@@ -62,7 +62,7 @@ an external reset; it no longer issues the misleading software reset.
 | External SPI-NOR programmer | External XIP window, SFC controller, 1/2/4-bit reads, 1/4-bit writes, and common command families (pp. 37–39) | Two identical full reads and one successful ESP32-C3 stock repair/boot; repeatable bit-identical full restore remains unproved |
 | External `RSTN` | Release restarts through ROM; SNC73200 lead 88 (pp. 21 and 43) | `MCU_RST` voltage behavior and read isolation are demonstrated; physical continuity/waveform remain unverified |
 | ROM USB-ISP | ROM enters it when no boot identifying mark is found (p. 44) | Identity/protocol and behavior with a corrupt-but-present identifying mark remain unknown |
-| Preserved flash loader | Recovered loader is separate from mask ROM | Observed over USB as `10f5:5037` mass-storage/SCSI mode; no open-source writer is currently included |
+| Preserved flash loader | Recovered loader is separate from mask ROM | Observed over USB as `10f5:5037` mass-storage/SCSI mode; a guarded two-stage write-path experiment is included, but it is unvalidated and is not a supported USB flasher |
 | SWD | One SWD port; SNC73200 SWO/SWCLK/SWDIO are leads 11/12/13 (pp. 1, 11 and 19) | Connect-under-reset and core visibility are untested; no erase operation is authorized |
 | Watchdog reset | Underflow can reset through ROM; WDT uses the 32-kHz ILRC (pp. 43 and 57–58) | Potential autonomous ROM route, but usable register fields are absent from this data sheet |
 | Software reset | Restarts PRAM (p. 43) | Explicitly not a loader recovery route |

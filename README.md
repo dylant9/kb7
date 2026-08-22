@@ -30,12 +30,13 @@ flash-image generation is disabled.
   remaining connected to the flash bus and disappeared when it was disconnected.
   This is a demonstrated emergency-repair path, not yet a repeatable,
   byte-identical full-chip rollback qualification.
-- The flash-access tooling adds proven external SPI recovery workflows
-  and read-only USB-ISP diagnostics. The loader's `F6 06` program layout was
+- The flash-access tooling adds proven external SPI recovery workflows,
+  read-only USB-ISP diagnostics and a dry-run-default two-stage USB mutation
+  experiment. The loader's `F6 06` program layout was
   established by a destructive incident; the `F6 15`/`F6 19` erase layouts are
   resolved by calibrated static analysis but remain untested on hardware. The
-  USB tooling intentionally cannot mutate flash; use SPI for owner-authorized
-  repair writes.
+  experiment is not a supported flasher; use SPI for owner-authorized ordinary,
+  recovery and production writes.
 - No custom firmware has been installed. USB, display, touch, RGB, MCU2/Hall,
   pinmux, cold-start memory setup and a legitimate USB identity still require
   board validation. `flash_approved` remains false.
@@ -62,8 +63,8 @@ stock-recovery investigation.
 - `tools/inspect_stock_flash.py` — read-only inspection of an owner-supplied
   32-MiB dump; raw images and reports remain outside the repository.
 - `tools/flash-access/` — ESP32/`flashrom` recovery notes, read-only USB-ISP
-  verification tools and the F6 command analysis. It contains no stock bytes
-  and no USB write utility.
+  verification tools, F6 command analysis and a guarded two-stage USB write-path
+  experiment. It contains no stock bytes and no supported USB flasher.
 - `tools/check_public_tree.py` — rejects compiled/vendor artifacts, archive and
   executable formats, symlinks, build directories, and prohibited artifact
   filenames.
