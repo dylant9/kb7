@@ -31,7 +31,7 @@ F6 15 ERASE    -- STATIC ANALYSIS ONLY, NOT YET HARDWARE-CONFIRMED
   address misreading the maximum reachable address is 0xFFFF -- entirely within
   header (0x0-0x1000) and bootloader (0x1000-0x10000). There is NO partial
   failure: it either lands correctly, or it damages the boot chain. Recovery is
-  a full-chip SPI rewrite from kb7-REPAIR-full32M.bin (~30 min).
+  a full-chip SPI rewrite from your own known-good backup image (~30 min).
 
 ADDRESS BASE -- reviewer please sanity-check this choice.
   Reads use an absolute 0x60000000-based address and work. The one confirmed
@@ -226,7 +226,7 @@ def main():
     if args.stage == "erase":
         print("  NOTE: erase encoding is static-analysis only. If wrong, the")
         print("        16-bit field can only reach 0x0000-0xffff = header+loader.")
-        print("        Recovery: full-chip SPI rewrite of kb7-REPAIR-full32M.bin.")
+        print("        Recovery: full-chip SPI rewrite from your known-good backup image.")
 
     if not args.commit:
         print("\nDRY RUN — nothing sent. Re-run with --commit.")
@@ -285,7 +285,7 @@ def main():
                 print("      *** F6 15 ERASE ENCODING IS NOW HARDWARE-CONFIRMED. ***")
         elif not clean:
             print("FAIL: wrote somewhere unintended (stray list above).")
-            print("      Recover: full-chip SPI write of kb7-REPAIR-full32M.bin.")
+            print("      Recover: full-chip SPI write from your known-good backup image.")
         else:
             print(f"INCONCLUSIVE: nothing strayed, but the {args.stage} did not")
             print("      take effect. Device may have rejected the command.")
