@@ -6,8 +6,10 @@ Date: 2026-08-22
 
 Two complete 32-MiB reads of the keyboard's external Macronix SPI NOR are
 bit-identical. This is a strong read-only backup and gives us the missing
-physical tail/configuration data. It does **not** yet prove that erase, program,
-restore or post-restore boot works, so `flash_approved` remains false.
+physical tail/configuration data. A subsequent ESP32-C3 repair programmed the
+stock repair image and restored normal boot after the programmer was physically
+disconnected. This proves a practical external write/recovery path, but not a
+repeatable byte-identical full-chip restore, so `flash_approved` remains false.
 
 The dump materially changed the clean-room firmware in two ways:
 
@@ -25,6 +27,7 @@ offsets, lengths and independently derived format facts.
 | Fact | Result |
 |---|---|
 | programmer | CH341B PCB through flashrom's `ch341a_spi` backend |
+| measured CH341 CS high | approximately 5 V; unsafe for further direct use on the 3.3-V flash |
 | flashrom | 1.7.0 |
 | JEDEC ID | `c2 20 19` |
 | identified part | Macronix `MX25L25635F/MX25L25645G`, 32 MiB |
@@ -46,9 +49,26 @@ Log SHA-256 values are `a5cc887ff442979a6c4b9a9f619ebf401a8d63c0a08a6f63257c19b7
 for read 1 and `dc569c5c659c0bf7ebe032e239c068a182fccbad9092314bc8aef8139a28019c`
 for the canonical read-2 transcript.
 
-The successful read proves that the in-circuit wiring and reset hold are
+The successful read proves that the in-circuit wiring and reset hold were
 sufficient for repeatable main-array reads. It does not prove the pad's physical
-continuity to SoC lead 88, nor any write behavior.
+continuity to SoC lead 88. The CH341 board's later-measured 5-V CS level is beyond
+the intended 3.3-V signaling domain, so that board must not be reconnected
+without proper level translation; the successful reads do not establish
+electrical safety.
+
+## External repair result
+
+An ESP32-C3 SPI programmer was used to program the stock repair image. The board
+initially booted intermittently or exposed the loader while that programmer was
+still wired but unpowered. Normal stock boot returned after it was physically
+disconnected, which is consistent with an unpowered bus master clamping or
+back-powering the SFC lines. External programmers must be disconnected or
+demonstrably high-impedance before reset is released.
+
+This is meaningful recovery evidence: the external flash accepted a repair and
+the SoC subsequently booted the repaired stock image. It does not yet document a
+repeatable whole-chip erase/program/readback cycle or an exact post-restore
+32-MiB hash, and it says nothing about whether the replacement firmware will run.
 
 ## USB extraction cross-check
 
@@ -66,7 +86,7 @@ This is important provenance: the machine code used for the clean-room analysis
 really is the code installed on this physical unit, not merely a matching update
 package.
 
-## Manifest verification and unresolved region-2 state
+## Manifest verification and repaired region-2 anomaly
 
 The recovered checksum is the sum modulo 2^32 of zlib CRC-32 values for each
 successive 64-KiB chunk. Regions 0 and 1 reproduce their stored checksums exactly.
@@ -87,14 +107,12 @@ checksum over the official region produces exactly the manifest's stored
 installed zeroed variant. The official bytes look like small RGB565/pixel data,
 but their exact asset role is not established.
 
-The preserved loader contains a generic manifest checksum routine and the boot
-configuration names only the manifest at `0x60010000`. The keyboard was working
-before acquisition, but that does not prove a later cold boot checked this exact
-post-runtime array state successfully. Whether runtime modified the asset,
-normal boot skips or tolerates it, or another state/path is involved remains
-unresolved. We must not silently replace those 52 bytes or claim a fully
-understood boot-integrity policy. A targeted sector reread before and after a
-true cold boot is useful; it must remain read-only.
+The repair restored the zeroed region-2 bytes from the checksum-matching stock
+reference, and the keyboard subsequently returned to normal stock boot once the
+external programmer was removed. That strongly supports treating the zeroed
+page as corruption rather than an intentional persistent state. The initiating
+cause is still not proven, and a canonical post-repair full read/hash should be
+retained before claiming a completely characterized boot-integrity policy.
 
 ## Tail findings
 
@@ -135,17 +153,18 @@ python3 tools/inspect_stock_flash.py kb7-stock-1.bin \
 
 Raw filenames and artifacts are operator inputs and stay outside the repository.
 
-## What remains before any write
+## What remains before a custom-firmware write
 
 1. Store the two original binaries in two independent locations and retain the
    canonical log and hashes.
-2. Reread the `0xa02000` sector after a true cold boot to confirm the 52-byte
-   region-2 state is stable.
+2. Archive a post-repair complete read and exact hash, and confirm the repaired
+   `0xa02000` sector remains stable across true cold boots.
 3. Read the flash configuration/security registers needed to establish 4-byte
    addressing, quad mode and protection behavior; preserve any OTP identifiers.
 4. Prove `MCU_RST` continuity/waveform and check that the SoC never drives the
    SPI bus while held.
 5. Validate a bounded erase/program/readback cycle on an expendable or known
-   custom-safe sector before contemplating a firmware region.
-6. Prove complete stock restore and normal boot. Until then the backup is a
-   strong recovery asset, not a demonstrated recovery procedure.
+   custom-safe sector before contemplating a replacement-firmware region.
+6. Turn the successful ESP32-C3 repair into a documented, repeatable full-stock
+   restore/readback procedure. The repair is a demonstrated recovery event, but
+   not yet a fully qualified rollback process.

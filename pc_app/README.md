@@ -13,6 +13,12 @@ Open `web/index.html` directly in a modern browser. The project stores drafts in
 browser-local storage and contains no HID, USB, serial, programmer, network, or
 device-discovery code.
 
+Current status: JSON, `KBS1` and `KBP1` validation/compilation are implemented
+and tested for up to five persistent profiles. Screen artifacts are capped to
+the current 1.25-MiB slot payload and profile artifacts to the five-record KBP1
+limit. The studio remains deliberately offline; it neither discovers the KB7
+nor sends the loader's USB/SCSI flash commands.
+
 Display **Touch Trace** mode records native coordinates, pressure when the
 browser supplies it, pointer sample rate and timing gaps, plus normalized X/Y
 joystick output with a configurable radial deadzone. Trace JSON is explicitly a
@@ -42,4 +48,5 @@ overrides. Logical-key→LED channel
 correlation is still absent, so nonempty per-key RGB is rejected rather than
 silently misaddressed. Simulator output is not a claim of working hardware.
 
-See `../docs/PROFILE-FORMAT.md` and `../docs/SCREEN-FORMAT.md`.
+See `../docs/PROFILE-FORMAT.md`, `../docs/SCREEN-FORMAT.md`,
+`../docs/HOST-PROTOCOL.md` and `../docs/STORAGE-MAP.md`.

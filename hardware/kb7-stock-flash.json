@@ -1,6 +1,6 @@
 {
   "schema": "kb7.hardware.stock-flash-observations",
-  "schema_version": 1,
+  "schema_version": 2,
   "observed_on": "2026-08-22",
   "acquisition": {
     "read_count": 2,
@@ -8,6 +8,8 @@
     "size_bytes": 33554432,
     "sha256": "c3c4125b8c42019bac65be8cb71ee1d8b9f91dd32c1f8cc918b34454d9bb7027",
     "programmer": "CH341B PCB using flashrom ch341a_spi",
+    "programmer_cs_logic_high_v": 5.0,
+    "programmer_voltage_safe_for_target": false,
     "flashrom_version": "1.7.0",
     "jedec_id": "c2 20 19",
     "identified_as": "Macronix MX25L25635F/MX25L25645G",
@@ -19,7 +21,7 @@
     "mcu_rst_asserted_v": 0.2,
     "mcu_rst_series_resistor_ohms": 1000,
     "reset_pad_to_soc_lead_continuity": "unverified",
-    "write_or_restore_tested": false,
+    "acquisition_programmer_write_tested": false,
     "logs": [
       {
         "name": "kb7-read-1.log",
@@ -34,6 +36,14 @@
         "status": "canonical complete acquisition transcript"
       }
     ]
+  },
+  "recovery_validation": {
+    "programmer": "ESP32-C3 SPI programmer",
+    "stock_repair_write_and_boot_observed": true,
+    "result": "stock boot restored after programming the repair image and physically disconnecting the programmer",
+    "unpowered_programmer_bus_effect": "boot was unreliable while the unpowered programmer remained connected to the SPI bus",
+    "full_chip_bit_identical_restore_proven": false,
+    "custom_firmware_booted": false
   },
   "boot_configuration": {
     "offset": "0x00000200",

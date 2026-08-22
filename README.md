@@ -6,9 +6,33 @@ studio.
 
 **It is not yet board-validated firmware. Do not install it on hardware.** The
 software-owned drivers and protocols are now implemented, but several
-electrical/pinmux/controller assumptions and the recovery procedure still need
-physical proof. Public defaults remain fail-closed and flash-image generation
-is disabled.
+electrical/pinmux/controller assumptions and a repeatable full rollback
+procedure still need physical proof. Public defaults remain fail-closed and
+flash-image generation is disabled.
+
+## Current status — 2026-08-22
+
+- The offline/software implementation is complete to the evidence currently
+  available. `make check` passes 89 Python/C integration tests, browser
+  validation, three ARM build profiles, hardware-fact checks and the public-tree
+  safety audit.
+- Two independent reads of the installed 32-MiB Macronix SPI NOR are
+  bit-identical. They match the earlier USB-extracted V1.22 components and
+  exposed stock-owned configuration/upload partitions that the custom storage
+  map now preserves.
+- An external ESP32-C3 SPI repair restored normal stock boot. The intermittent
+  boot seen immediately afterward was consistent with the unpowered programmer
+  remaining connected to the flash bus and disappeared when it was disconnected.
+  This is a demonstrated emergency-repair path, not yet a repeatable,
+  byte-identical full-chip rollback qualification.
+- No custom firmware has been installed. USB, display, touch, RGB, MCU2/Hall,
+  pinmux, cold-start memory setup and a legitimate USB identity still require
+  board validation. There is currently no open-source USB flash writer in this
+  repository, and `flash_approved` remains false.
+
+See the [firmware completion status](docs/FIRMWARE-COMPLETION-2026-08-18.md),
+[full-flash acquisition record](docs/FULL-FLASH-ACQUISITION-2026-08-22.md), and
+[boot/recovery model](docs/BOOT-RECOVERY-MODEL.md) for the evidence boundaries.
 
 ## Repository contents
 
@@ -17,11 +41,13 @@ is disabled.
   recovery diagnostics. Hardware-sensitive paths require explicit gates.
 - `pc_app/` — dependency-free browser editor plus Python validators, compiler,
   protocol model, storage model, samples, and tests. It performs no device I/O.
-- `hardware/` — page-cited, machine-readable SoC/MMIO/IRQ/DMA and KB7 package
-  pin facts, with explicit confidence and continuity status.
+- `hardware/` — page-cited, machine-readable SoC/MMIO/IRQ/DMA, KB7 package-pin,
+  reset and full-flash observations, with explicit evidence boundaries.
 - `docs/` — project-owned screen/profile/control/storage formats, the full
   security audit, remediation matrix, report schemas, and public-source
   provenance review.
+- `tools/inspect_stock_flash.py` — read-only inspection of an owner-supplied
+  32-MiB dump; raw images and reports remain outside the repository.
 - `tools/check_public_tree.py` — rejects compiled/vendor artifacts, archive and
   executable formats, symlinks, build directories, and known private filenames.
 
@@ -40,9 +66,12 @@ control.
 Run its tests with:
 
 ```sh
-PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=pc_app python3 -m unittest discover -s pc_app/tests -v
-node --check pc_app/web/app.js
+make check
 ```
+
+That root target runs the studio tests plus the firmware builds and public-tree
+checks. The narrower Python and JavaScript commands remain documented in
+`pc_app/README.md`.
 
 ## Inspect the firmware source
 
@@ -67,7 +96,10 @@ any hardware-facing code, then review
 [AUDIT-REMEDIATION-2026-08-17.md](docs/AUDIT-REMEDIATION-2026-08-17.md) and the
 later [firmware completion status](docs/FIRMWARE-COMPLETION-2026-08-18.md),
 [SNC7320 datasheet audit](docs/SOC-DATASHEET-AUDIT-2026-08-18.md), and
-[boot/recovery model](docs/BOOT-RECOVERY-MODEL.md). Run
+[boot/recovery model](docs/BOOT-RECOVERY-MODEL.md). The
+[full-flash acquisition record](docs/FULL-FLASH-ACQUISITION-2026-08-22.md)
+supersedes all earlier assumptions that the erased flash tail was generally
+available for custom storage. Run
 this immediately before every commit or release:
 
 ```sh

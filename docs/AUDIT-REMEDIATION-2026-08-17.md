@@ -49,8 +49,10 @@ hardware measurements:
   the four project-owned screen/profile slots.
 - MCU2 needs both a feature gate and separate board-profile proof; its required
   SPI0 function-4 pinmux is not guessed.
-- A full external-programmer backup/restore and verified MCU reset hold remain
-  mandatory before an independent core0 experiment.
+- Two identical external-programmer backups and one ESP32-C3 stock repair/boot
+  are now demonstrated. A repeatable exact full-chip restore/readback and
+  verified MCU reset/SFC-idle waveform remain mandatory before an independent
+  core0 experiment.
 - Autonomous loader entry remains unavailable. The recovered mailbox marker's
   lifetime and consumer are unproven, and software reset is explicitly a PRAM
   restart. See `BOOT-RECOVERY-MODEL.md`.
@@ -80,8 +82,9 @@ Any future image-producing release pipeline must, before it is enabled:
 The audited source defects and the offline-implementable functions are
 incorporated, but the public firmware is still a non-flashable engineering
 implementation. Remaining blockers are physical validation, unpublished
-pinmux encodings, assigned USB identity and proven external recovery; none is
-silently enabled.
+pinmux encodings, assigned USB identity and a release-quality repeatable
+recovery runbook; none is silently enabled. One external stock repair has
+succeeded, but no replacement firmware has run on hardware.
 
 ## Verification record
 

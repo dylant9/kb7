@@ -14,6 +14,21 @@ panel sequence, RGB controller protocol, Hall routing model and USB controller
 stack. It still excludes vendor code/binaries, decompiler output, raw captures,
 stock patch tooling, assigned USB identity and every generated binary.
 
+## Current status — 2026-08-22
+
+All substantial software-owned functions supported by the available evidence
+are implemented and host-tested, including five profiles, USB EP0/HID/vendor
+transport, Hall/action processing, display/touch/RGB paths and atomic screen/
+profile storage. Full-chip reads corrected the mutable store allow-list so it no
+longer overlaps stock configuration or upload partitions.
+
+The default build still parks before the application and leaves every
+unverified peripheral, USB attachment and flash mutation path disabled. An
+external ESP32-C3 repair has restored the stock firmware on the physical unit,
+but the replacement images themselves have never run on the board. Cold-start
+clock/OPI state, alternate-function pinmux, controller electrical behavior and
+the complete rollback procedure remain hardware gates.
+
 Requirements: GNU Make, Python 3, and `arm-none-eabi-gcc`/binutils.
 
 ```sh
@@ -32,7 +47,9 @@ profile.
 findings have regression-tested repairs, described in
 `../docs/FIRMWARE-COMPLETION-2026-08-18.md`. USB/MCU2 identities and board
 profiles, generic non-GPIO pinmux, logical-key→LED correlation and hardware
-recovery validation remain unresolved. Do not install these ELFs.
+validation remain unresolved. External stock repair has succeeded once, but a
+repeatable exact rollback procedure is still required. The repository has no
+USB flashing utility. Do not install these ELFs.
 
 The compatibility function named `kb7_enter_loader()` does not claim an
 autonomous loader transition. The datasheet establishes that AIRCR/software

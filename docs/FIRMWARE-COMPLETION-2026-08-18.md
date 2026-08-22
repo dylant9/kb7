@@ -3,7 +3,8 @@
 Review date: 2026-08-18
 Updated with full-flash evidence: 2026-08-22
 Scope: independently authored public source after the missing-function work
-Hardware exercised: none
+Replacement firmware exercised on hardware: none
+Stock recovery exercised: one successful external ESP32-C3 repair and boot
 
 ## Verdict and primary LCD answer
 
@@ -22,6 +23,12 @@ cannot transmit until pinmux/continuity are proven, and several proprietary
 controller assumptions still require physical validation. The first hardware
 run must use a complete external-flash backup, a proven programmer wiring plan,
 and `MCU_RST` held low.
+
+Two bit-identical full stock reads and the later successful ESP32-C3 repair now
+provide a real external recovery result. The initial post-repair boot problem
+was traced to leaving the unpowered programmer connected to the SFC bus. This
+improves the recovery position, but does not validate any replacement-firmware
+hardware path or constitute a repeatable bit-identical full-chip rollback test.
 
 ## Completed software-owned work
 
@@ -171,8 +178,9 @@ The implementation now reflects these material SNC7320 facts:
 These are not honest candidates for further offline coding:
 
 1. Confirm the complete SoC marking/package and `MCU_RST`→RSTN lead-88
-   continuity. The Macronix main array now has two identical programmer backups;
-   prove bounded write/readback and complete stock restore/boot while reset is held.
+   continuity. The Macronix main array has two identical backups and one
+   successful ESP32-C3 repair/boot; archive an exact post-repair read and make
+   the complete stock restore/readback procedure repeatable.
 2. Passively capture post-boot SYS0/SYS1, OPI/DRAM and cache state or validate
    the reconstructed cold-start sequence on an isolated board.
 3. Determine the unpublished generic `SYS0_PINCTRL` encoding, especially LCD
@@ -188,9 +196,10 @@ These are not honest candidates for further offline coding:
    physical key legends before enabling per-key effects.
 8. Verify action-bar GPIO continuity, active-low polarity and safe pulls before
    enabling its board-profile gate.
-9. Prove the external reset/programmer recovery runbook before any combined
-   image is written. Autonomous software loader entry remains intentionally
-   unavailable.
+9. Turn the successful external repair into a repeatable reset/programmer
+   recovery runbook before any combined image is written. Autonomous software
+   loader entry remains intentionally unavailable, and no open-source USB
+   writer is included.
 
 ## Build and test profiles
 

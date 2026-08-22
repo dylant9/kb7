@@ -9,6 +9,28 @@ output, PCB captures, or copied vendor tables.
   document inconsistencies.
 - `kb7-pin-map.json` joins package-lead facts to clean-room KB7 logical-GPIO
   findings without pretending that PCB continuity has been measured.
+- `kb7-stock-flash.json` records hashes, ranges and independently derived format
+  facts from two bit-identical owner-supplied 32-MiB reads. It contains no dump,
+  log, firmware bytes or extracted asset.
+
+## Current physical evidence — 2026-08-22
+
+- The external device identifies as Macronix `MX25L25635F/MX25L25645G`
+  (`c2 20 19`), and two complete main-array reads have the same SHA-256.
+- `MCU_RST` measured about 3.2 V released and 0.2 V when asserted through 1 kΩ;
+  continuity to the expected SoC lead and an SFC-idle waveform are still
+  unmeasured.
+- The CH341B PCB used for acquisition was later measured at approximately 5 V
+  on CS. It is not considered electrically safe for further connection to this
+  3.3-V flash without proper level translation.
+- An ESP32-C3 SPI repair restored stock boot. Leaving that programmer connected
+  while unpowered interfered with boot, so every external bus master must be
+  physically disconnected or demonstrably high-impedance before releasing
+  reset.
+
+This proves one external repair path, not a repeatable bit-identical full-chip
+restore and not the safety of installing the replacement firmware. Raw backups,
+programmer logs and repair images remain private.
 
 Every factual item identifies its evidence class and source page. Page numbers
 refer to Sonix *SNC7320 Series Data Sheet*, revision 2.1 (1 June 2022), whose

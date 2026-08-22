@@ -1,6 +1,7 @@
 # Public-source provenance review
 
-Review date: 2026-08-17; remediation additions reviewed 2026-08-18
+Review date: 2026-08-17; remediation additions reviewed 2026-08-18 and
+full-flash metadata reviewed 2026-08-22
 Scope: this repository directory only
 
 ## Decision
@@ -27,6 +28,9 @@ the contributor does not possess.
   map; no Sonix PDF, diagram, or copied vendor table is included.
 - Original machine-readable SoC and package-pin facts with page-level
   provenance, confidence classes, and unverified continuity fields.
+- Independently derived full-flash hashes, ranges, format observations and
+  recovery measurements. No raw dump, programmer log or repair image is
+  included.
 - Apache-2.0 license and project/trademark notice.
 
 No external scripts, fonts, images, packages, or vendored libraries are bundled.

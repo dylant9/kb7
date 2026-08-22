@@ -121,6 +121,8 @@ def validate_pin_map(pinmap: dict[str, object]) -> None:
 
 
 def validate_stock_flash(stock: dict[str, object]) -> None:
+    require(stock["schema_version"] == 2,
+            "stock-flash evidence schema must describe the repair result")
     acquisition = stock["acquisition"]
     require(acquisition["read_count"] == 2 and acquisition["bit_identical"] is True,
             "stock flash must retain the two-read evidence boundary")
@@ -129,8 +131,18 @@ def validate_stock_flash(stock: dict[str, object]) -> None:
     require(acquisition["sha256"] ==
             "c3c4125b8c42019bac65be8cb71ee1d8b9f91dd32c1f8cc918b34454d9bb7027",
             "unexpected stock flash hash")
-    require(acquisition["write_or_restore_tested"] is False,
-            "do not claim a tested restore without new physical evidence")
+    require(acquisition["programmer_cs_logic_high_v"] == 5.0 and
+            acquisition["programmer_voltage_safe_for_target"] is False,
+            "retain the unsafe CH341 CS-voltage observation")
+    require(acquisition["acquisition_programmer_write_tested"] is False,
+            "the CH341 acquisition setup was not write-qualified")
+
+    recovery = stock["recovery_validation"]
+    require(recovery["stock_repair_write_and_boot_observed"] is True,
+            "retain the observed external stock-repair result")
+    require(recovery["full_chip_bit_identical_restore_proven"] is False and
+            recovery["custom_firmware_booted"] is False,
+            "do not promote a repair into full rollback or custom-firmware proof")
 
     regions = stock["manifest"]["regions"]
     require([region["index"] for region in regions] == [0, 1, 2],

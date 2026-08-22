@@ -14,9 +14,13 @@ the SoC boots from a separate storage device (Data Sheet pp. 10, 38 and 83).
 A CH341B PCB has now read the in-circuit external flash twice through flashrom.
 Both complete 32-MiB reads are bit-identical. JEDEC ID `c2 20 19` identifies a
 Macronix `MX25L25635F/MX25L25645G`; status `0x00` showed block protection, WEL
-and WIP clear. This proves repeatable main-array reads with this wiring, not safe
-erase/program behavior. Do not assume another CH341 board has voltage-safe logic
-merely because it exposes a 3.3-V pin.
+and WIP clear. The board was later measured at approximately 5 V on CS and is
+not safe for further direct use with this 3.3-V flash without level translation.
+
+An ESP32-C3 SPI repair subsequently restored normal stock boot. Boot was
+unreliable while the unpowered programmer remained connected and recovered when
+it was physically disconnected. This proves one external write/recovery event,
+not a repeatable byte-identical full-chip restore procedure.
 
 The board pad labeled `MCU_RST` is a strong candidate for active-low `RSTN`,
 which is package lead 88 on the presumed SNC73200 LQFP128. It measured about
@@ -55,9 +59,10 @@ an external reset; it no longer issues the misleading software reset.
 
 | Layer | What the datasheet establishes | KB7 status |
 |---|---|---|
-| External SPI-NOR programmer | External XIP window, SFC controller, 1/2/4-bit reads, 1/4-bit writes, and common command families (pp. 37–39) | Two identical full main-array reads obtained; bounded write and full restore/boot remain unproved |
+| External SPI-NOR programmer | External XIP window, SFC controller, 1/2/4-bit reads, 1/4-bit writes, and common command families (pp. 37–39) | Two identical full reads and one successful ESP32-C3 stock repair/boot; repeatable bit-identical full restore remains unproved |
 | External `RSTN` | Release restarts through ROM; SNC73200 lead 88 (pp. 21 and 43) | `MCU_RST` voltage behavior and read isolation are demonstrated; physical continuity/waveform remain unverified |
-| USB-ISP | ROM enters it when no boot identifying mark is found (p. 44) | Protocol, VID/PID, connector path, and behavior with corrupt-but-present marks are unknown |
+| ROM USB-ISP | ROM enters it when no boot identifying mark is found (p. 44) | Identity/protocol and behavior with a corrupt-but-present identifying mark remain unknown |
+| Preserved flash loader | Recovered loader is separate from mask ROM | Observed over USB as `10f5:5037` mass-storage/SCSI mode; no open-source writer is currently included |
 | SWD | One SWD port; SNC73200 SWO/SWCLK/SWDIO are leads 11/12/13 (pp. 1, 11 and 19) | Connect-under-reset and core visibility are untested; no erase operation is authorized |
 | Watchdog reset | Underflow can reset through ROM; WDT uses the 32-kHz ILRC (pp. 43 and 57–58) | Potential autonomous ROM route, but usable register fields are absent from this data sheet |
 | Software reset | Restarts PRAM (p. 43) | Explicitly not a loader recovery route |
@@ -108,6 +113,9 @@ time multiplexing exists.
    two supplies drive the same rail.
 5. Do not power only the flash on an otherwise unpowered board unless its rail
    and signal paths are isolated; protection structures can back-power the SoC.
+6. Disconnect an ESP32 or other programmer completely before boot unless its
+   unpowered pins are proven high-impedance; the KB7 failed to boot reliably
+   while an unpowered ESP32-C3 remained attached to the SFC lines.
 
 The power-up requirement is that VDDC be above 1.2 V for the run transition and
 VDDIO33 exceed 1.8 V before RSTN reaches 1.8 V (p. 81). Holding reset low while
@@ -146,8 +154,9 @@ software reset path. It does not solve:
 - a bad backup or incomplete boot container; or
 - releasing reset into an image whose early execution damages hardware.
 
-For those reasons, the recovery gate is successful only after a stock image can
-be backed up, restored, read back identically, and booted normally.
+The successful ESP32-C3 repair is now a real recovery result. A release-quality
+recovery gate still requires that result to be repeatable: restore a stock image,
+read it back identically, disconnect every programmer signal, and boot normally.
 
 ## Missing information to collect
 
@@ -155,7 +164,7 @@ be backed up, restored, read back identically, and booted normally.
 - `MCU_RST` to lead-88 continuity and reset/SFC-idle waveform;
 - exact flash rail, configuration/security/OTP state, 4-byte address behavior,
   and SFC wiring width;
-- a bounded safe-sector program/readback and full stock restore/boot proof;
+- a documented repeatable full stock restore plus exact post-restore hash;
 - passive SFC capture during stock boot and update;
 - SWD accessibility/core routing under reset;
 - USB-ISP identity and protocol;
