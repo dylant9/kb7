@@ -12,7 +12,7 @@ makes the replacement firmware flash-approved.
 | Path | Transport | Reliability | Can write? |
 |---|---|---|---|
 | **SPI** | ESP32-C3 running `serprog` + `flashrom` | Proven, byte-exact | **Yes — proven** |
-| **USB ISP** | Bootloader mass-storage `F6` commands | Reads proven; program observed; erase encoding static-only | **No — read-only policy** |
+| **USB ISP** | Bootloader mass-storage `F6` commands | Reads proven; program confirmed; erase encoding static-only | **Not validated — see warning below** |
 
 ---
 
@@ -142,19 +142,33 @@ the same argument trace to erase. In the program path the `>> 9` is applied to
 the transfer **size**; in the erase path it is applied to the aligned
 **address**.
 
-### USB writing remains disabled
+### ⚠️ USB writing is NOT validated — do not use it
+
+**If you have found this repository and want to flash a KB7: use the SPI path.**
+The USB write path is an active research effort, not a working feature. Treat
+anything here that writes over USB as experimental and capable of destroying
+your bootloader.
 
 Host-side address validation **cannot** protect against device-side
-misaddressing. The experimental host tool correctly refused intended targets
-outside the scratch window—but the device acted on the *encoded* value
-(`0x470`), not the intended offset (`0x8e000`). No USB mutation tool or command
-emitter is included in the public tree.
+misaddressing. An earlier host tool correctly refused intended targets outside
+the scratch window — but the device acted on the *encoded* value (`0x470`), not
+the intended offset (`0x8e000`), and overwrote the header, bootloader, manifest
+and core0. Recovery required a full-chip SPI rewrite.
 
-Even with the encoding statically resolved, there is no erase test that is
-non-destructive under every remaining implementation failure. The loader is an
-early `v0.001 test!` build and the USB bulk path has other observed limitations.
-Use USB ISP only for diagnostics and reads; use the proven SPI path for all
-writes.
+`kb7-isp-write2.py` exists to settle the one remaining unknown — whether the
+loader's erase handler implements the statically recovered `F6 15` encoding. It
+is **dry-run by default**, confined to an unused scratch sector, and refuses to
+erase unless a programmed marker makes the result observable. It is a validation
+experiment, not a flashing tool.
+
+Even with the encoding statically resolved, no erase test is non-destructive
+under every remaining implementation failure: `F6 15`'s field is 16 bits, so a
+wrong reading can only reach `0x0000`–`0xffff` — entirely header and bootloader.
+There is no partial-failure mode. The loader is an early `v0.001 test!` build and
+its USB bulk path has other observed limitations.
+
+**Do not attempt a USB write without a working SPI programmer, a byte-exact
+backup of your own device, and a willingness to spend 30 minutes restoring it.**
 
 ---
 
