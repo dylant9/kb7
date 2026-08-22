@@ -14,7 +14,7 @@ VERSION = 1
 PROFILE_SET_FORMAT = "kb7-profile-set-v1"
 HEADER = struct.Struct("<IHHIIBBHII20s")
 RECORD_SIZE = 1792
-PROFILE_COUNT_MAX = 4
+PROFILE_COUNT_MAX = 5
 NAME_BYTES = 64
 LOGICAL_KEYS = 85
 MODES = 4
@@ -251,7 +251,7 @@ def _compile_record(document: dict[str, Any]) -> bytes:
 
 
 def compile_profile_binary(document: dict[str, Any]) -> bytes:
-    """Compile one profile or a versioned one-to-four profile set to KBP1."""
+    """Compile one profile or a versioned one-to-five profile set to KBP1."""
 
     if not isinstance(document, dict):
         raise ProfileFormatError("profile input must be an object")
@@ -261,7 +261,7 @@ def compile_profile_binary(document: dict[str, Any]) -> bytes:
         profiles = document.get("profiles")
         active = document.get("active_profile")
         if not isinstance(profiles, list) or not 1 <= len(profiles) <= PROFILE_COUNT_MAX:
-            raise ProfileFormatError("profile set must contain 1..4 profiles")
+            raise ProfileFormatError("profile set must contain 1..5 profiles")
         if (not isinstance(active, int) or isinstance(active, bool) or
                 not 0 <= active < len(profiles)):
             raise ProfileFormatError("profile set active_profile is out of range")

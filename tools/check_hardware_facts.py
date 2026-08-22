@@ -120,14 +120,52 @@ def validate_pin_map(pinmap: dict[str, object]) -> None:
             "do not mark MCU_RST continuity as verified without a measurement record")
 
 
+def validate_stock_flash(stock: dict[str, object]) -> None:
+    acquisition = stock["acquisition"]
+    require(acquisition["read_count"] == 2 and acquisition["bit_identical"] is True,
+            "stock flash must retain the two-read evidence boundary")
+    require(acquisition["size_bytes"] == 0x02000000,
+            "stock flash size must remain 32 MiB")
+    require(acquisition["sha256"] ==
+            "c3c4125b8c42019bac65be8cb71ee1d8b9f91dd32c1f8cc918b34454d9bb7027",
+            "unexpected stock flash hash")
+    require(acquisition["write_or_restore_tested"] is False,
+            "do not claim a tested restore without new physical evidence")
+
+    regions = stock["manifest"]["regions"]
+    require([region["index"] for region in regions] == [0, 1, 2],
+            "stock manifest region indices changed")
+    require([region["checksum_matches"] for region in regions] == [True, True, False],
+            "preserve the unresolved installed region-2 checksum anomaly")
+
+    partitions = stock["stock_tail_partitions"]
+    require([(part["start"], part["end_exclusive"]) for part in partitions] == [
+        ("0x01800000", "0x01a00000"),
+        ("0x01a00000", "0x01c00000"),
+        ("0x01f00000", "0x02000000"),
+    ], "stock tail ownership boundaries changed")
+    require(partitions[0]["header_profile_count"] == 5 and
+            partitions[1]["header_profile_count"] == 5,
+            "stock configuration must retain five-profile evidence")
+
+    custom = stock["custom_mutable_slots"]
+    require(custom == [
+        ["screen_a", "0x01570000", "0x016b0000"],
+        ["screen_b", "0x016b0000", "0x017f0000"],
+        ["profile_a", "0x01c00000", "0x01c38000"],
+        ["profile_b", "0x01c38000", "0x01c70000"],
+    ], "custom slots no longer match the full-flash-derived safe map")
+
+
 def main() -> int:
     try:
         validate_soc(load("snc7320-soc.json"))
         validate_pin_map(load("kb7-pin-map.json"))
+        validate_stock_flash(load("kb7-stock-flash.json"))
     except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
         print(f"hardware facts check: {error}")
         return 1
-    print("hardware facts check: SoC, IRQ, DMA, and 80-pin package mappings pass")
+    print("hardware facts check: SoC, IRQ, package, and stock-flash mappings pass")
     return 0
 
 

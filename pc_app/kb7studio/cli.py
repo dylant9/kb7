@@ -89,7 +89,7 @@ def parser() -> argparse.ArgumentParser:
     profile_parser.add_argument("--output", type=Path)
     profile_parser.set_defaults(function=command_profile_check)
     profile_compile = subcommands.add_parser(
-        "profile-compile", help="compile a JSON profile or 1..4 profile set to firmware KBP1"
+        "profile-compile", help="compile a JSON profile or 1..5 profile set to firmware KBP1"
     )
     profile_compile.add_argument("source", type=Path)
     profile_compile.add_argument("output", type=Path)

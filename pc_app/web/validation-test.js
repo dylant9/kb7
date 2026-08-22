@@ -29,11 +29,11 @@ vm.runInNewContext(
 const action = (type, arg0 = 0, arg1 = 0) => ({id: 1, action: {type, arg0, arg1}});
 const screenIds = new Set([1]);
 assert.doesNotThrow(() => actionContext.validateAction(action("rgb_effect", 4), screenIds, 0, 100));
-assert.doesNotThrow(() => actionContext.validateAction(action("profile", 3), screenIds, 0, 100));
+assert.doesNotThrow(() => actionContext.validateAction(action("profile", 4), screenIds, 0, 100));
 assert.doesNotThrow(() => actionContext.validateAction(action("hid_key", 4), screenIds, 0, 100));
 assert.doesNotThrow(() => actionContext.validateAction(action("media_key", 0xe9), screenIds, 0, 100));
 for (const invalid of [
-  action("rgb_effect", 5), action("profile", 4),
+  action("rgb_effect", 5), action("profile", 5),
   action("hid_key", 0), action("media_key", 0),
   {id: 1, action: {type: "none", flags: false}},
 ]) assert.throws(() => actionContext.validateAction(invalid, screenIds, 0, 100));
@@ -107,6 +107,6 @@ vm.runInNewContext(
   binaryContext,
 );
 assert.throws(
-  () => binaryContext.parseBinary(new Uint8Array(0x200000 - 63)),
+  () => binaryContext.parseBinary(new Uint8Array(0x140000 - 63)),
   /screen-slot payload capacity/,
 );

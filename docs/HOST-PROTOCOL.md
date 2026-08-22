@@ -117,7 +117,7 @@ completion, using wrap-safe runtime milliseconds. ABORT must match the active
 transfer ID and store; after expiry, a new BEGIN is accepted. BEGIN erases only
 the inactive header sector. Later sectors are erased lazily as ordered WRITE
 chunks reach them, bounding a command to at most one sector erase instead of
-blocking input processing for a whole 2 MiB slot erase.
+blocking input processing for a whole 1.25 MiB screen-slot erase.
 
 COMMIT makes the new object persistent and selects its generation for the next
 boot. Firmware v1 does not hot-reload a committed screen/profile; reboot after a

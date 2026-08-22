@@ -16,7 +16,7 @@ SCREEN = struct.Struct("<HHHHIHH")
 WIDGET = struct.Struct("<HBBhhhhHHhhhHBBHIIHH")
 MAX_SCREENS = 16
 MAX_WIDGETS = 128
-MAX_BINARY_SIZE = 0x200000 - 64  # KBS1 payload capacity of one firmware slot.
+MAX_BINARY_SIZE = 0x140000 - 64  # KBS1 payload capacity of one firmware slot.
 
 WIDGET_TYPES = {"label": 1, "button": 2, "slider": 3, "toggle": 4, "gauge": 5}
 ACTIONS = {
@@ -89,7 +89,7 @@ def _validate_action_fields(action: int, target: int, arg0: int, arg1: int,
     elif action == ACTIONS["rgb_effect"]:
         valid = arg0 <= 4 and arg1 == 0
     elif action == ACTIONS["profile"]:
-        valid = arg0 <= 3 and arg1 == 0
+        valid = arg0 <= 4 and arg1 == 0
     elif action == ACTIONS["brightness"]:
         valid = minimum >= 0 and maximum <= 100 and arg0 == 0 and arg1 == 0
     elif action == ACTIONS["actuation"]:

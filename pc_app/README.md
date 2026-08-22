@@ -36,7 +36,7 @@ and the A/B updater against a fixed-address simulated NOR device. No test opens
 a physical device.
 
 The compiler includes the recovered 85-key logical/HID routing model and can
-emit one-to-four persistent Hall/analog/global-lighting profiles, layout
+emit one-to-five persistent Hall/analog/global-lighting profiles, layout
 variants, initial modes, and complete Primary/Game/Easy-Shift/FN1 action-table
 overrides. Logical-key→LED channel
 correlation is still absent, so nonempty per-key RGB is rejected rather than

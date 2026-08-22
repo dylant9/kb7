@@ -81,9 +81,9 @@ class ProfileBinaryTests(unittest.TestCase):
         self.assertEqual(struct.unpack_from("<HBB", blob, fn_offset), (0, 1, 0))
         self.assertEqual(parse_profile_binary(blob)["profile_count"], 1)
 
-    def test_compiles_four_profile_container_and_active_slot(self) -> None:
+    def test_compiles_five_profile_container_and_active_slot(self) -> None:
         profiles = []
-        for index in range(4):
+        for index in range(5):
             profile = copy.deepcopy(self.document)
             profile["name"] = f"Slot {index + 1}"
             profiles.append(profile)
@@ -93,10 +93,16 @@ class ProfileBinaryTests(unittest.TestCase):
             "profiles": profiles,
         })
         parsed = parse_profile_binary(blob)
-        self.assertEqual(len(blob), 48 + 4 * 1792)
-        self.assertEqual(parsed["profile_count"], 4)
+        self.assertEqual(len(blob), 48 + 5 * 1792)
+        self.assertEqual(parsed["profile_count"], 5)
         self.assertEqual(parsed["active_profile"], 2)
-        self.assertEqual(parsed["names"], ["Slot 1", "Slot 2", "Slot 3", "Slot 4"])
+        self.assertEqual(parsed["names"],
+                         ["Slot 1", "Slot 2", "Slot 3", "Slot 4", "Slot 5"])
+
+        profiles.append(copy.deepcopy(self.document))
+        with self.assertRaisesRegex(ProfileFormatError, "1..5"):
+            compile_profile_binary({"format": "kb7-profile-set-v1",
+                                    "active_profile": 0, "profiles": profiles})
 
     def test_rejects_invalid_layer_and_fn_overrides(self) -> None:
         changed = copy.deepcopy(self.document)

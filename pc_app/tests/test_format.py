@@ -108,7 +108,7 @@ class ScreenFormatTests(unittest.TestCase):
             compile_document(bad)
         for action in (
             {"type": "rgb_effect", "arg0": 5},
-            {"type": "profile", "arg0": 4},
+            {"type": "profile", "arg0": 5},
             {"type": "hid_key", "arg0": 0},
             {"type": "media_key", "arg0": 0},
         ):

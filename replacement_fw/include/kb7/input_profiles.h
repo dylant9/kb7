@@ -3,9 +3,9 @@
 
 #include "kb7/input.h"
 
-/* Four independent project-defined RAM slots. Persistent KBP1 loading may copy
- * validated complete profiles into these slots through the API below. */
-#define KB7_INPUT_PROFILE_SLOT_COUNT 4U
+/* The full stock flash database contains profile indices 0..4. Persistent KBP1
+ * loading may copy validated complete profiles into matching RAM slots. */
+#define KB7_INPUT_PROFILE_SLOT_COUNT 5U
 
 struct kb7_input_profile_bank {
     struct kb7_input_profile slot[KB7_INPUT_PROFILE_SLOT_COUNT];

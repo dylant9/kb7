@@ -1,77 +1,89 @@
 # KB7 custom flash storage map
 
+## Evidence and rule
+
+Two independent 32-MiB CH341/flashrom reads made on 2026-08-22 were
+bit-identical. They prove that the tail is **not** generally free space: stock
+configuration banks occupy `0x1800000` and `0x1a00000`, and recovered stock code
+addresses a separate 1-MiB store beginning at `0x1f00000`. The earlier custom
+map overlapped all three. It must not be used.
+
+The replacement firmware may mutate only the four A/B slots in the table below.
+Every vendor range and every merely-erased/unallocated range remains denied by
+`kb7_flash_range_mutable()`. An erased sector is evidence of current contents,
+not proof that no stock version or recovery path owns it.
+
 ## Immutable/prohibited ranges
 
-| Flash offsets | Size | Rule |
-|---|---:|---|
-| `0x0000000..0x000ffff` | 64 KiB | header + loader; never erase/write |
-| `0x00100000..0x0156af8b` | `0x146af8c` | vendor region 2; never erase/write |
-
-The in-image gap's first fully free sector is `0x0008d000`. The confirmed
-MX25L25645G tail begins at sector `0x0156b000`; all tail commands require 4-byte
-address mode because they are above 16 MiB.
-
-## In-image gap (`0x8d000..0xfffff`)
-
-| Range | Purpose |
+| Flash offsets | Rule |
 |---|---|
-| `0x8d000..0x8dfff` | engineering boot/crash marker, future; initially erased |
-| `0x8e000..0x8ffff` | two rotating 4-KiB diagnostic records, future |
-| `0x90000..0xfffff` | reserved; no v1 dependency |
+| `0x0000000..0x0156afff` | complete stock boot container, code, region 2 and padding; never erase/write |
+| `0x01800000..0x019fffff` | stock/legacy five-profile configuration partition; preserve wholesale |
+| `0x01a00000..0x01bfffff` | active stock five-profile configuration partition; preserve wholesale |
+| `0x01f00000..0x01ffffff` | stock-owned 1-MiB upload/store partition referenced by both recovered code regions |
 
-The first release plan does not program this gap. Keeping it unused minimizes
-interaction with loader region boundaries.
+The in-image gap `0x0008d000..0x000fffff` is erased in both reads but remains
+prohibited. The first release does not need it, and preserving it avoids an
+unnecessary loader/version compatibility assumption.
 
-## Tail (`0x156b000..0x1ffffff`)
+## Tail allocation
 
-| Start | End exclusive | Length | Purpose |
+| Start | End exclusive | Length | Purpose / policy |
 |---:|---:|---:|---|
-| `0x156b000` | `0x156c000` | 4 KiB | superblock A / future asset generation index |
-| `0x156c000` | `0x156d000` | 4 KiB | superblock B |
-| `0x156d000` | `0x1570000` | 12 KiB | alignment/reserved |
-| `0x1570000` | `0x1770000` | 2 MiB | screen slot A |
-| `0x1770000` | `0x1970000` | 2 MiB | screen slot B |
-| `0x1970000` | `0x1c70000` | 3 MiB | custom asset/font slot A |
-| `0x1c70000` | `0x1f70000` | 3 MiB | custom asset/font slot B |
-| `0x1f70000` | `0x1fa8000` | 224 KiB | `KBP1` input/lighting profile slot A |
-| `0x1fa8000` | `0x1fe0000` | 224 KiB | `KBP1` input/lighting profile slot B |
-| `0x1fe0000` | `0x2000000` | 128 KiB | crash/diagnostic ring |
+| `0x0156b000` | `0x0156c000` | 4 KiB | future superblock A; currently prohibited |
+| `0x0156c000` | `0x0156d000` | 4 KiB | future superblock B; currently prohibited |
+| `0x0156d000` | `0x01570000` | 12 KiB | alignment/reserved; prohibited |
+| `0x01570000` | `0x016b0000` | `0x140000` (1.25 MiB) | custom `KBS1` screen slot A |
+| `0x016b0000` | `0x017f0000` | `0x140000` (1.25 MiB) | custom `KBS1` screen slot B |
+| `0x017f0000` | `0x01800000` | 64 KiB | erased guard band; prohibited |
+| `0x01800000` | `0x01a00000` | 2 MiB | stock legacy configuration partition |
+| `0x01a00000` | `0x01c00000` | 2 MiB | stock active configuration partition |
+| `0x01c00000` | `0x01c38000` | `0x38000` (224 KiB) | custom `KBP1` profile slot A |
+| `0x01c38000` | `0x01c70000` | `0x38000` (224 KiB) | custom `KBP1` profile slot B |
+| `0x01c70000` | `0x01f00000` | `0x290000` | erased/unallocated; prohibited |
+| `0x01f00000` | `0x02000000` | 1 MiB | stock upload/store partition |
 
-All boundaries are 4-KiB sector aligned and slots are multiples of the 256-byte
-page size.
+All slot boundaries are 4-KiB sector aligned and multiples of the 256-byte
+page size. Commands above 16 MiB require the proven 4-byte address path.
 
-## Screen slot header
+## Stock tail observations
 
-Each 2-MiB slot begins with 64 bytes: magic `KSL1`, version/header length, state,
-generation, payload length, payload CRC-32, header CRC-32, and 36 reserved bytes.
-The header CRC is calculated with `state=VALID` and the CRC field zero. This lets
-finalization change only state from `WRITING=0x7fffffff` to
-`VALID=0x3fffffff`, a legal NOR 1→0 bit transition. `ERASED=0xffffffff`.
+Both stock configuration headers begin with `f5 10`, have version 1, declare
+five profiles and have valid trailing additive checksums. The legacy header at
+`0x1800000` selects profile 0; the active header at `0x1a00000` selects profile
+4. Record groups consistently enumerate indices 0 through 4. The active
+type-`0x20` records contain the same 85-byte default usage table independently
+recovered from program flow, which cross-checks the replacement key map.
+Active type-`0x30` records contain five checksum-valid 85-entry `uint16_t`
+permutations: profile 0 swaps indices 6 and 22, while profiles 1 through 4 are
+identity mappings. This supports the custom firmware's per-profile remapping
+model, but it is not conflated with the distinct MCU2 sensor-route variants.
+
+These observations justify expanding the clean-room runtime/KBP1 limit from
+four to five profiles. They do **not** justify writing or reusing the stock
+record format: several record semantics remain unresolved, and preserving the
+entire stock partitions is the safer compatibility boundary.
+
+## Custom slot header and commit
+
+Each custom slot begins with 64 bytes: magic `KSL1`, version/header length,
+state, generation, payload length, payload CRC-32, header CRC-32 and 36 reserved
+bytes. The header CRC is calculated with `state=VALID` and the CRC field zero.
+Finalization therefore changes only `WRITING=0x7fffffff` to
+`VALID=0x3fffffff`, a legal NOR 1→0 transition. Erased state is `0xffffffff`.
 
 Commit:
 
 1. Select the non-active/older slot; never erase the active slot.
-2. Erase the inactive slot sectors needed.
-3. Write WRITING header with generation `max+1` and final-state header CRC.
-4. Program the payload in page-bounded chunks (the host protocol supplies at
-   most 36 bytes per WRITE); read back and CRC it.
+2. Erase its header sector and later sectors lazily as ordered payload writes
+   reach them.
+3. Write the WRITING header with generation `max+1` and final-state header CRC.
+4. Program page-bounded payload chunks, read them back and CRC the result.
 5. Clear the state word to VALID and read back the header.
-6. At boot, validate both slots and choose the newest CRC-valid generation using
-   wrap-safe signed subtraction, then parse it semantically. If that parse fails,
-   try the other CRC-valid generation before falling back to built-in UI.
+6. At boot, validate payload and object semantics for both generations, trying
+   the older valid object if the newer one fails.
 
-The C implementation validates the complete payload before choosing a slot; a
-newer header with a corrupt or semantically invalid payload cannot hide the older valid generation. The
-simulated-NOR host test covers corruption fallback, wrap-safe selection, staged
-write failures, and preservation of the active slot when BEGIN erases its
-target.
-
-The two superblocks are not needed for screen selection—generation headers avoid
-a fragile active pointer. They are reserved for the larger asset-store manifest,
-which will need a compact index.
-
-Wear policy: ordinary UI boot is read-only. Writes occur only on explicit host
-commit. Profiles use the same validated A/B generation and corrupt/invalid-newest
-fallback model as screens; they are not an append-only log. The crash-record
-area remains reserved for a future rotating-sector implementation. Factory
-reset erases custom slot headers only and can never affect firmware or region 2.
+Ordinary boot is read-only. Writes occur only on explicit host commit and the
+public build compiles mutation fail-closed. Factory reset erases only the four
+custom slot headers. The future superblocks and unallocated erased spans are not
+part of the mutation allow-list.

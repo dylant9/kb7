@@ -64,16 +64,16 @@ class CProfileParserTests(unittest.TestCase):
     def test_c_accepts_python_compiler_output(self) -> None:
         self.assertEqual(self.parse(self.blob), 0)
 
-    def test_c_accepts_four_authored_profile_records(self) -> None:
+    def test_c_accepts_five_authored_profile_records(self) -> None:
         document = json.loads(
             (ROOT / "pc_app/samples/offline-example-profile.json").read_text())
         document["lighting"]["per_key"] = {}
         profiles = []
-        for index in range(4):
+        for index in range(5):
             profile = json.loads(json.dumps(document))
             profile["name"] = f"Profile {index + 1}"
             profile["firmware"] = {
-                "layout_variant": index,
+                "layout_variant": index % 4,
                 "initial_mode": "game" if index == 1 else "primary",
                 "actions": {"game": {"A": {"type": "keyboard", "usage": "B"}}},
             }

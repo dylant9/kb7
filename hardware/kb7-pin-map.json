@@ -1,7 +1,7 @@
 {
   "schema": "kb7.hardware.pin-map",
   "schema_version": 1,
-  "generated_on": "2026-08-18",
+  "generated_on": "2026-08-22",
   "source": {
     "datasheet": {
       "title": "SNC7320 Series 32-bit Dual-Core SoC Data Sheet",
@@ -60,7 +60,11 @@
       "active_level": "low",
       "evidence": ["datasheet", "user_observation", "inference"],
       "continuity": "unverified",
-      "required_test": "powered-off continuity from labeled pad to lead 88; released-voltage and reset-waveform measurement"
+      "released_voltage_v": 3.2,
+      "asserted_voltage_v": 0.2,
+      "assertion_method": "1 kOhm to ground while board was USB-powered",
+      "observed_result": "two bit-identical full SPI-NOR reads while asserted",
+      "required_test": "powered-off continuity from labeled pad to lead 88 and reset/SFC-idle waveform measurement"
     },
     {
       "function": "ST1633i touch SCL",

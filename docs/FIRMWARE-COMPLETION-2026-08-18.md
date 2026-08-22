@@ -1,6 +1,7 @@
 # Firmware implementation completion and pre-flash status
 
 Review date: 2026-08-18
+Updated with full-flash evidence: 2026-08-22
 Scope: independently authored public source after the missing-function work
 Hardware exercised: none
 
@@ -79,7 +80,8 @@ so `kb7_usb_init()` returns before any USB MMIO or electrical attach.
   sources are merged, with the held source restored after a temporary pulse.
 - Exact recovered raw-Hall-to-`0..32` travel conversion, per-key actuation and
   Rapid Trigger state.
-- Four mutable, validated in-memory profiles. Profile selection resets transient
+- Five mutable, validated in-memory profiles, matching the five indices proved
+  by the stock configuration database. Profile selection resets transient
   key/Fn/filter state.
 - Configurable analog output with deadzone, saturation, linear/exponential/
   S-curve response, smoothing, inversion, opposing-key cancellation and
@@ -119,9 +121,13 @@ until the logical 14–17 function-4 pinmux is known.
 ### Persistent formats and release construction
 
 - Existing strict `KBS1` screen parser and dual screen slots.
-- New strict `KBP1` input/lighting profile parser, one-to-four fixed records,
+- New strict `KBP1` input/lighting profile parser, one-to-five fixed records,
   C/Python compiler compatibility and two `0x38000` profile slots in the
-  documented `0x01f70000..0x01fe0000` reservation.
+  documented `0x01c00000..0x01c70000` reservation.
+- Two bit-identical full 32-MiB programmer reads exposed and corrected an unsafe
+  earlier storage map. Stock-owned configuration at `0x01800000..0x01bfffff`
+  and the upload store at `0x01f00000..0x01ffffff` are now prohibited; screen
+  A/B slots are 1.25 MiB each at `0x01570000..0x017effff`.
 - Payload CRC is checked during slot selection and both boot loaders retry the
   older CRC-valid generation when the newest object fails semantic parsing. A new transfer erases only the inactive
   slot, one sector at a time as WRITE reaches it. Screen and profile stores are
@@ -155,15 +161,18 @@ The implementation now reflects these material SNC7320 facts:
   alternate-function encodings fail closed.
 - Backlight is P0.6/`CT32B6_PWM1` mode 7.
 - POR/external/LVD/DPD/watchdog reset enter ROM; software reset restarts PRAM.
-- RSTN is package lead 88 for the expected LQFP128 device; the board's
-  `MCU_RST` continuity and voltage still need measurement.
+- RSTN is package lead 88 for the expected LQFP128 device. The board's
+  `MCU_RST` measured about 3.2 V released and 0.2 V when pulled to ground
+  through 1 kΩ during two successful reads; physical lead-88 continuity and a
+  reset waveform still need measurement.
 
 ## Remaining hardware-only gates
 
 These are not honest candidates for further offline coding:
 
-1. Confirm the exact part marking/package and `MCU_RST`→RSTN lead-88
-   continuity; prove external programmer backup/restore while reset is held.
+1. Confirm the complete SoC marking/package and `MCU_RST`→RSTN lead-88
+   continuity. The Macronix main array now has two identical programmer backups;
+   prove bounded write/readback and complete stock restore/boot while reset is held.
 2. Passively capture post-boot SYS0/SYS1, OPI/DRAM and cache state or validate
    the reconstructed cold-start sequence on an isolated board.
 3. Determine the unpublished generic `SYS0_PINCTRL` encoding, especially LCD

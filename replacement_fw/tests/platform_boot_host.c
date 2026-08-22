@@ -74,6 +74,10 @@ int main(void) {
         kb7_flash_range_mutable(KB7_STORAGE_PROFILE_A +
                                     KB7_STORAGE_PROFILE_SLOT_BYTES - 1U,
                                 2U) ||
+        kb7_flash_range_mutable(KB7_STORAGE_STOCK_LEGACY_START, UINT32_C(1)) ||
+        kb7_flash_range_mutable(KB7_STORAGE_STOCK_CONFIG_START, UINT32_C(1)) ||
+        kb7_flash_range_mutable(KB7_STORAGE_STOCK_UPLOAD_START, UINT32_C(1)) ||
+        kb7_flash_range_mutable(UINT32_C(0x01c70000), UINT32_C(1)) ||
         kb7_flash_range_mutable(UINT32_C(0x01fe0000), UINT32_C(1)) ||
         kb7_flash_range_mutable(KB7_STORAGE_SCREEN_A, 0U)) return 15;
     if (!map_register_page(UINT32_C(0x60000000))) return 77;

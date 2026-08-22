@@ -97,6 +97,21 @@ def main() -> int:
                    "KB7_STORAGE_PROFILE_SLOT_BYTES"):
         if marker not in storage:
             failures.append(f"persistent profile slot marker {marker} is missing")
+    safe_storage_markers = {
+        "KB7_STORAGE_SCREEN_A": "0x01570000",
+        "KB7_STORAGE_SCREEN_B": "0x016b0000",
+        "KB7_STORAGE_SCREEN_SLOT_BYTES": "0x00140000",
+        "KB7_STORAGE_PROFILE_A": "0x01c00000",
+        "KB7_STORAGE_PROFILE_B": "0x01c38000",
+        "KB7_STORAGE_STOCK_UPLOAD_START": "0x01f00000",
+    }
+    for name, value in safe_storage_markers.items():
+        if f"#define {name} UINT32_C({value})" not in storage:
+            failures.append(f"full-flash-derived storage marker {name} is not {value}")
+
+    input_profiles = source("include/kb7/input_profiles.h")
+    if "#define KB7_INPUT_PROFILE_SLOT_COUNT 5U" not in input_profiles:
+        failures.append("runtime profile count no longer matches the five-slot stock evidence")
 
     profile = source("core1/profile_blob.c")
     if "KB7_PROFILE_RECORD_SIZE" not in profile or "kb7_input_profile_valid" not in profile:

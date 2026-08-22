@@ -133,9 +133,9 @@ paged Hall telemetry report.
 without dynamic allocation:
 
 - 48-byte header: magic `KBP1`, version/header/total lengths, body CRC-32,
-  profile count `1..4`, active slot, fixed record size, flags and zero reserved
+  profile count `1..5`, active slot, fixed record size, flags and zero reserved
   bytes;
-- one to four 1,792-byte records;
+- one to five 1,792-byte records;
 - each record contains a NUL-terminated UTF-8 name, layout/mode, global
   lighting state, 85 four-byte Hall records, four by 85 four-byte action
   records, and the analog configuration; and
@@ -143,7 +143,9 @@ without dynamic allocation:
   UTF-8, CRC, actions and the complete runtime profile are validated before a
   flash slot can become `VALID`.
 
-The A/B profile slots are `0x01f70000` and `0x01fa8000`, each `0x38000` bytes.
+The A/B profile slots are `0x01c00000` and `0x01c38000`, each `0x38000` bytes.
+They were relocated after full-chip reads proved that the earlier tail assignment
+overlapped stock configuration/upload partitions.
 Selection validates both the slot header and complete payload CRC, then the
 runtime parser falls back to the older generation if the newest payload is
 corrupt or semantically invalid.
@@ -194,7 +196,7 @@ entries are **not** valid standalone input. Replace each entry with a complete
 ```
 
 Each nested profile contains the complete screen/lighting/switch/analog fields
-described above. The set contains one to four profiles and the active index must
+described above. The set contains one to five profiles and the active index must
 name one of them. The browser edits a singular profile; the versioned set and
 full layer table are deliberately available through JSON and the offline CLI.
 

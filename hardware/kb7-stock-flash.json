@@ -1,0 +1,165 @@
+{
+  "schema": "kb7.hardware.stock-flash-observations",
+  "schema_version": 1,
+  "observed_on": "2026-08-22",
+  "acquisition": {
+    "read_count": 2,
+    "bit_identical": true,
+    "size_bytes": 33554432,
+    "sha256": "c3c4125b8c42019bac65be8cb71ee1d8b9f91dd32c1f8cc918b34454d9bb7027",
+    "programmer": "CH341B PCB using flashrom ch341a_spi",
+    "flashrom_version": "1.7.0",
+    "jedec_id": "c2 20 19",
+    "identified_as": "Macronix MX25L25635F/MX25L25645G",
+    "status_register": "0x00",
+    "block_protection": "disabled",
+    "board_power": "USB",
+    "programmer_vcc_connected": false,
+    "mcu_rst_released_v": 3.2,
+    "mcu_rst_asserted_v": 0.2,
+    "mcu_rst_series_resistor_ohms": 1000,
+    "reset_pad_to_soc_lead_continuity": "unverified",
+    "write_or_restore_tested": false,
+    "logs": [
+      {
+        "name": "kb7-read-1.log",
+        "size_bytes": 40692,
+        "sha256": "a5cc887ff442979a6c4b9a9f619ebf401a8d63c0a08a6f63257c19b73815460a",
+        "status": "contains interleaved LIBUSB_BUSY output from a second invocation"
+      },
+      {
+        "name": "kb7-read-2.log",
+        "size_bytes": 56361,
+        "sha256": "dc569c5c659c0bf7ebe032e239c068a182fccbad9092314bc8aef8139a28019c",
+        "status": "canonical complete acquisition transcript"
+      }
+    ]
+  },
+  "boot_configuration": {
+    "offset": "0x00000200",
+    "magic": "SN_BCFG",
+    "primary_manifest_address": "0x60010000",
+    "secondary_manifest_address": "0x00000000"
+  },
+  "manifest": {
+    "offset": "0x00010000",
+    "sha256": "a945368195d825160ebfdd49e5f96581334da3205e0c3bd924e17fb5a7940590",
+    "checksum_algorithm": "sum modulo 2^32 of zlib CRC-32 for each 0x10000-byte region chunk",
+    "regions": [
+      {
+        "index": 0,
+        "flash_offset": "0x00011000",
+        "load_address": "0x00000000",
+        "length": "0x0000f35c",
+        "sha256": "d779faf9f591e71602e5f17e966ac366602699a83fb5e612534d694d3dafd153",
+        "stored_checksum": "0xc3f43a6f",
+        "calculated_checksum": "0xc3f43a6f",
+        "checksum_matches": true
+      },
+      {
+        "index": 1,
+        "flash_offset": "0x00021000",
+        "load_address": "0x10000000",
+        "length": "0x0006b168",
+        "sha256": "b2869bc657ba896474e760f513e4514fac678a951364efc29cbf9b6bb5e2ba72",
+        "stored_checksum": "0xc8ed2815",
+        "calculated_checksum": "0xc8ed2815",
+        "checksum_matches": true
+      },
+      {
+        "index": 2,
+        "flash_offset": "0x00100000",
+        "load_address": "0x60100000",
+        "length": "0x0146af8c",
+        "sha256": "ecc8984281e8e3cf0ef934bb7a63cb8573e913251660ae586ae9db4a99f1fe37",
+        "stored_checksum": "0xaa83e9a3",
+        "calculated_checksum": "0xdaa1be3b",
+        "checksum_matches": false
+      }
+    ]
+  },
+  "region2_reference_comparison": {
+    "reference": "official V1.24 region 2",
+    "reference_sha256": "0b17248fb9ecb43df568f1c7d785e91c9a3038ff3ebaf26cc0068a2f301dc4f7",
+    "reference_vendor_checksum": "0xaa83e9a3",
+    "reference_checksum_matches_manifest": true,
+    "differing_byte_count": 52,
+    "installed_values_in_all_difference_ranges": "00",
+    "difference_ranges": [
+      ["0x00a02022", "0x00a02030"],
+      ["0x00a020be", "0x00a020d2"],
+      ["0x00a020d6", "0x00a020dc"],
+      ["0x00a020e8", "0x00a020f4"]
+    ],
+    "interpretation": "unresolved stock-state anomaly; do not normalize before loader behavior is understood"
+  },
+  "stock_tail_partitions": [
+    {
+      "start": "0x01800000",
+      "end_exclusive": "0x01a00000",
+      "role": "legacy five-profile configuration",
+      "header_active_profile": 0,
+      "header_profile_count": 5
+    },
+    {
+      "start": "0x01a00000",
+      "end_exclusive": "0x01c00000",
+      "role": "active five-profile configuration",
+      "header_active_profile": 4,
+      "header_profile_count": 5
+    },
+    {
+      "start": "0x01f00000",
+      "end_exclusive": "0x02000000",
+      "role": "stock upload/store partition referenced by recovered code",
+      "current_contents": "erased"
+    }
+  ],
+  "stock_configuration_record_groups": {
+    "legacy_0x01800000": [
+      [1, "0x20", 92, 5],
+      [2, "0x21", 348, 5],
+      [3, "0x22", 348, 5],
+      [4, "0x23", 180, 5]
+    ],
+    "active_0x01a00000": [
+      [1, "0x20", 92, 5],
+      [3, "0x22", 348, 5],
+      [4, "0x23", 348, 5],
+      [5, "0x26", 176, 5],
+      [6, "0x27", 176, 5],
+      [7, "0x2b", 92, 5],
+      [8, "0x2c", 92, 5],
+      [9, "0x30", 180, 5],
+      [13, "0x29", 440, 5],
+      [14, "0x17", 44, 5]
+    ],
+    "active_programmed_unparsed_sectors": [2, 10, 11],
+    "active_erased_sectors": [12, 15]
+  },
+  "default_usage_table_crosscheck": {
+    "record_type": "0x20",
+    "entry_count": 85,
+    "profile_copies_per_bank": 5,
+    "identical_in_legacy_and_active_banks": true,
+    "sha256": "ac380ee830412d0c0047505b3758b9fa44fd5550b80a00c8142de2e12c7f040e",
+    "matches_replacement_firmware_table": true
+  },
+  "type30_profile_permutations": {
+    "record_length": 180,
+    "entry_count": 85,
+    "entry_width_bytes": 2,
+    "all_trailing_checksums_match": true,
+    "profiles_1_through_4": "identity 0..84",
+    "profile_0_changed_entries": [[6, 22], [22, 6]],
+    "profile_0_header_variant_byte": 1,
+    "semantic_boundary": "per-profile index remap; not assumed to be the MCU2 sensor-route layout selector"
+  },
+  "custom_mutable_slots": [
+    ["screen_a", "0x01570000", "0x016b0000"],
+    ["screen_b", "0x016b0000", "0x017f0000"],
+    ["profile_a", "0x01c00000", "0x01c38000"],
+    ["profile_b", "0x01c38000", "0x01c70000"]
+  ],
+  "evidence_boundary": "Raw images and logs are private owner-supplied artifacts; this file contains independently derived factual metadata only."
+}

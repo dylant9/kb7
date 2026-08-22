@@ -259,7 +259,8 @@ int main(int argc, char **argv) {
     command.opcode = KB7_HOST_QUERY_CAPABILITIES;
     if (process(&server, &command, &response) != KB7_HOST_STATUS_OK ||
         response.payload[10] != KB7_SCREEN_VERSION ||
-        response.payload[11] != KB7_PROFILE_VERSION || response.payload[12] != 4U ||
+        response.payload[11] != KB7_PROFILE_VERSION ||
+        response.payload[12] != KB7_INPUT_PROFILE_SLOT_COUNT ||
         response.payload[14] != (uint8_t)KB7_PROFILE_RECORD_SIZE ||
         response.payload[15] != (uint8_t)(KB7_PROFILE_RECORD_SIZE >> 8U)) return 25;
 

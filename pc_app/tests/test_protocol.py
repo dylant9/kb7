@@ -32,9 +32,9 @@ class ProtocolTests(unittest.TestCase):
         response = OfflineReceiver().process(Report(COMMAND, QUERY_CAPABILITIES))
         fields = __import__("struct").unpack("<HHBBIBBBB HIII", response.payload)
         self.assertEqual(fields[:4], (480, 800, 16, 128))
-        self.assertEqual(fields[4], 0x200000)
-        self.assertEqual(fields[5:9], (1, 1, 4, 1))
-        self.assertEqual(fields[9:12], (1792, 0x38000, 48 + 4 * 1792))
+        self.assertEqual(fields[4], 0x140000)
+        self.assertEqual(fields[5:9], (1, 1, 5, 1))
+        self.assertEqual(fields[9:12], (1792, 0x38000, 48 + 5 * 1792))
         self.assertEqual(fields[12], 0x1F)
 
     def test_frame_corruption_is_rejected(self) -> None:
@@ -119,7 +119,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(receiver.committed, b"")
 
     def test_profile_capacity_matches_kbp1_maximum(self) -> None:
-        too_large = b"x" * (48 + 4 * 1792 + 1)
+        too_large = b"x" * (48 + 5 * 1792 + 1)
         with self.assertRaises(ProtocolError):
             transfer_reports(too_large, 13, STORE_PROFILE)
 

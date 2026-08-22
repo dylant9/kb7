@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from .format import ScreenFormatError, parse_binary
 from .profile import ProfileFormatError
-from .profile_binary import parse_profile_binary
+from .profile_binary import PROFILE_COUNT_MAX, parse_profile_binary
 
 REPORT_ID = 0x5C
 VERSION = 1
@@ -22,10 +22,10 @@ WIDGET_EVENT = 0x40
 OK, BAD_VERSION, BAD_CRC, BAD_LENGTH, BAD_STATE, RANGE, STORAGE, UNSUPPORTED = range(8)
 RESET_TOKEN = 0x4B423752
 STORE_SCREEN, STORE_PROFILE = 0, 1
-SCREEN_SLOT_BYTES = 0x200000
+SCREEN_SLOT_BYTES = 0x140000
 PROFILE_SLOT_BYTES = 0x38000
 SLOT_HEADER_BYTES = 64
-PROFILE_MAX_BYTES = 48 + 4 * 1792
+PROFILE_MAX_BYTES = 48 + 5 * 1792
 SCREEN_MIN_BYTES = 64
 PROFILE_MIN_BYTES = 48 + 1792
 CAPABILITIES = 0x1F
@@ -159,7 +159,8 @@ class OfflineReceiver:
                 payload = struct.pack(
                     "<HHBBIBBBB HIII",
                     480, 800, 16, 128, self.capacities[STORE_SCREEN],
-                    1, 1, 4, VERSION, 1792, self.capacities[STORE_PROFILE],
+                    1, 1, PROFILE_COUNT_MAX, VERSION, 1792,
+                    self.capacities[STORE_PROFILE],
                     PROFILE_MAX_BYTES, CAPABILITIES,
                 )
         elif report.opcode == BEGIN:

@@ -1,6 +1,6 @@
 # SNC7320 boot and KB7 recovery model
 
-Review date: 2026-08-18
+Review date: 2026-08-22
 Source: Sonix *SNC7320 Series Data Sheet*, revision 2.1, 1 June 2022
 Source SHA-256: `d360aca16c2695f12edf91d263b2994b36edf5ad6faf130547a9220dfaca94b4`
 
@@ -11,15 +11,17 @@ route because it does not require working custom firmware. The SNC73200 M1
 variant contains 8 MiB of volatile SiP OPI PSRAM, not persistent firmware flash;
 the SoC boots from a separate storage device (Data Sheet pp. 10, 38 and 83).
 
-A CH341-class SPI-NOR programmer is suitable in principle, but the SoC data
-sheet cannot approve a particular programmer or clip setup. First identify the
-external flash's exact part, voltage, capacity, JEDEC ID, protection scheme, and
-address mode from the flash vendor's documentation. Do not assume a common
-CH341A board has 3.3-V-safe logic merely because it has a 3.3-V power setting.
+A CH341B PCB has now read the in-circuit external flash twice through flashrom.
+Both complete 32-MiB reads are bit-identical. JEDEC ID `c2 20 19` identifies a
+Macronix `MX25L25635F/MX25L25645G`; status `0x00` showed block protection, WEL
+and WIP clear. This proves repeatable main-array reads with this wiring, not safe
+erase/program behavior. Do not assume another CH341 board has voltage-safe logic
+merely because it exposes a 3.3-V pin.
 
 The board pad labeled `MCU_RST` is a strong candidate for active-low `RSTN`,
-which is package lead 88 on the presumed SNC73200 LQFP128. Continuity must be
-measured with power removed before it is relied on (pp. 11 and 21).
+which is package lead 88 on the presumed SNC73200 LQFP128. It measured about
+3.2 V released and 0.2 V when grounded through 1 kΩ during the successful reads.
+Continuity to lead 88 must still be measured with power removed (pp. 11 and 21).
 
 This document is a recovery design and validation checklist, not permission to
 flash the current prototype.
@@ -53,8 +55,8 @@ an external reset; it no longer issues the misleading software reset.
 
 | Layer | What the datasheet establishes | KB7 status |
 |---|---|---|
-| External SPI-NOR programmer | External XIP window, SFC controller, 1/2/4-bit reads, 1/4-bit writes, and common command families (pp. 37–39) | Preferred independent route; exact flash and in-circuit topology still unknown |
-| External `RSTN` | Release restarts through ROM; SNC73200 lead 88 (pp. 21 and 43) | `MCU_RST` label is strong evidence, but continuity and released voltage are unmeasured |
+| External SPI-NOR programmer | External XIP window, SFC controller, 1/2/4-bit reads, 1/4-bit writes, and common command families (pp. 37–39) | Two identical full main-array reads obtained; bounded write and full restore/boot remain unproved |
+| External `RSTN` | Release restarts through ROM; SNC73200 lead 88 (pp. 21 and 43) | `MCU_RST` voltage behavior and read isolation are demonstrated; physical continuity/waveform remain unverified |
 | USB-ISP | ROM enters it when no boot identifying mark is found (p. 44) | Protocol, VID/PID, connector path, and behavior with corrupt-but-present marks are unknown |
 | SWD | One SWD port; SNC73200 SWO/SWCLK/SWDIO are leads 11/12/13 (pp. 1, 11 and 19) | Connect-under-reset and core visibility are untested; no erase operation is authorized |
 | Watchdog reset | Underflow can reset through ROM; WDT uses the 32-kHz ILRC (pp. 43 and 57–58) | Potential autonomous ROM route, but usable register fields are absent from this data sheet |
@@ -114,6 +116,10 @@ the KB7's regulator or supervisor circuitry.
 
 ### Read-only programmer proof
 
+Steps 1–3 below have now been substantially completed for the 32-MiB main array;
+the canonical evidence is in `FULL-FLASH-ACQUISITION-2026-08-22.md`. Flashrom
+warns that the chip's OTP area is not included in a normal read.
+
 1. Read and record JEDEC ID, status/configuration registers, block protection,
    quad-enable state, and 3-byte/4-byte address mode.
 2. Read the complete chip at least twice without writing and require identical
@@ -146,8 +152,10 @@ be backed up, restored, read back identically, and booted normally.
 ## Missing information to collect
 
 - complete SoC and flash markings and clear PCB photographs;
-- `MCU_RST` to lead-88 continuity, released voltage, and reset waveform;
-- exact flash rail, JEDEC/status values, and SFC wiring width;
+- `MCU_RST` to lead-88 continuity and reset/SFC-idle waveform;
+- exact flash rail, configuration/security/OTP state, 4-byte address behavior,
+  and SFC wiring width;
+- a bounded safe-sector program/readback and full stock restore/boot proof;
 - passive SFC capture during stock boot and update;
 - SWD accessibility/core routing under reset;
 - USB-ISP identity and protocol;

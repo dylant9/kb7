@@ -1197,7 +1197,7 @@ function validateAction(widget, screenIds, minimum, maximum) {
   if (["none", "navigate"].includes(actionType)) valid = arg0 === 0 && arg1 === 0;
   else if (actionType === "rgb_color") valid = arg0 === 0 && arg1 <= 0xffffff;
   else if (actionType === "rgb_effect") valid = arg0 <= 4 && arg1 === 0;
-  else if (actionType === "profile") valid = arg0 <= 3 && arg1 === 0;
+  else if (actionType === "profile") valid = arg0 <= 4 && arg1 === 0;
   else if (actionType === "brightness") valid = minimum >= 0 && maximum <= 100 && arg0 === 0 && arg1 === 0;
   else if (actionType === "actuation") valid = minimum >= 0 && maximum <= 0xff && arg0 === 0 && arg1 === 0;
   else if (actionType === "rapid_trigger") valid = minimum >= 0 && maximum <= 1 && arg0 <= 0xff && arg1 <= 0xff;
@@ -1282,7 +1282,7 @@ function compileScreens() {
     first += item.widgets.length;
   }
   const total = 48 + screens.length * 16 + widgets.length * 40 + stringLength;
-  if (total > 0x200000 - 64) throw Error("Compiled screen store exceeds firmware slot capacity");
+  if (total > 0x140000 - 64) throw Error("Compiled screen store exceeds firmware slot capacity");
   const buffer = new ArrayBuffer(total);
   const view = new DataView(buffer);
   const bytes = new Uint8Array(buffer);
@@ -1342,7 +1342,7 @@ function compileScreens() {
 }
 
 function parseBinary(bytes) {
-  if (bytes.length > 0x200000 - 64) throw Error("KBS exceeds the firmware screen-slot payload capacity");
+  if (bytes.length > 0x140000 - 64) throw Error("KBS exceeds the firmware screen-slot payload capacity");
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (bytes.length < 48 || view.getUint32(0, true) !== 0x3153424b || view.getUint16(4, true) !== 1 || view.getUint16(6, true) !== 48 || view.getUint32(8, true) !== bytes.length || crc32(bytes.slice(48)) !== view.getUint32(12, true)) throw Error("Invalid KBS header or CRC");
   const screenCount = view.getUint16(16, true);

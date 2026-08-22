@@ -1,4 +1,5 @@
 #include "kb7/screen.h"
+#include "kb7/input_profiles.h"
 #include "kb7/reports.h"
 #include "kb7/regs.h"
 
@@ -44,7 +45,8 @@ static bool action_fields_valid(const struct kb7_widget_record *widget) {
     case KB7_ACTION_RGB_EFFECT:
         return widget->action_arg0 <= 4U && widget->action_arg1 == 0U;
     case KB7_ACTION_PROFILE:
-        return widget->action_arg0 <= 3U && widget->action_arg1 == 0U;
+        return widget->action_arg0 < KB7_INPUT_PROFILE_SLOT_COUNT &&
+               widget->action_arg1 == 0U;
     case KB7_ACTION_BRIGHTNESS:
         return widget->minimum >= 0 && widget->maximum <= 100 &&
                widget->action_arg0 == 0U && widget->action_arg1 == 0U;

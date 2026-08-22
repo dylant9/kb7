@@ -42,7 +42,7 @@ class PowerLoss(RuntimeError):
 
 
 class AtomicSlots:
-    def __init__(self, slot_size: int = 0x200000):
+    def __init__(self, slot_size: int = 0x140000):
         self.slot_size = slot_size
         self.flash = bytearray(b"\xff" * (slot_size * 2))
 
