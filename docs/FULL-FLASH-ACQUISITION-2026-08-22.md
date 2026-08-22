@@ -147,8 +147,8 @@ Conservative ownership is therefore:
 region-2 reference comparisons. It is read-only:
 
 ```sh
-python3 tools/inspect_stock_flash.py kb7-stock-1.bin \
-  --compare kb7-stock-2.bin --output inspection.json
+python3 tools/inspect_stock_flash.py /path/to/first-read.bin \
+  --compare /path/to/second-read.bin --output /path/to/inspection.json
 ```
 
 Raw filenames and artifacts are operator inputs and stay outside the repository.

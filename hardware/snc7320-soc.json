@@ -75,7 +75,7 @@
       "end": "0x100fffff",
       "mapped_size_bytes": 1048576,
       "physical_cache_bytes": 16384,
-      "notes": "Not a private Core 1 flash region; controller supports one core at a time."
+      "notes": "Not a dedicated Core 1 flash region; controller supports one core at a time."
     },
     {
       "name": "shared AHB SRAM",

@@ -1,0 +1,289 @@
+#!/usr/bin/env python3
+"""
+KB7 ISP-mode flash verifier  --  STRICTLY READ-ONLY.
+
+Reads the SPI-NOR through the SoC's OWN flash controller while the device sits in
+bootloader/ISP mode (10f5:5037), then verifies the SN_FWIN region CRCs.
+
+WHY THIS MATTERS: our ESP32/flashrom reads test the *chip*. This tests the
+*SoC reading the chip* -- the exact path the bootloader uses when it CRC-checks
+regions at boot. If CRCs fail here but pass via the programmer, the SoC's flash
+read path is the fault.
+
+SAFETY: only these F6 subcodes are representable, and they are all non-mutating:
+    0x00  identify
+    0x01  read status
+    0x05  NOR read
+    0x17  enter 4-byte addressing (mode bit, not a write)
+    0xF1  device descriptor
+Program (0x06), erase (0x15/0x19), and every NAND opcode are absent by construction.
+There is no code path in this file that can modify flash.
+
+Requires libusb-1.0 and permission to claim the MSC interface (run with sudo, or
+add a udev rule for 10f5:5037).
+
+Usage:
+    sudo python3 kb7-isp-verify.py                # verify CRCs (reads ~22MB)
+    sudo python3 kb7-isp-verify.py -o dump.bin    # also save what it read
+"""
+
+import argparse
+import ctypes as ct
+import struct
+import sys
+import zlib
+
+VID, PID = 0x10F5, 0x5037
+FLASH_BASE = 0x60000000
+BLOCK = 512
+# 4 KiB per F6 05 command (8 blocks). This matches the Phase-0 test vector
+# (F6 05 .. 00 08); larger chunks make the device's bulk-IN endpoint fail with
+# LIBUSB_ERROR_IO, so its internal read buffer is evidently ~4 KiB.
+CHUNK = 0x1000
+
+# ---- the only subcodes this tool can emit (all read-only) --------------------
+SUB_IDENTIFY, SUB_STATUS, SUB_READ, SUB_EN4B, SUB_DESC = 0x00, 0x01, 0x05, 0x17, 0xF1
+_ALLOWED = {SUB_IDENTIFY, SUB_STATUS, SUB_READ, SUB_EN4B, SUB_DESC}
+
+# ---- minimal libusb-1.0 ctypes binding --------------------------------------
+lib = ct.CDLL("libusb-1.0.so.0")
+
+
+class _EP(ct.Structure):
+    _fields_ = [("bLength", ct.c_uint8), ("bDescriptorType", ct.c_uint8),
+                ("bEndpointAddress", ct.c_uint8), ("bmAttributes", ct.c_uint8),
+                ("wMaxPacketSize", ct.c_uint16), ("bInterval", ct.c_uint8),
+                ("bRefresh", ct.c_uint8), ("bSynchAddress", ct.c_uint8),
+                ("extra", ct.POINTER(ct.c_ubyte)), ("extra_length", ct.c_int)]
+
+
+class _IFD(ct.Structure):
+    _fields_ = [("bLength", ct.c_uint8), ("bDescriptorType", ct.c_uint8),
+                ("bInterfaceNumber", ct.c_uint8), ("bAlternateSetting", ct.c_uint8),
+                ("bNumEndpoints", ct.c_uint8), ("bInterfaceClass", ct.c_uint8),
+                ("bInterfaceSubClass", ct.c_uint8), ("bInterfaceProtocol", ct.c_uint8),
+                ("iInterface", ct.c_uint8), ("endpoint", ct.POINTER(_EP)),
+                ("extra", ct.POINTER(ct.c_ubyte)), ("extra_length", ct.c_int)]
+
+
+class _IF(ct.Structure):
+    _fields_ = [("altsetting", ct.POINTER(_IFD)), ("num_altsetting", ct.c_int)]
+
+
+class _CFG(ct.Structure):
+    _fields_ = [("bLength", ct.c_uint8), ("bDescriptorType", ct.c_uint8),
+                ("wTotalLength", ct.c_uint16), ("bNumInterfaces", ct.c_uint8),
+                ("bConfigurationValue", ct.c_uint8), ("iConfiguration", ct.c_uint8),
+                ("bmAttributes", ct.c_uint8), ("MaxPower", ct.c_uint8),
+                ("interface", ct.POINTER(_IF)),
+                ("extra", ct.POINTER(ct.c_ubyte)), ("extra_length", ct.c_int)]
+
+
+lib.libusb_open_device_with_vid_pid.restype = ct.c_void_p
+lib.libusb_open_device_with_vid_pid.argtypes = [ct.c_void_p, ct.c_uint16, ct.c_uint16]
+lib.libusb_get_device.restype = ct.c_void_p
+lib.libusb_get_device.argtypes = [ct.c_void_p]
+lib.libusb_get_active_config_descriptor.argtypes = [ct.c_void_p, ct.POINTER(ct.POINTER(_CFG))]
+lib.libusb_bulk_transfer.argtypes = [ct.c_void_p, ct.c_ubyte, ct.POINTER(ct.c_ubyte),
+                                     ct.c_int, ct.POINTER(ct.c_int), ct.c_uint]
+for fn in ("libusb_kernel_driver_active", "libusb_detach_kernel_driver",
+           "libusb_attach_kernel_driver", "libusb_claim_interface",
+           "libusb_release_interface"):
+    getattr(lib, fn).argtypes = [ct.c_void_p, ct.c_int]
+lib.libusb_clear_halt.argtypes = [ct.c_void_p, ct.c_ubyte]
+lib.libusb_close.argtypes = [ct.c_void_p]
+
+
+class Device:
+    def __init__(self):
+        self.ctx = ct.c_void_p()
+        if lib.libusb_init(ct.byref(self.ctx)) != 0:
+            raise RuntimeError("libusb_init failed")
+        self.h = lib.libusb_open_device_with_vid_pid(self.ctx, VID, PID)
+        if not self.h:
+            raise RuntimeError(
+                f"device {VID:04x}:{PID:04x} not found.\n"
+                "  The keyboard must be in ISP/bootloader mode.\n"
+                "  Check with: lsusb | grep 10f5")
+        self.iface, self.ep_in, self.ep_out, self.reattach = self._find_msc()
+        if lib.libusb_kernel_driver_active(self.h, self.iface) == 1:
+            lib.libusb_detach_kernel_driver(self.h, self.iface)
+            self.reattach = True
+        rc = lib.libusb_claim_interface(self.h, self.iface)
+        if rc != 0:
+            raise RuntimeError(f"claim_interface failed ({rc}) — try running with sudo")
+        self.tag = 0
+
+    def _find_msc(self):
+        cfg = ct.POINTER(_CFG)()
+        if lib.libusb_get_active_config_descriptor(
+                lib.libusb_get_device(self.h), ct.byref(cfg)) != 0:
+            raise RuntimeError("could not read config descriptor")
+        for i in range(cfg.contents.bNumInterfaces):
+            alt = cfg.contents.interface[i].altsetting[0]
+            if alt.bInterfaceClass != 0x08:      # mass storage
+                continue
+            ein = eout = None
+            for e in range(alt.bNumEndpoints):
+                ep = alt.endpoint[e]
+                if ep.bmAttributes & 0x03 != 0x02:   # bulk only
+                    continue
+                if ep.bEndpointAddress & 0x80:
+                    ein = ep.bEndpointAddress
+                else:
+                    eout = ep.bEndpointAddress
+            if ein is not None and eout is not None:
+                return alt.bInterfaceNumber, ein, eout, False
+        raise RuntimeError("no bulk mass-storage interface found")
+
+    def _xfer(self, ep, buf, length, timeout=8000):
+        n = ct.c_int(0)
+        rc = lib.libusb_bulk_transfer(self.h, ct.c_ubyte(ep),
+                                      ct.cast(buf, ct.POINTER(ct.c_ubyte)),
+                                      length, ct.byref(n), timeout)
+        if rc != 0:
+            # A failed bulk transfer usually leaves the endpoint halted; clear it
+            # so the next command has a chance rather than cascading failures.
+            lib.libusb_clear_halt(self.h, ct.c_ubyte(ep))
+            raise RuntimeError(
+                f"bulk transfer failed on ep 0x{ep:02x}: rc={rc}"
+                f"{' (LIBUSB_ERROR_IO)' if rc == -1 else ''}, len={length}")
+        return n.value
+
+    def cmd(self, cdb, data_len=0):
+        """Raw Bulk-Only Transport. data-IN only (we never send data OUT)."""
+        assert len(cdb) == 16 and cdb[0] == 0xF6
+        if cdb[1] not in _ALLOWED:
+            raise ValueError(f"subcode 0x{cdb[1]:02x} is not in the read-only whitelist")
+        self.tag = (self.tag + 1) & 0xFFFFFFFF
+        cbw = struct.pack("<IIIBBB", 0x43425355, self.tag, data_len,
+                          0x80 if data_len else 0x00, 0, 16) + cdb
+        self._xfer(self.ep_out, ct.create_string_buffer(cbw, 31), 31)
+        out = b""
+        if data_len:
+            b = ct.create_string_buffer(data_len)
+            got = self._xfer(self.ep_in, b, data_len)
+            out = bytes(b.raw[:got])
+        csw = ct.create_string_buffer(13)
+        self._xfer(self.ep_in, csw, 13)
+        sig, tag, residue, status = struct.unpack("<IIIB", bytes(csw.raw[:13]))
+        if sig != 0x53425355:
+            raise RuntimeError("bad CSW signature")
+        return out, status, residue
+
+    def close(self):
+        try:
+            lib.libusb_release_interface(self.h, self.iface)
+            if self.reattach:
+                lib.libusb_attach_kernel_driver(self.h, self.iface)
+            lib.libusb_close(self.h)
+        finally:
+            lib.libusb_exit(self.ctx)
+
+
+# ---- read-only command builders ---------------------------------------------
+def cdb_simple(sub):
+    return bytes([0xF6, sub]) + bytes(14)
+
+
+def cdb_read(offset, nbytes):
+    if nbytes % BLOCK or not (0 < nbytes <= 0xFFFF * BLOCK):
+        raise ValueError("read length must be a positive multiple of 512")
+    addr = FLASH_BASE + offset            # raw byte address (READ encoding)
+    return (bytes([0xF6, SUB_READ, 0x00]) + struct.pack(">I", addr)
+            + struct.pack(">H", nbytes // BLOCK) + bytes(7))
+
+
+def fwin(d):
+    return sum(zlib.crc32(d[o:o + 0x10000]) & 0xFFFFFFFF
+               for o in range(0, len(d), 0x10000)) & 0xFFFFFFFF
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("-o", "--out", help="also write what was read to this file")
+    ap.add_argument("--chunk", type=lambda s: int(s, 0), default=CHUNK,
+                    help=f"bytes per F6 05 command (default 0x{CHUNK:x}); "
+                         "must be a multiple of 512. Lower it if you see "
+                         "LIBUSB_ERROR_IO.")
+    args = ap.parse_args()
+    chunk = args.chunk
+    if chunk % BLOCK or chunk <= 0:
+        ap.error("--chunk must be a positive multiple of 512")
+
+    dev = Device()
+    try:
+        print(f"connected: {VID:04x}:{PID:04x}  iface {dev.iface}  "
+              f"ep_in 0x{dev.ep_in:02x} ep_out 0x{dev.ep_out:02x}")
+
+        ident, st, _ = dev.cmd(cdb_simple(SUB_IDENTIFY), 8)
+        print(f"  F6 00 identify : {ident.hex(' ')}  (status {st})")
+        desc, st, _ = dev.cmd(cdb_simple(SUB_DESC), 36)
+        print(f"  F6 F1 descript.: {desc[:16].hex(' ')}...  (status {st})")
+
+        _, st, _ = dev.cmd(cdb_simple(SUB_EN4B))
+        print(f"  F6 17 enter 4-byte addressing: status {st}")
+
+        print("\nreading header+manifest ...")
+        head = b""
+        while len(head) < 0x11000:
+            d, st, _ = dev.cmd(cdb_read(len(head), chunk), chunk)
+            if st != 0 or not d:
+                raise RuntimeError(f"read failed at 0x{len(head):x} (status {st})")
+            head += d
+        if head[:8] != b"SNC7320A":
+            print(f"  !! header magic is {head[:8]!r}, expected b'SNC7320A'")
+        man = head[0x10000:0x11000]
+        if man[:8] != b"SN_FWIN\x00":
+            raise RuntimeError(f"manifest magic is {man[:8]!r} — aborting")
+        print(f"  header OK, manifest OK (version {man[8:16].rstrip(bytes(1)).decode()})")
+
+        regions = []
+        for i, ent in ((0, 0x20), (1, 0x30), (2, 0x40)):
+            load, store, length, crc = struct.unpack_from("<IIII", man, ent)
+            regions.append((i, store - FLASH_BASE, length, crc))
+        end = max(off + ln for _, off, ln, _ in regions)
+        print(f"  need 0x{end:x} bytes ({end/1e6:.1f} MB) to cover all regions\n")
+
+        data = bytearray(head)
+        while len(data) < end:
+            n = min(chunk, end - len(data))
+            n = ((n + BLOCK - 1) // BLOCK) * BLOCK
+            d, st, _ = dev.cmd(cdb_read(len(data), n), n)
+            if st != 0 or len(d) != n:
+                raise RuntimeError(f"read failed at 0x{len(data):x} "
+                                   f"(status {st}, got {len(d)}/{n})")
+            data += d
+            pct = 100.0 * len(data) / end
+            print(f"\r  reading via SoC: {pct:5.1f}%  ({len(data):,}/{end:,})",
+                  end="", flush=True)
+        print("\n")
+
+        allpass = True
+        for i, off, length, crc in regions:
+            calc = fwin(bytes(data[off:off + length]))
+            ok = calc == crc
+            allpass &= ok
+            print(f"  region{i}: declared=0x{crc:08x} computed=0x{calc:08x} "
+                  f"{'PASS' if ok else '*** FAIL ***'}")
+
+        print()
+        if allpass:
+            print("ALL REGION CRCs PASS as read through the SoC's own flash controller.")
+            print("=> The bootloader's integrity check is NOT the reason it drops to ISP.")
+        else:
+            print("A REGION FAILS when read through the SoC's own flash controller,")
+            print("even though the programmer reads the chip cleanly.")
+            print("=> The SoC's flash read path is the fault, not the chip contents.")
+
+        if args.out:
+            with open(args.out, "xb") as f:
+                f.write(bytes(data))
+            print(f"\nsaved {len(data):,} bytes to {args.out}")
+    finally:
+        dev.close()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

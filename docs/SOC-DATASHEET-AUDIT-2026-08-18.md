@@ -11,7 +11,7 @@ memory and interrupt assumptions, and exposes additional release blockers:
 - the low-level KB7 LCD software is present in the recovered application flash,
   not exclusively in SoC mask ROM; the SoC supplies the PPU/TFT/8080 hardware;
 - the SoC contains two ARM Cortex-M3 processors, not one Cortex-M4;
-- `0x10000000` is a shared 1-MiB I-cache execution window, not a private
+- `0x10000000` is a shared 1-MiB I-cache execution window, not a dedicated
   second-core flash address;
 - `0x20000000..0x20000fff` is the shared inter-core mailbox;
 - `0x40022000`, `0x40023000`, and `0x40024000` are respectively the SPI-NOR,
@@ -69,7 +69,8 @@ The evidence separates hardware from software:
   hardware (Data Sheet pp. 36 and 66–69);
 - the recovered flash contains the panel-reset and 9-bit command serializer,
   panel command stream, PPU programming, display descriptors, framebuffer
-  movement, and vblank path described in the private interoperability report;
+  movement, and vblank path summarized by the independently authored driver and
+  firmware-completion record;
 - the closed display call graph does not enter either resolved Core-0 ROM call;
   the datasheet now identifies the `0x40022000` block used by the surviving ROM
   transition as the SPI-NOR controller, not the display block (pp. 36–38); and

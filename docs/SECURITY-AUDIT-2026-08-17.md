@@ -45,7 +45,7 @@ The public helper now parks for external reset; see `BOOT-RECOVERY-MODEL.md`.
    reference fatal-return sentinels as success, omitted a reference divider
    calculation, and core0 continued boot after failure.
 
-2. **USB was not an enumerating stack.** The private engineering version marked
+2. **USB was not an enumerating stack.** The pre-remediation source marked
    USB ready without an EP0 state machine, descriptor-request handling, OUT
    dispatch, or IN submission; sends always failed. Its emitted report IDs and
    lengths also disagreed with its descriptor.
@@ -116,9 +116,9 @@ The public helper now parks for external reset; see `BOOT-RECOVERY-MODEL.md`.
 ## Verified positive properties
 
 - Clean replacement core0/core1 builds completed with no unresolved relocations.
-- All six private bounded experiments built and passed structural confinement
-  checks; none are distributed here.
-- Current private ELF extraction matched every corresponding private payload.
+- All six bounded build experiments passed structural confinement checks; no
+  generated artifacts are distributed here.
+- Locally generated ELF extraction matched every corresponding local payload.
 - Region lengths, erased-byte padding, checksums, and bundle containment were
   internally consistent.
 - Eight package tests and twenty PC-application tests passed.

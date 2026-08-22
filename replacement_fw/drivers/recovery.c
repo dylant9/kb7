@@ -34,7 +34,7 @@ void kb7_fault_capture(uint32_t cause, const uint32_t *stack) {
 void kb7_enter_loader(void) {
     /*
      * AIRCR/software reset restarts PRAM on this SoC.  The exact ROM-entering
-     * reset entry is not published and a watchdog reset would be destructive
+     * reset entry is not documented and a watchdog reset would be destructive
      * if the external recovery path is unavailable. Preserve the observed
      * request marker, then park for the proven MCU_RST/external-reset path.
      */
