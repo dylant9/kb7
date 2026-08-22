@@ -1,8 +1,30 @@
 name: source checks
 
+# Manual only, for now.
+#
+# This project is early and iterating fast, and the repo is private, so Actions
+# minutes are billed. The previous config ran on every push AND every pull
+# request — meaning a branch push fired it twice — and each run spent several
+# minutes on `apt-get update` plus a full gcc-arm-none-eabi install before any
+# checking happened.
+#
+# The checks themselves are still worth running; just run them locally:
+#
+#     make check
+#
+# Trigger a cloud run by hand from the Actions tab (Run workflow) when it is
+# actually useful — before a release, or when validating something that depends
+# on a clean-room environment rather than a local one.
+#
+# When the project stabilises, consider restoring automation narrowly, e.g.:
+#   on:
+#     pull_request:
+#       branches: [main]
+#       paths: ['replacement_fw/**', 'tools/**', 'Makefile']
+# plus caching the APT toolchain so the install cost is paid once.
+
 on:
-  push:
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
