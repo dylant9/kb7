@@ -184,8 +184,9 @@ image or an early-valid mixed state.
    hard-disabled and there is no execute command. The offline baseline hash and
    USB topology are not a unique physical-device identity; two byte-identical
    units remain indistinguishable.
-3. Design and pass a fixed scratch-only multi-sector/reconciliation hardware
-   experiment before reviewing any source change that could enable execution.
+3. Independently review and run the prepared fixed scratch-only
+   multi-sector/reconciliation experiment before reviewing any source change
+   that could enable firmware-region execution.
 4. Prove entry back to `5037` after a checksum-valid but nonfunctional custom
    core0, or continue to require an attached and independently tested SPI
    recovery path.

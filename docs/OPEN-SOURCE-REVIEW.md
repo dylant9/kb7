@@ -74,7 +74,8 @@ No external scripts, fonts, images, packages, or vendored libraries are bundled.
   raw pin-map evidence, ROM traces, and decompiler-level reports.
 - The stock-core patch experiments and their exact vendor function addresses.
 - Generated manifests, full-image-bound plans, sector images, executor journals,
-  prefixes and any package containing stock bytes. Independently authored
+  scratch-restart state, prefixes and any package containing stock bytes.
+  Independently authored
   planner/checker/executor source is included; its generated state stays
   owner-local.
 

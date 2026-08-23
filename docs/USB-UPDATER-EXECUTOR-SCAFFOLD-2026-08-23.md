@@ -145,14 +145,33 @@ classified, 2 means validation/transport failure, 3 means the image requires
 SPI recovery, and 4 means a modeled partial transition was observed but no
 automatic mutation is authorized.
 
+## Live read-only validation
+
+The owner ran both commands in separate Python/libusb sessions on 2026-08-23.
+The locally generated plan contained 161 fixed operations and had bundle ID
+`77f435c8154f3052f1eafc34160a495345b3388c869cef7f7391afe135cf83a7`.
+Its offline simulation passed with zero early checksum-valid non-target states.
+
+Live `preflight` obtained two exact captures and classified the device as
+`exact_stock` at USB topology `3-2.2`. The observed complete-image SHA-256 was
+`2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f`,
+matching both owner baselines. It durably created a bound read-only journal.
+
+A subsequent `reconcile`, started as a new process with a new USB handle,
+again classified the complete image as `exact_stock`, operation boundary 0,
+with no pre-existing journal error and no rebuild. Both commands reported live
+mutation disabled, and neither issued a mutating command. This validates the
+live read-only reopen, identity, whole-image and journal-binding path on the
+development unit. It does not validate updater writes, a unique device serial,
+or physical interruption recovery.
+
 ## Remaining gates
 
 Live firmware-region execution remains unavailable until all of the following
 are separately completed and reviewed:
 
-1. Design, independently review and run a fixed scratch-only
-   multi-sector/restart experiment while external SPI recovery is connected and
-   proven.
+1. Independently review and run the prepared fixed scratch-only
+   multi-sector/restart experiment while external SPI recovery remains proven.
 2. Exercise reconciliation after controlled disconnects at safe scratch
    boundaries and after modeled partial scratch operations.
 3. Re-review the exact operation transport, intent/restart behavior and source

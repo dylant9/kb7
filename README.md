@@ -19,7 +19,7 @@ image generation is disabled.
 ## Current status — 2026-08-23
 
 - The offline/software implementation is complete to the evidence currently
-  available. `make check` passes 140 Python/C integration tests, browser
+  available. `make check` passes 152 Python/C integration tests, browser
   validation, three ARM build profiles, hardware-fact checks and the public-tree
   safety audit.
 - Two independent reads of the installed 32-MiB Macronix SPI NOR are
@@ -53,8 +53,11 @@ image generation is disabled.
   `flash_approved=false`. A separate executor scaffold now provides only
   read-only live `preflight` and `reconcile`: it binds two exact full-chip reads,
   loader identity, USB topology and a durable journal, while its mutation path
-  remains hard-disabled and unreachable from the CLI. Neither tool makes a
-  custom-firmware hardware trial safe. See the
+  remains hard-disabled and unreachable from the CLI. Both read-only commands
+  have now passed in separate live sessions at exact-stock boundary 0. A
+  separate fixed two-sector scratch/restart experiment is prepared, dry-run by
+  default, but has not yet been run. Neither path makes a custom-firmware
+  hardware trial safe. See the
   [offline updater design](docs/USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md) and
   [executor scaffold status](docs/USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md).
 - No custom firmware has been installed. USB, display, touch, RGB, MCU2/Hall,
@@ -71,7 +74,9 @@ boundaries. The
 [F6 erase analysis](tools/flash-access/F6-ERASE-ENCODING.md) record the separate
 stock-recovery investigation. The
 [erase-footprint test plan](tools/flash-access/ERASE-GRANULARITY-TEST-PLAN.md)
-records the completed fixed hardware experiment and its recovery boundary.
+records the completed fixed hardware experiment and its recovery boundary; the
+[scratch restart test plan](tools/flash-access/SCRATCH-RESTART-TEST-PLAN.md)
+records the next bounded experiment and its stricter limits.
 
 ## Repository contents
 

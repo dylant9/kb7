@@ -95,7 +95,7 @@ required rollback route, but no replacement firmware has run on hardware.
 
 The latest offline verification pass completed successfully on 2026-08-23:
 
-- `make check`: 140 Python/C integration tests passed, browser JavaScript syntax
+- `make check`: 152 Python/C integration tests passed, browser JavaScript syntax
   and executable validator checks passed, and the default, guarded-audit, and
   all-branches integration firmware profiles built and passed ELF verification;
 - the largest all-branches profile used 8,320 bytes of core0 text, 12 bytes of
@@ -103,7 +103,7 @@ The latest offline verification pass completed successfully on 2026-08-23:
   4 bytes of data and 19,312 bytes of BSS;
 - neither ELF contains unresolved relocations, and core0's vector table is
   exactly `0x13c` bytes;
-- the public-tree policy check accepted 176 UTF-8 source/documentation files and
+- the public-tree policy check accepted 179 UTF-8 source/documentation files and
   found no firmware blobs, generated binaries, or disallowed material; and
 - independent warning passes using GCC `-fanalyzer` and strict conversion,
   shadowing, and undefined-macro diagnostics completed without findings.

@@ -209,7 +209,8 @@ These are not honest candidates for further offline coding:
    intentionally unavailable. The narrow marker and guarded erase-footprint
    experiments passed at their fixed stock-loader scratch targets, but are not
    a supported flasher and do not install these replacement images; external
-   SPI remains the required recovery route.
+   SPI remains the required recovery route. A separate fixed multi-sector and
+   process-restart scratch experiment is prepared but has not run on hardware.
 
 ## Build and test profiles
 

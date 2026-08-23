@@ -33,8 +33,13 @@ DENIED_NAMES = {
     "simulation.json",
     ".kb7-usb-updater-journal-v1.json",
     "updater-journal.json",
+    ".kb7-isp-scratch-restart-state.json",
+    "scratch-restart-state.json",
 }
-DENIED_JSON_SCHEMAS = {"kb7-usb-updater-journal-v1"}
+DENIED_JSON_SCHEMAS = {
+    "kb7-isp-scratch-restart-state-v1",
+    "kb7-usb-updater-journal-v1",
+}
 DENIED_TEXT = (
     "Ghidra " + "decompiler output",
     "Turtle Beach " + "Swarm II Installer",
