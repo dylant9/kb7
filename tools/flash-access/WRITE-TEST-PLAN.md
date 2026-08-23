@@ -204,6 +204,12 @@ were exact, and the final image returned byte-for-byte to the baseline. The
 dated evidence record is
 [`../../docs/USB-ISP-WRITE-VALIDATION-2026-08-23.md`](../../docs/USB-ISP-WRITE-VALIDATION-2026-08-23.md).
 
+The granularity limitation above remains an accurate description of this first
+marker cycle. A separate guarded run later populated a complete sector and
+immediate guards at `0x000c6000`, establishing an observable exact 4-KiB
+footprint at that target. Its evidence is recorded in
+[`../../docs/USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md`](../../docs/USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md).
+
 That result justifies further engineering of a non-invasive updater, not use by
 general users. Any new destructive test still requires the full-chip SPI
 recovery rehearsal, matching backups and explicit acceptance of losing the

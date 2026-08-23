@@ -1,9 +1,11 @@
 # `F6` write-command encoding — final investigation record
 
 Status as of 2026-08-23: **`F6 06`, `F6 18`, and the normal-NOR `F6 15`
-sequence are confirmed on the V1.22 loader at offset `0x0008e000`; `F6 19`
-remains resolved only by calibrated static data-flow analysis.** This does not
-authorize general USB writes; see the safety verdict below.
+sequence are confirmed on the V1.22 loader at offset `0x0008e000`; a separate
+guarded run established an observable exact 4-KiB `F6 15` footprint at
+`0x000c6000`; `F6 19` remains resolved only by calibrated static data-flow
+analysis.** This does not authorize general USB writes; see the safety verdict
+below.
 
 The result was independently summarized from local static analysis of a
 lawfully obtained updater. No vendor binary, recovered symbol table,
@@ -112,9 +114,18 @@ returned byte-for-byte to the original baseline. The
 [dated validation record](../../docs/USB-ISP-WRITE-VALIDATION-2026-08-23.md)
 contains the exact hashes and evidence limits.
 
-That confirms one loader, flash configuration, target and command size. It does
-not validate exact erase granularity, arbitrary operations, interruption
-recovery, another loader revision or `F6 19`. The bootloader calls itself
+That first cycle confirms one loader, flash configuration, target and command
+size, but did not reveal erase granularity because surrounding bytes were
+already erased. The later fixed footprint experiment populated all 4,096 bytes
+of sector `0x000c6000` plus immediate lower and upper guards. `F6 18` followed
+by `F6 15` index `0x0630` erased every target byte while both guards and every
+other byte in the exact 32-MiB postimage survived; cleanup restored the
+baseline and the keyboard subsequently cold-booted normally. See the
+[guarded footprint record](../../docs/USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md).
+
+That second result remains limited to one unit, loader, target and normal-NOR
+path. It does not validate arbitrary operations, interruption recovery, another
+loader revision or `F6 19`. The bootloader calls itself
 `v0.001 test!`, its bulk endpoint fails above 4 KiB, and the first program
 experiment destroyed the boot chain after a host-side guard validated the
 intended rather than encoded address. The SPI path remains the supported owner-

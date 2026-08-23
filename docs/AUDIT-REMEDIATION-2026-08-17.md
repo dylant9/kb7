@@ -98,7 +98,7 @@ The latest offline verification pass completed successfully on 2026-08-23:
   4 bytes of data and 19,312 bytes of BSS;
 - neither ELF contains unresolved relocations, and core0's vector table is
   exactly `0x13c` bytes;
-- the public-tree policy check accepted 167 UTF-8 source/documentation files and
+- the public-tree policy check accepted 168 UTF-8 source/documentation files and
   found no firmware blobs, generated binaries, or disallowed material; and
 - independent warning passes using GCC `-fanalyzer` and strict conversion,
   shadowing, and undefined-macro diagnostics completed without findings.

@@ -1,8 +1,8 @@
 # Public-source provenance review
 
 Review date: 2026-08-17; remediation additions reviewed 2026-08-18; full-flash
-and public-repository status reviewed 2026-08-22; bounded USB-ISP result reviewed
-2026-08-23
+and public-repository status reviewed 2026-08-22; bounded USB-ISP results
+reviewed 2026-08-23
 Scope: this repository directory only
 
 ## Decision
@@ -33,9 +33,10 @@ that the contributor does not possess.
   recovery measurements. No raw dump, programmer log or repair image is
   included.
 - Independently authored external-SPI recovery helpers, read-only USB-ISP
-  diagnostics, a guarded dry-run-default USB write-path validation experiment,
-  and a clean-room summary of the F6 interoperability findings. No vendor DLL,
-  disassembly listing, general USB flasher, or stock byte payload is included.
+  diagnostics, two guarded dry-run-default USB write-path validation
+  experiments, and clean-room summaries of the F6 interoperability findings.
+  No vendor DLL, disassembly listing, general USB flasher, raw transcript, or
+  stock byte payload is included.
 - Apache-2.0 license and project/trademark notice.
 
 No external scripts, fonts, images, packages, or vendored libraries are bundled.

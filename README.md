@@ -37,9 +37,12 @@ image generation is disabled.
   experiments. On 2026-08-23 one guarded V1.22 cycle at offset `0x0008e000`
   confirmed the sub-16-MiB `F6 18` + `F6 06` marker program and normal-NOR
   `F6 18` + `F6 15` erase sequence, with exact 32-MiB postflight comparisons
-  and final restoration to the baseline. A separate four-stage guarded test is
-  prepared, but has not yet run, to measure the observable erase footprint at
-  `0x000c6000`. Exact 4-KiB granularity and `F6 19` therefore remain unproven.
+  and final restoration to the baseline. A second guarded test populated all
+  4,096 bytes of sector `0x000c6000` plus immediate lower and upper guards. The
+  target erase removed exactly the populated 4-KiB sector, both guards survived,
+  every complete-array postimage matched, cleanup restored the baseline, and a
+  later cold boot worked normally. That is a one-unit, one-loader, one-target
+  observable footprint result; `F6 19` and general update safety remain unproven.
   This is not a supported general flasher; use SPI for owner-authorized
   ordinary, recovery and production writes.
 - No custom firmware has been installed. USB, display, touch, RGB, MCU2/Hall,
@@ -51,11 +54,12 @@ See the [firmware completion status](docs/FIRMWARE-COMPLETION-2026-08-18.md),
 [boot/recovery model](docs/BOOT-RECOVERY-MODEL.md) for the firmware evidence
 boundaries. The
 [bounded USB-ISP validation record](docs/USB-ISP-WRITE-VALIDATION-2026-08-23.md),
+[guarded erase-footprint result](docs/USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md),
 [flash-access guide](tools/flash-access/README.md), and
 [F6 erase analysis](tools/flash-access/F6-ERASE-ENCODING.md) record the separate
 stock-recovery investigation. The
 [erase-footprint test plan](tools/flash-access/ERASE-GRANULARITY-TEST-PLAN.md)
-defines the pending fixed hardware experiment and its recovery boundary.
+records the completed fixed hardware experiment and its recovery boundary.
 
 ## Repository contents
 

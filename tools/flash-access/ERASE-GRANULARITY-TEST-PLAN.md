@@ -1,7 +1,8 @@
 # KB7 USB-ISP erase-footprint test plan
 
-Status: **prepared for one owner-authorized hardware run; not yet hardware-
-validated**.
+Status: **completed successfully once on one owner-controlled KB7 on
+2026-08-23**. The exact evidence is recorded in
+[`../../docs/USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md`](../../docs/USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md).
 
 `kb7-isp-erase-granularity.py` is a fixed, destructive laboratory experiment,
 not a firmware updater. Its purpose is to answer the one question left open by
@@ -246,25 +247,32 @@ F6 15 00 06 38 00 00 00 00 00 00 00 00 00 00 00
 to match the original baseline byte-for-byte. Only then does the script remove
 the state file and report completion.
 
-## What a complete pass would prove
+## What the completed pass proves
 
 For this one device, preserved V1.22 loader, normal-NOR selection, flash state
-and target, a complete pass would establish that the **observable** effect of
-the tested `F6 15` command is exactly `[0x000c6000,0x000c7000)`:
+and target, the completed pass establishes that the **observable** effect of
+the tested `F6 15` command was exactly `[0x000c6000,0x000c7000)`:
 
 - every initially programmed byte inside that 4-KiB sector reads back erased;
 - programmed bytes immediately below and above it survive exactly; and
 - the rest of the 32-MiB image has no observable difference.
 
+The prepared image, target-erased image, both cleanup images and final baseline
+all matched their exact full-chip predictions. A separately invoked final USB
+capture also matched the baseline, the state was cleared, and the owner later
+confirmed normal operation after a cold boot.
+
 That is sufficient evidence for the erase footprint needed by the next updater
-design step. It would not prove undocumented internal behavior, atomicity,
+design step. It does not prove undocumented internal behavior, atomicity,
 power-loss recovery, endurance, every offset, an above-16-MiB mutation, another
-loader revision or another device. It would not validate `F6 19`; that alternate
-flash-type path remains untested. It would not by itself validate arbitrary
+loader revision or another device. It does not validate `F6 19`; that alternate
+flash-type path remains untested. It does not by itself validate arbitrary
 image planning or make a general USB updater safe or complete.
 
-Until the hardware run passes, exact 4-KiB granularity remains unproven. Even
-after a pass, external SPI remains the recovery path and ordinary write method.
+The result is deliberately scoped to an observable exact 4-KiB programmed-data
+footprint at this tested target. External SPI remains the recovery path and
+ordinary write method. Repeating this destructive run merely to reconfirm the
+same target is unnecessary.
 
 ## Recovery procedure
 

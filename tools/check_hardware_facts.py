@@ -121,7 +121,7 @@ def validate_pin_map(pinmap: dict[str, object]) -> None:
 
 
 def validate_stock_flash(stock: dict[str, object]) -> None:
-    require(stock["schema_version"] == 3 and
+    require(stock["schema_version"] == 4 and
             stock["updated_on"] == "2026-08-23",
             "stock-flash evidence schema must describe the recovery and USB-ISP results")
     acquisition = stock["acquisition"]
@@ -162,10 +162,78 @@ def validate_stock_flash(stock: dict[str, object]) -> None:
             "f6 15 00 04 70 00 00 00 00 00 00 00 00 00 00 00",
             "unexpected bounded USB-ISP mutation CDB")
     require(usb_write["complete_postimages_exact"] is True and
-            usb_write["exact_erase_granularity_proven"] is False and
+            usb_write["exact_erase_granularity_proven_by_this_cycle"] is False and
             usb_write["f6_19_tested"] is False and
             usb_write["custom_firmware_booted"] is False,
             "retain the narrow USB-ISP proof boundary")
+
+    granularity = stock["usb_isp_erase_granularity_validation"]
+    require(granularity["device_count"] == 1 and
+            granularity["loader_window_sha256"] ==
+            "9cc33333a88641b633bb5a4c0d55425c757e0fbdbe70eb99e9a9e40b76378a56" and
+            granularity["plan_sha256"] ==
+            "a68642a348b18ee27a2f1cfdb6c8137aeff43c0ce14487f9c765c4c76e9be783",
+            "unexpected guarded erase-footprint identity or plan")
+    require(granularity["baseline_read_count"] == 2 and
+            granularity["baseline_reads_bit_identical"] is True and
+            granularity["baseline_size_bytes"] == 0x02000000 and
+            granularity["baseline_sha256"] ==
+            "2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f" and
+            granularity["baseline_manifest_region_checksums_passed"] is True,
+            "guarded erase baseline evidence changed")
+    require(granularity["target_sector_start"] == "0x000c6000" and
+            granularity["target_sector_end_exclusive"] == "0x000c7000" and
+            granularity["target_sector_size_bytes"] == 0x1000 and
+            granularity["program_address_mode_command"] == "f6 18" and
+            granularity["program_operation_count"] == 10 and
+            granularity["program_block_size_bytes"] == 0x200 and
+            granularity["target_program_block_count"] == 8 and
+            granularity["guard_program_block_count"] == 2 and
+            granularity["all_program_postimages_exact"] is True,
+            "guarded erase preparation geometry changed")
+    require(granularity["prepared_image_sha256"] ==
+            "fdda369b75acc245efe119a165df7825649178af30c42096fcd4d2341547a3b7" and
+            granularity["target_erase_address_mode_command"] == "f6 18" and
+            granularity["target_erase_cdb"] ==
+            "f6 15 00 06 30 00 00 00 00 00 00 00 00 00 00 00" and
+            granularity["target_erased_image_sha256"] ==
+            "0551c79084a3afd0eb7e21ec84b7c01ef74e0f35cc9da2a7b74f45c8cca74c03" and
+            granularity["target_erased_bytes_verified"] == 0x1000,
+            "guarded target-erase result changed")
+    require(granularity["lower_guard_offset"] == "0x000c5e00" and
+            granularity["upper_guard_offset"] == "0x000c7000" and
+            granularity["lower_guard_survived_exactly"] is True and
+            granularity["upper_guard_survived_exactly"] is True and
+            granularity["observable_effect_start"] == "0x000c6000" and
+            granularity["observable_effect_end_exclusive"] == "0x000c7000" and
+            granularity[
+                "observable_exact_4k_erase_footprint_proven_at_tested_target"
+            ] is True,
+            "observable 4-KiB erase-footprint evidence changed")
+    require(granularity["lower_cleanup_cdb"] ==
+            "f6 15 00 06 28 00 00 00 00 00 00 00 00 00 00 00" and
+            granularity["lower_cleaned_image_sha256"] ==
+            "b7959a78477eaa09c40a91692579a7735c812b1b078ccfacc94b21571fda52cb" and
+            granularity["upper_cleanup_cdb"] ==
+            "f6 15 00 06 38 00 00 00 00 00 00 00 00 00 00 00" and
+            granularity["final_postflight_sha256"] ==
+            granularity["baseline_sha256"] and
+            granularity["final_postflight_matches_baseline"] is True and
+            granularity["independent_final_usb_capture_size_bytes"] ==
+            0x02000000 and
+            granularity["independent_final_usb_capture_sha256"] ==
+            granularity["baseline_sha256"] and
+            granularity["independent_final_usb_capture_matches_baseline"] is True and
+            granularity["state_cleared"] is True and
+            granularity["post_test_cold_boot_and_normal_operation_owner_confirmed"]
+            is True,
+            "guarded erase cleanup or functional closure changed")
+    require(granularity["f6_19_tested"] is False and
+            granularity["above_16mib_mutation_tested"] is False and
+            granularity["interruption_or_power_loss_tested"] is False and
+            granularity["arbitrary_offsets_tested"] is False and
+            granularity["custom_firmware_booted"] is False,
+            "do not broaden the guarded erase-footprint proof boundary")
 
     regions = stock["manifest"]["regions"]
     require([region["index"] for region in regions] == [0, 1, 2],

@@ -12,7 +12,7 @@ makes the replacement firmware flash-approved.
 | Path | Transport | Reliability | Can write? |
 |---|---|---|---|
 | **SPI** | ESP32-C3 running `serprog` + `flashrom` | Proven, byte-exact | **Yes — proven** |
-| **USB ISP** | Bootloader mass-storage `F6` commands | Reads proven; one exact `F6 06` marker program and `F6 15` erase cycle confirmed; guarded erase-footprint test prepared | **Narrow lab primitive validated; not a supported flasher** |
+| **USB ISP** | Bootloader mass-storage `F6` commands | Reads proven; one marker cycle and one guarded exact-footprint cycle passed on the V1.22 loader | **Narrow lab primitives validated; not a supported flasher** |
 
 ---
 
@@ -116,7 +116,7 @@ selects `F6 17` when the program or erase range crosses the absolute
 it. The 2026-08-23 validation cycle exercised `F6 18` immediately before both
 the sub-16-MiB program and erase.
 
-### Erase encoding: static proof plus one bounded hardware validation
+### Erase encoding: static proof plus bounded hardware validation
 
 Calibrated data-flow analysis of the updater proved:
 
@@ -148,9 +148,9 @@ original baseline. That confirms the normal-NOR target interpretation on this
 unit; it does not prove exact erase granularity because the rest of the sector
 and surrounding gap were already `0xff`. `F6 19` remains untested.
 
-`kb7-isp-erase-granularity.py` is the fixed follow-up experiment for that one
-remaining footprint question. It populates every byte of sector `0x000c6000`,
-places non-`0xff` guards immediately below and above it, and requires the whole
+The fixed follow-up `kb7-isp-erase-granularity.py` subsequently populated every
+byte of sector `0x000c6000`, placed non-`0xff` guards immediately below and
+above it, and required the whole
 aligned `[0x000c0000,0x00100000)` containment envelope to be erased in the
 baseline. It additionally pins the actual preserved-loader flash window
 `[0x00001000,0x00010000)` to SHA-256
@@ -166,8 +166,13 @@ source or command drift changes it and invalidates prior stage state. This is a
 fail-closed consistency check, not code signing.
 It is dry-run by default and has four identity- and image-bound stages: prepare,
 erase the target, clean the lower guard, and clean the upper guard back to the
-exact baseline. It has not yet run on hardware. See
-[ERASE-GRANULARITY-TEST-PLAN.md](ERASE-GRANULARITY-TEST-PLAN.md).
+exact baseline. That fixed cycle passed on the development unit: all 4,096
+target bytes erased, both adjacent guards survived exactly, every 32-MiB
+postimage matched its prediction, cleanup restored the baseline, and the owner
+then confirmed a working cold boot. This proves an observable exact 4-KiB
+footprint only at that target with this unit and loader. See the
+[runbook](ERASE-GRANULARITY-TEST-PLAN.md) and
+[dated result](../../docs/USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md).
 
 ### The disproven Phase-0 program model
 
@@ -193,12 +198,12 @@ the same argument trace to erase. In the program path the `>> 9` is applied to
 the transfer **size**; in the erase path it is applied to the aligned
 **address**.
 
-### ⚠️ USB mutation validated once — not a supported flashing path
+### ⚠️ Bounded USB mutations validated — not a supported flashing path
 
 **If you have found this repository and want to flash a KB7: use the SPI path.**
-The narrow USB marker program/erase sequence has passed once under laboratory
-guards; no general USB updater exists. Treat anything here that writes over USB
-as experimental and capable of destroying your bootloader.
+The narrow marker cycle and fixed erase-footprint cycle have passed under
+laboratory guards; no general USB updater exists. Treat anything here that
+writes over USB as experimental and capable of destroying your bootloader.
 
 Host-side address validation **cannot** protect against device-side
 misaddressing. An earlier host tool correctly refused intended targets outside
@@ -217,11 +222,11 @@ state. It is a restricted validation experiment, not a flashing tool. See
 
 The separate `kb7-isp-erase-granularity.py` does not broaden that primitive
 into a flasher. Its address, patterns, geometry and commands are fixed solely to
-make an under- or over-erase observable at one guarded target. Do not physically
-power-cycle the keyboard while its markers remain. A hardware pass would prove
-an observable exact 4-KiB footprint only for the tested V1.22 loader, unit and
-target; it would not prove `F6 19`, arbitrary update planning or power-loss
-recovery.
+make an under- or over-erase observable at one guarded target. Its completed
+hardware pass proved that observable exact 4-KiB footprint for the tested V1.22
+loader, unit and target. It did not prove `F6 19`, arbitrary update planning or
+power-loss recovery, and the fixed script remains destructive and unsuitable
+as an updater.
 
 The successful cycle does not make another mutation intrinsically safe:
 transport failure, power loss, an untested offset/version or a future tooling
@@ -265,7 +270,7 @@ default after writing; add `-N` to verify only the written region.
 | `kb7-isp-verify.py` | Read flash **through the SoC's own controller** and verify region CRCs | **read-only** — mutating opcodes are unrepresentable |
 | `kb7-isp-repeat.py` | Re-read one region N times across chunk sizes to measure read repeatability | read-only |
 | `kb7-isp-write2.py` | Two-stage marker-program/sector-erase validation experiment | **destructive; dry-run by default; not a firmware flasher** |
-| `kb7-isp-erase-granularity.py` | Fixed four-stage guarded test of the observable `F6 15` erase footprint | **destructive; dry-run by default; not yet hardware-validated** |
+| `kb7-isp-erase-granularity.py` | Fixed four-stage guarded test of the observable `F6 15` erase footprint | **destructive; dry-run by default; passed once at the fixed target** |
 | `WRITE-TEST-PLAN.md` | Exact experimental sequence, remaining failure modes and SPI recovery procedure | documentation only |
 | `ERASE-GRANULARITY-TEST-PLAN.md` | Fixed target, exact four-stage sequence, proof limits and SPI recovery procedure | documentation only |
 | `F6-ERASE-ENCODING.md` | Calibrated static proof of the erase address units and CDB layouts | documentation only |
@@ -297,6 +302,11 @@ closed. Each stage opens a fresh USB session without requiring a physical power
 cycle, requires an exact full-chip preimage, persists a started state before
 mutation, and accepts only its exact full-chip postimage. Read the dedicated
 plan before even running its offline dry mode.
+
+The four-stage run has now passed once at this exact target. All target and
+guard postimages matched, the complete baseline was restored, and the keyboard
+subsequently cold-booted normally. Do not repeat it merely to reconfirm that
+same bounded fact.
 
 ---
 

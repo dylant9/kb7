@@ -1,8 +1,9 @@
 # `F6 15` / `F6 19` erase-command encoding
 
 Status: **resolved by static data-flow analysis on 2026-08-22; the normal-NOR
-`F6 15` target interpretation was confirmed in one bounded hardware cycle on
-2026-08-23.** `F6 19` remains static-only.
+`F6 15` target interpretation and an exact observable 4-KiB footprint at one
+guarded target were confirmed on hardware on 2026-08-23.** `F6 19` remains
+static-only.
 
 ## Result
 
@@ -202,6 +203,30 @@ observationally identical. See the
 [dated result](../../docs/USB-ISP-WRITE-VALIDATION-2026-08-23.md) for the hashes,
 transport checks and full evidence boundary.
 
+## Guarded footprint validation at `0x000c6000`
+
+A second fixed experiment populated all eight 512-byte blocks of sector
+`[0x000c6000,0x000c7000)` with non-`0xff` patterns and placed non-`0xff`
+512-byte guards immediately below and above it. After an exact full-chip
+preflight, it selected `F6 18` and sent:
+
+```text
+F6 15 00 06 30 00 00 00 00 00 00 00 00 00 00 00
+```
+
+All 4,096 target bytes read back as erased, both adjacent guards survived
+exactly, and the complete 32-MiB image matched its predicted postimage. Separate
+cleanup stages restored the original baseline exactly, a final new-session USB
+capture matched it, and the owner then confirmed normal operation after a cold
+boot.
+
+This establishes an observable exact 4-KiB programmed-data erase footprint at
+that target on the tested unit, preserved V1.22 loader and normal-NOR path. It
+does not generalize the result to every address, device, loader or flash
+revision, and it does not test `F6 19`, above-16-MiB mutation or interruption
+behavior. See the
+[dated footprint result](../../docs/USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md).
+
 ## Proven facts versus remaining inference
 
 Proven from the updater's register and stack data flow:
@@ -227,7 +252,6 @@ Inferred from the known MX25L25645G target and the zero-selector NOR default:
 
 Still not proven on hardware:
 
-- exact erase granularity inside the initially erased scratch gap;
 - arbitrary targets, other command sizes, repeated/interrupted operation or
   another loader/flash revision; and
 - the exact device-side purpose and behavior of the alternate

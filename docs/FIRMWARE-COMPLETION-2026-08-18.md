@@ -33,9 +33,11 @@ SPI rollback path, but does not validate any replacement-firmware hardware path.
 
 The preserved V1.22 loader has also completed one guarded USB-ISP marker program
 and erase cycle at offset `0x0008e000`, with exact complete-array postflight
-comparisons and final restoration to the baseline. This validates only that
-narrow stock-loader primitive; it is not an installation route for these
-replacement images.
+comparisons and final restoration to the baseline. A second fixed cycle at
+`0x000c6000` populated an entire sector plus immediate guards and observed an
+exact 4-KiB programmed-data footprint at that target; cleanup restored the full
+baseline and the keyboard then cold-booted normally. These remain bounded stock-
+loader results, not an installation route for these replacement images.
 
 ## Completed software-owned work
 
@@ -204,10 +206,10 @@ These are not honest candidates for further offline coding:
    enabling its board-profile gate.
 9. Maintain the successful external-SPI reset/programmer recovery runbook before
    any combined image is written. Autonomous software loader entry remains
-   intentionally unavailable. The narrow two-stage USB write-path experiment
-   passed once against a stock-loader scratch sector, but is not a supported
-   flasher and does not install these replacement images; external SPI remains
-   the required recovery route.
+   intentionally unavailable. The narrow marker and guarded erase-footprint
+   experiments passed at their fixed stock-loader scratch targets, but are not
+   a supported flasher and do not install these replacement images; external
+   SPI remains the required recovery route.
 
 ## Build and test profiles
 

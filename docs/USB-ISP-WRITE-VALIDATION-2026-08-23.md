@@ -144,6 +144,16 @@ remained enabled.
 
 ## Operational consequence
 
+### Subsequent validation
+
+The granularity limitation above applies to this original `0x0008e000` marker
+cycle. A later, separately scoped experiment populated an entire sector and
+immediate guards at `0x000c6000`, observed an exact 4-KiB programmed-data erase
+footprint, restored the full baseline, and was followed by a working cold boot.
+See
+[`USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md`](USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md).
+It does not broaden the original result into a general updater qualification.
+
 The corrected CDB model is no longer static-only for the tested path. Repeating
 this destructive marker cycle merely to reconfirm it is unnecessary. Further
 USB write work should build on the confirmed `F6 18`/`F6 06`/`F6 15` semantics

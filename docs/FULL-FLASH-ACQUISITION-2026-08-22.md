@@ -17,6 +17,10 @@ On 2026-08-23 a separate bounded USB-ISP experiment also programmed and erased
 one 512-byte marker in the manifest gap and returned the complete main array
 exactly to its preflight baseline. See
 [`USB-ISP-WRITE-VALIDATION-2026-08-23.md`](USB-ISP-WRITE-VALIDATION-2026-08-23.md).
+A later guarded cycle populated an entire 4-KiB sector and immediate guards,
+observed exactly that sector erased with both guards preserved, restored the
+same full-chip baseline, and was followed by a working cold boot. See
+[`USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md`](USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md).
 
 The dump materially changed the clean-room firmware in two ways:
 
@@ -172,8 +176,10 @@ Raw filenames and artifacts are operator inputs and stay outside the repository.
 4. Prove `MCU_RST` continuity/waveform and check that the SoC never drives the
    SPI bus while held.
 5. The bounded USB-ISP marker program/erase/readback cycle has passed once at
-   `0x0008e000`; retain its single-unit/single-target evidence boundary rather
-   than treating it as a general updater qualification.
+   `0x0008e000`, and the later guarded `0x000c6000` cycle established an exact
+   observable 4-KiB footprint at that target. Retain their one-unit/loader/
+   target evidence boundaries rather than treating them as a general updater
+   qualification.
 6. Preserve the successful ESP32-C3 full-stock restore/readback procedure as an
    owner-controlled runbook and repeat it whenever programmer, wiring, reset
    isolation or baseline assumptions change.

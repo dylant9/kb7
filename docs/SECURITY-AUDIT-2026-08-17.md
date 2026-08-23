@@ -33,7 +33,9 @@ not change the non-flashable verdict. A later external-SPI full-stock
 restore/verification rehearsal established the development unit's rollback
 path, but the required replacement-firmware hardware profiles remain
 unavailable; see `FULL-FLASH-ACQUISITION-2026-08-22.md` and
-`USB-ISP-WRITE-VALIDATION-2026-08-23.md`.
+`USB-ISP-WRITE-VALIDATION-2026-08-23.md`. A subsequent guarded footprint run is
+recorded separately in `USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md`;
+it validates one stock-loader erase boundary, not replacement firmware.
 
 The full SNC7320 datasheet review on 2026-08-18 added a critical correction:
 AIRCR/software reset restarts PRAM, not mask ROM. The former mailbox-marker plus

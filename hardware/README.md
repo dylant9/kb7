@@ -30,9 +30,15 @@ output, PCB captures, or copied vendor tables.
 - The V1.22 preserved loader completed one guarded `F6 18` + `F6 06`/`F6 15`
   marker cycle at `0x0008e000`; complete postflight reads found no unintended
   byte difference and the final image exactly matched the baseline.
+- A second guarded cycle populated all 4,096 bytes of sector `0x000c6000` and
+  immediate 512-byte guards on both sides. The normal-NOR `F6 15` operation had
+  an exact observable 4-KiB programmed-data footprint at that target, cleanup
+  restored the complete baseline, and the owner then confirmed a normal cold
+  boot and working keyboard. This remains a one-unit/loader/target result;
+  `F6 19`, other targets and interruption behavior are untested.
 
-This demonstrates the development unit's external-SPI rollback path and one
-narrow preserved-loader write primitive. It does not prove the safety of
+This demonstrates the development unit's external-SPI rollback path and two
+bounded preserved-loader experiments. It does not prove the safety of
 installing the replacement firmware or provide a general USB flasher. Raw
 backups, programmer logs and repair images are intentionally not published or
 included in this public repository.
