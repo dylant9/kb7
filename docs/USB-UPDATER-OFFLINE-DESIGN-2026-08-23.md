@@ -15,6 +15,13 @@ full-image-bound plan and a model report. It is not a flasher, its bundles are
 unsigned, and every result records `execution_authorized=false` and
 `flash_approved=false`.
 
+An optional
+[detached authentication tool](OFFLINE-UPDATER-AUTHENTICATION-2026-08-23.md)
+now revalidates the complete bundle before producing or checking an Ed25519
+envelope. It requires a separately pinned public-key SPKI fingerprint and
+repeats the false authorization flags. No project release key or trust root is
+provisioned, and authentication never makes a bundle executable.
+
 A separate [read-only executor scaffold](USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md)
 now performs live two-read preflight and reconciliation, durable journal
 binding, and offline fault injection. Its public CLI cannot mutate flash and
@@ -85,11 +92,12 @@ Only the aligned sector envelopes `0x11000..0x21000` and
 
 CRC balancing is compatibility with the recovered loader, not authenticity.
 CRC-32 is not a signature. The bundle content ID detects accidental or
-unreviewed changes but does not identify a publisher; a future distributable
-updater needs a detached signature verified by a separately pinned project
-public key. The independent `simulate` command binds and reconstructs the
-sector payloads, but it does not receive the original ELF inputs and therefore
-does not independently attest their source provenance.
+unreviewed changes but does not identify a publisher. The detached Ed25519
+mechanism can identify a publisher only after a project key and independently
+distributed fingerprint are provisioned; neither exists yet. The independent
+`simulate` command binds and reconstructs the sector payloads, but it does not
+receive the original ELF inputs and therefore does not independently attest
+their source provenance.
 
 ## Paired-build guard
 
@@ -222,8 +230,10 @@ image or an early-valid mixed state.
 
 ## Remaining steps before any firmware-region hardware trial
 
-1. Independently review the planner, pair guard and model after every change;
-   freeze and sign a specific source/bundle format.
+1. Independently review the planner, pair guard and model after every change.
+   The detached Ed25519 mechanism is implemented, but a release key, trusted
+   fingerprint distribution, rotation/revocation policy, and signed release
+   procedure still need approval.
 2. The paired-firmware executor's strict read-only preflight, durable intent journal
    (`fsync` file, atomic rename and directory `fsync`), two-read
    reconciliation, live loader/topology/session binding and fake-transport

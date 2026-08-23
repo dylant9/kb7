@@ -78,6 +78,14 @@ v1 result is in `USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md`, and the
 v2 result is in
 `USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md`.
 
+A later offline-only Ed25519 tool closes the mechanical publisher-
+authentication gap without changing the execution boundary: it re-runs the
+complete planner verifier, binds every bundle file and false authorization
+flag, and requires a separately pinned public-key fingerprint. No project key
+or trust root is provisioned, so no signed release exists. The remaining board
+gates now have a staged powered-off/passive-first plan in
+`BOARD-VALIDATION-PLAN-2026-08-23.md`; it authorizes no firmware write.
+
 The full SNC7320 datasheet review on 2026-08-18 added a critical correction:
 AIRCR/software reset restarts PRAM, not mask ROM. The former mailbox-marker plus
 software-reset helper therefore did not prove entry to the preserved loader.

@@ -106,6 +106,12 @@ Any future image-producing release pipeline must, before it is enabled:
 4. confine all outputs to the requested output directory; and
 5. pass independent hardware recovery, USB, display, RGB, Hall-map, and NOR tests.
 
+The detached Ed25519 authentication mechanism now covers the exact verified
+offline bundle and an explicitly pinned publisher key. It is not an
+image-producing or installation pipeline, no project trust root is provisioned,
+and it keeps `flash_approved=false`. The remaining physical gates and their
+no-write-first order are recorded in `BOARD-VALIDATION-PLAN-2026-08-23.md`.
+
 ## Current verdict
 
 The audited source defects and the offline-implementable functions are
@@ -119,7 +125,7 @@ required rollback route, but no replacement firmware has run on hardware.
 
 The latest offline verification pass completed successfully on 2026-08-23:
 
-- `make check`: 201 Python tests passed, browser JavaScript syntax
+- `make check`: 209 Python tests passed, browser JavaScript syntax
   and executable validator checks passed, and the default, guarded-audit, and
   all-branches integration firmware profiles built and passed ELF verification;
 - the largest all-branches profile used 8,320 bytes of core0 text, 12 bytes of
@@ -127,7 +133,7 @@ The latest offline verification pass completed successfully on 2026-08-23:
   4 bytes of data and 19,312 bytes of BSS;
 - neither ELF contains unresolved relocations, and core0's vector table is
   exactly `0x13c` bytes;
-- the public-tree policy check accepted 188 UTF-8 source/documentation files and
+- the public-tree policy check accepted 192 UTF-8 source/documentation files and
   found no firmware blobs, generated binaries, or disallowed material; and
 - independent warning passes using GCC `-fanalyzer` and strict conversion,
   shadowing, and undefined-macro diagnostics completed without findings.

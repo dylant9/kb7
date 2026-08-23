@@ -58,6 +58,10 @@ that the contributor does not possess.
   summarized results from those runs. No vendor DLL, disassembly listing, general USB
   firmware flasher, raw transcript, capture, journal or stock byte payload is
   included.
+- Independently authored offline Ed25519 bundle-authentication source and
+  tests. It signs only after complete planner revalidation and cannot authorize
+  a write. No private key, public release key, trust fingerprint, generated
+  signature envelope, bundle, baseline, or payload is included.
 - Apache-2.0 license and project/trademark notice.
 
 No external scripts, fonts, images, packages, or vendored libraries are bundled.
@@ -101,6 +105,9 @@ No external scripts, fonts, images, packages, or vendored libraries are bundled.
 - Generated manifests, full-image-bound plans, sector images, paired-executor
   or scratch-executor journals, scratch-restart state, prefixes and any package
   containing stock bytes.
+- Updater authentication envelopes and private signing keys. A reviewed public
+  key/fingerprint may be considered only after the release trust policy is
+  separately approved.
   Independently authored
   planner/checker/executor source is included; its generated state stays
   owner-local.

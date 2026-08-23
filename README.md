@@ -19,7 +19,7 @@ image generation is disabled.
 ## Current status — 2026-08-23
 
 - The offline/software implementation is complete to the evidence currently
-  available. `make check` passes 201 Python tests, browser
+  available. `make check` passes 209 Python tests, browser
   validation, three ARM build profiles, hardware-fact checks and the public-tree
   safety audit.
 - Two independent reads of the installed 32-MiB Macronix SPI NOR are
@@ -116,9 +116,18 @@ image generation is disabled.
   [v3 validation record](docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-VALIDATION-2026-08-23.md),
   historical [v2 mandatory-checkpoint test plan](docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md),
   and [v2 validation record](docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md).
+- A detached Ed25519 authentication tool now revalidates the complete offline
+  bundle before signing or verifying it and requires an explicitly pinned
+  public-key fingerprint. This supplies a publisher-authentication mechanism,
+  but no project release key or trust root is provisioned and a valid signature
+  never changes `execution_authorized=false` or `flash_approved=false`. See the
+  [offline authentication design](docs/OFFLINE-UPDATER-AUTHENTICATION-2026-08-23.md).
 - No custom firmware has been installed. USB, display, touch, RGB, MCU2/Hall,
   pinmux, cold-start memory setup and a legitimate USB identity still require
-  board validation. `flash_approved` remains false.
+  board validation. The new
+  [board-validation plan](docs/BOARD-VALIDATION-PLAN-2026-08-23.md) starts with
+  powered-off continuity and stock-powered passive capture, not a firmware
+  write. `flash_approved` remains false.
 
 See the [firmware completion status](docs/FIRMWARE-COMPLETION-2026-08-18.md),
 [full-flash acquisition record](docs/FULL-FLASH-ACQUISITION-2026-08-22.md), and

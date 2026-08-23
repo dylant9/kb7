@@ -7,9 +7,14 @@ build/
 *.d
 *.map
 *.dis
-# Owner-local updater-plan metadata (payloads are already covered by *.bin)
+# Owner-local updater plans, authentication material, and state
+# (payloads are already covered by *.bin)
 bundle.json
 simulation.json
+*updater-authentication*.json
+*updater-auth*.json
+*.pem
+*.key
 *updater-journal*.json
 *updater-scratch-journal*
 *scratch-restart-state*.json

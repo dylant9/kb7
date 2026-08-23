@@ -158,6 +158,11 @@ until the logical 14–17 function-4 pinmux is known.
   It emits no full image, contains no device I/O and remains unsigned,
   execution-unapproved and `flash_approved=false`; see
   `USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md`.
+- A separate offline Ed25519 tool revalidates that complete bundle before
+  creating or checking a detached authentication envelope. It requires a
+  separately pinned public-key fingerprint and cannot authorize execution.
+  The mechanism is tested, but a project release key and trust policy are not
+  provisioned; see `OFFLINE-UPDATER-AUTHENTICATION-2026-08-23.md`.
 
 ## Datasheet correctness cross-check
 
@@ -185,6 +190,10 @@ The implementation now reflects these material SNC7320 facts:
 ## Remaining hardware-only gates
 
 These are not honest candidates for further offline coding:
+
+The stop-gated measurement order and exact macro/evidence mapping are now in
+`BOARD-VALIDATION-PLAN-2026-08-23.md`. Its first session performs no custom
+execution and no firmware-region write.
 
 1. Confirm the complete SoC marking/package and `MCU_RST`→RSTN lead-88
    continuity. Preserve the demonstrated external-SPI full-stock

@@ -88,6 +88,42 @@ class PublicTreeTests(unittest.TestCase):
                 3,
             )
 
+    def test_updater_authentication_and_private_keys_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "kb7-updater-authentication-v1.json").write_text(
+                "{}\n", encoding="utf-8")
+            (root / "release-updater-auth-20260823.json").write_text(
+                "{}\n", encoding="utf-8")
+            (root / "renamed.json").write_text(
+                '{"format":"KB7 offline updater detached authentication v1"}\n',
+                encoding="utf-8")
+            (root / "innocent.txt").write_text(
+                "-----BEGIN " + "PRIVATE KEY-----\nnot-a-real-key\n",
+                encoding="utf-8")
+            (root / "also-innocent.txt").write_text(
+                "-----BEGIN " + "ENCRYPTED PRIVATE KEY-----\nnot-a-real-key\n",
+                encoding="utf-8")
+            (root / "public-material.txt").write_text(
+                "-----BEGIN " + "PUBLIC KEY-----\nnot-a-real-key\n",
+                encoding="utf-8")
+
+            result = MODULE.inspect(root)
+
+            self.assertFalse(result["passed"])
+            self.assertEqual(
+                sum("prohibited artifact filename" in failure
+                    for failure in result["failures"]),
+                2,
+            )
+            self.assertEqual(
+                sum("owner-local updater authentication" in failure
+                    for failure in result["failures"]),
+                1,
+            )
+            self.assertEqual(sum("KEY" in failure
+                                 for failure in result["failures"]), 3)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -288,6 +288,7 @@ default after writing; add `-N` to verify only the written region.
 | `kb7-isp-erase-granularity.py` | Fixed four-stage guarded test of the observable `F6 15` erase footprint | **destructive; dry-run by default; passed once at the fixed target** |
 | `kb7-isp-scratch-restart.py` | Fixed two-sector experiment with two deliberate no-readback/reconciliation checkpoints | **destructive; dry-run by default; passed once at the fixed plan** |
 | `kb7-updater-plan.py` | V1.22-only paired-region planner and interruption-model checker | **offline only; no device I/O; not an executor** |
+| `kb7-updater-sign.py` | Detached Ed25519 signing, verification, and public-key fingerprinting after complete planner revalidation | **offline authenticity only; never installation authorization** |
 | `kb7-updater-executor.py` | Two-read live preflight, durable journal binding and image-derived reconciliation | **read-only CLI; mutation hard-disabled; not an installer** |
 | `kb7-updater-scratch-executor.py` | One-operation-per-process replay of the fixed 22-command V1.22 scratch plan, mandatory boundary-9 host termination, and local-only state inspection | **destructive; dry-run by default; current v3 passed once at the fixed plan** |
 | `../../docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md` | Exact v3 durable-command-complete/pre-WIP self-termination sequence and stop rules | documentation only |
@@ -483,6 +484,22 @@ option. It does not prove physical torn-erase behavior, custom-firmware recovery
 or board correctness. See the
 [offline updater design](../../docs/USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md)
 for the exact state machine and evidence boundary.
+
+### Detached offline authentication
+
+`kb7-updater-sign.py` adds optional detached Ed25519 authentication without
+changing the bundle or enabling execution. Both `sign` and `verify` first run
+the planner's complete bundle verification against two matching owner-local
+32-MiB baselines. The signed statement binds every bundle file, the bundle ID,
+baseline, exact target, pair ID, signing-key SPKI fingerprint, and false
+authorization flags.
+
+Verification requires `--trusted-key-sha256`; the public key alone is not a
+trust root. The project has not provisioned a release key or independently
+distributed fingerprint yet, so this is a tested mechanism rather than a
+signed project release. Generated envelopes and all keys stay outside the
+bundle and public tree. See the
+[authentication design](../../docs/OFFLINE-UPDATER-AUTHENTICATION-2026-08-23.md).
 
 ### Read-only updater executor scaffold
 

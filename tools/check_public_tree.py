@@ -32,6 +32,7 @@ DENIED_NAMES = {
     "kb7-isp-write.py",
     "bundle.json",
     "simulation.json",
+    "kb7-updater-authentication-v1.json",
     ".kb7-usb-updater-journal-v1.json",
     "updater-journal.json",
     ".kb7-usb-updater-scratch-journal-v1.json",
@@ -42,6 +43,8 @@ DENIED_NAMES = {
     "scratch-restart-state.json",
 }
 DENIED_NAME_PATTERNS = {
+    "*updater-authentication*.json",
+    "*updater-auth*.json",
     "*updater-scratch-journal*",
 }
 DENIED_JSON_SCHEMAS = {
@@ -50,6 +53,9 @@ DENIED_JSON_SCHEMAS = {
     "kb7-usb-updater-scratch-journal-v1",
     "kb7-usb-updater-scratch-journal-v2",
     "kb7-usb-updater-scratch-journal-v3",
+}
+DENIED_JSON_FORMATS = {
+    "KB7 offline updater detached authentication v1",
 }
 DENIED_TEXT = (
     "Ghidra " + "decompiler output",
@@ -63,6 +69,9 @@ DENIED_TEXT = (
     "private " + "RE " + "archive",
     "$HOME/" + "dev/kb7",
     str(Path("/") / "root" / ".codex" / "attachments"),
+    "-----BEGIN " + "PRIVATE KEY-----",
+    "-----BEGIN " + "ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN " + "PUBLIC KEY-----",
 )
 MAGICS = {
     b"\x7fELF": "ELF",
@@ -116,6 +125,9 @@ def inspect(root: Path) -> dict[str, object]:
             if (isinstance(structured, dict) and
                     structured.get("schema") in DENIED_JSON_SCHEMAS):
                 failures.append(f"owner-local updater journal: {relative}")
+            if (isinstance(structured, dict) and
+                    structured.get("format") in DENIED_JSON_FORMATS):
+                failures.append(f"owner-local updater authentication: {relative}")
         for marker in DENIED_TEXT:
             if marker in text:
                 failures.append(f"prohibited content marker {marker!r}: {relative}")

@@ -280,13 +280,17 @@ are separately completed and reviewed:
    future paired-firmware executor
    must remain independently locked until its own review and must likewise
    expose no raw mutation interface.
-4. Add release authenticity: the present owner-local bundle is content-hashed
-   but unsigned.
+4. Provision release authenticity policy: detached Ed25519 bundle
+   authentication is implemented and re-runs the complete planner verifier,
+   but no project release key, independently distributed trust fingerprint,
+   rotation/revocation procedure, or signed release exists yet. Authentication
+   does not authorize installation.
 5. Prove a reliable path back to USB ISP after a checksum-valid but
    nonfunctional custom core0, or require independently tested external SPI for
    every trial.
 6. Pass the replacement firmware's cold-start, USB, memory, pinmux and
-   peripheral hardware gates.
+   peripheral hardware gates. The staged, no-write-first sequence is in
+   `BOARD-VALIDATION-PLAN-2026-08-23.md`.
 
 Until then, the paired-firmware executor's `preflight` and `reconcile` remain
 diagnostics only. The scratch harness does not change that status. Any actual
