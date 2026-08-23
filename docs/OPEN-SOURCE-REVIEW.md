@@ -58,7 +58,9 @@ No external scripts, fonts, images, packages, or vendored libraries are bundled.
   V1.22-only paired planner accepts two owner-supplied full captures and emits
   only clean replacement sector images plus offline metadata. It preserves the
   manifest, contains no device I/O, never emits a full stock image and remains
-  execution-unapproved.
+  execution-unapproved. A separate source-only executor scaffold exposes only
+  read-only preflight/reconciliation; its live mutation adapter is hard-disabled
+  and no execute command exists.
 
 ## Excluded and retained only outside the public repository
 
@@ -71,9 +73,10 @@ No external scripts, fonts, images, packages, or vendored libraries are bundled.
 - USB/SPI/I2C captures, screenshots or assets extracted from vendor software,
   raw pin-map evidence, ROM traces, and decompiler-level reports.
 - The stock-core patch experiments and their exact vendor function addresses.
-- Generated manifests, full-image-bound plans, sector images, prefixes and any
-  package containing stock bytes. Independently authored planner/checker source
-  is included; its generated output stays owner-local.
+- Generated manifests, full-image-bound plans, sector images, executor journals,
+  prefixes and any package containing stock bytes. Independently authored
+  planner/checker/executor source is included; its generated state stays
+  owner-local.
 
 ## Engineering checks
 

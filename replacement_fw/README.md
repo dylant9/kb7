@@ -64,7 +64,8 @@ validation remain unresolved. External SPI is the demonstrated stock rollback
 route. The repository has no supported USB flashing utility. Separate read-only
 USB diagnostics, two fixed guarded destructive experiments that passed at
 stock-loader scratch targets (including an observable exact 4-KiB footprint at
-one target), and the proven external-SPI recovery notes live in
+one target), a read-only updater preflight/reconciliation scaffold, and the
+proven external-SPI recovery notes live in
 [`../tools/flash-access/`](../tools/flash-access/README.md); none is an
 installation route for these ELFs. Do not install them.
 

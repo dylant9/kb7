@@ -15,6 +15,11 @@ full-image-bound plan and a model report. It is not a flasher, its bundles are
 unsigned, and every result records `execution_authorized=false` and
 `flash_approved=false`.
 
+A separate [read-only executor scaffold](USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md)
+now performs live two-read preflight and reconciliation, durable journal
+binding, and offline fault injection. Its public CLI cannot mutate flash and
+its mutation adapter is hard-disabled. It is not a supported updater.
+
 The planner was exercised offline against two matching V1.22 full-chip inputs
 and the current locally built ELFs. An independent `simulate` pass reproduced
 the same 161-operation plan, preserved every immutable byte, found no early
@@ -130,14 +135,15 @@ Only exact stock (before the first effective poison) and the exact paired
 target (after the last gate) may satisfy the recovered loader checksum model.
 All known intermediate command-boundary states select ISP.
 
-This is presently a boundary/invariant analysis, not a restart-capable executor
-or an exhaustive emulation of physical torn commands. It deliberately does
-**not** claim power-loss atomicity. It cannot prove behavior for an interrupted
-NOR erase pulse, program disturb, misaddressed device-side handler, unstable
-cell, loader defect or electrical failure. Any mid-command hardware result
-would require two stable full reads and exact image-derived classification; no
-journal may authorize a blind retry. An unclassified result requires external
-SPI recovery.
+The planner report is a boundary/invariant analysis, not an exhaustive
+emulation of physical torn commands. The separate executor scaffold now
+implements restart classification and a durable-intent model with fake
+transports, but live mutation is unavailable. Neither component claims
+power-loss atomicity. They cannot prove behavior for an interrupted NOR erase
+pulse, program disturb, misaddressed device-side handler, unstable cell, loader
+defect or electrical failure. Any mid-command hardware result requires two
+stable full reads and exact image-derived classification; no journal may
+authorize a blind retry. An unclassified result requires external SPI recovery.
 
 ## Offline use
 
@@ -171,13 +177,15 @@ image or an early-valid mixed state.
 
 1. Independently review the planner, pair guard and model after every change;
    freeze and sign a specific source/bundle format.
-2. Implement a separate executor with strict BOT transport, durable intent
-   journal (`fsync` file, atomic rename and directory `fsync`), two-read
-   reconciliation, live loader/topology/session binding and no raw address/CDB
-   interface. The offline baseline hash alone is not a unique physical-device
-   identity; two byte-identical units are indistinguishable to this planner.
-3. Fault-inject that executor at every state transition and add a scratch-only
-   multi-sector/reconciliation hardware experiment.
+2. The separate executor's strict read-only preflight, durable intent journal
+   (`fsync` file, atomic rename and directory `fsync`), two-read
+   reconciliation, live loader/topology/session binding and fake-transport
+   fault injection are implemented. Its live mutation adapter remains
+   hard-disabled and there is no execute command. The offline baseline hash and
+   USB topology are not a unique physical-device identity; two byte-identical
+   units remain indistinguishable.
+3. Design and pass a fixed scratch-only multi-sector/reconciliation hardware
+   experiment before reviewing any source change that could enable execution.
 4. Prove entry back to `5037` after a checksum-valid but nonfunctional custom
    core0, or continue to require an attached and independently tested SPI
    recovery path.

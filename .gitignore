@@ -10,6 +10,7 @@ build/
 # Owner-local updater-plan metadata (payloads are already covered by *.bin)
 bundle.json
 simulation.json
+*updater-journal*.json
 
 # Firmware/reference material must never enter the public repository
 firmware/

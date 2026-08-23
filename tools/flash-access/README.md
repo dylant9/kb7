@@ -202,9 +202,11 @@ the transfer **size**; in the erase path it is applied to the aligned
 
 **If you have found this repository and want to flash a KB7: use the SPI path.**
 The narrow marker cycle and fixed erase-footprint cycle have passed under
-laboratory guards; no USB updater executor exists. The offline planner described
-below cannot touch a device. Treat anything here that writes over USB as
-experimental and capable of destroying your bootloader.
+laboratory guards; no live USB mutation updater exists. The offline planner
+described below cannot touch a device, and the separate executor scaffold can
+only preflight and reconcile through read-only full-chip captures. Treat
+anything here that writes over USB as experimental and capable of destroying
+your bootloader.
 
 Host-side address validation **cannot** protect against device-side
 misaddressing. An earlier host tool correctly refused intended targets outside
@@ -273,6 +275,7 @@ default after writing; add `-N` to verify only the written region.
 | `kb7-isp-write2.py` | Two-stage marker-program/sector-erase validation experiment | **destructive; dry-run by default; not a firmware flasher** |
 | `kb7-isp-erase-granularity.py` | Fixed four-stage guarded test of the observable `F6 15` erase footprint | **destructive; dry-run by default; passed once at the fixed target** |
 | `kb7-updater-plan.py` | V1.22-only paired-region planner and interruption-model checker | **offline only; no device I/O; not an executor** |
+| `kb7-updater-executor.py` | Two-read live preflight, durable journal binding and image-derived reconciliation | **read-only CLI; mutation hard-disabled; not an installer** |
 | `WRITE-TEST-PLAN.md` | Exact experimental sequence, remaining failure modes and SPI recovery procedure | documentation only |
 | `ERASE-GRANULARITY-TEST-PLAN.md` | Fixed target, exact four-stage sequence, proof limits and SPI recovery procedure | documentation only |
 | `F6-ERASE-ENCODING.md` | Calibrated static proof of the erase address units and CDB layouts | documentation only |
@@ -327,13 +330,32 @@ have rank 32. The saved plan and report are content-hashed and independently
 recomputed by the `simulate` command.
 
 This remains an unsigned, full-image-bound planning artifact. It does not know
-a unique physical-device identity; a future executor must additionally bind the
-live loader, USB topology and session. The tool imports no
+a unique physical-device identity. The separate read-only executor scaffold
+adds live loader, USB topology and session binding, but byte-identical units at
+the same topology are still indistinguishable. The planner imports no
 USB library and exposes no execute, commit, force, arbitrary-offset or raw-CDB
 option. It does not prove physical torn-erase behavior, custom-firmware recovery
 or board correctness. See the
 [offline updater design](../../docs/USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md)
 for the exact state machine and evidence boundary.
+
+### Read-only updater executor scaffold
+
+`kb7-updater-executor.py` reloads and independently verifies the complete
+owner-local plan before opening USB. `preflight` requires two identical 32-MiB
+live reads that exactly equal the planned V1.22 baseline, then binds a durable
+journal to the live loader, topology, flash anchors, bundle and tool-source
+hashes. `reconcile` again requires two identical full reads and classifies only
+exact modeled boundaries or a transition confined to the journal's active
+operation unit. It never treats the journal as flash-state authority and never
+authorizes an automatic retry.
+
+The internal one-operation state engine is fault-injected with fake transports
+at intent, mode, transport, polling, readback and journal boundaries. The public
+CLI offers only `preflight` and `reconcile`; the live mutation adapter is
+hard-disabled. This is diagnostic/restart architecture, not a firmware flasher.
+See the
+[executor scaffold record](../../docs/USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md).
 
 ---
 

@@ -39,10 +39,16 @@ class PublicTreeTests(unittest.TestCase):
             root = Path(temporary)
             (root / "bundle.json").write_text("{}\n")
             (root / "simulation.json").write_text("{}\n")
+            (root / ".kb7-usb-updater-journal-v1.json").write_text("{}\n")
+            (root / "updater-journal.json").write_text("{}\n")
+            (root / "innocent-name.json").write_text(
+                '{"schema":"kb7-usb-updater-journal-v1"}\n')
             result = MODULE.inspect(root)
             self.assertFalse(result["passed"])
             self.assertEqual(sum("prohibited artifact filename" in failure
-                                 for failure in result["failures"]), 2)
+                                 for failure in result["failures"]), 4)
+            self.assertTrue(any("owner-local updater journal" in failure
+                                for failure in result["failures"]))
 
 
 if __name__ == "__main__":

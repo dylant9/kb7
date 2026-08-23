@@ -19,7 +19,7 @@ image generation is disabled.
 ## Current status — 2026-08-23
 
 - The offline/software implementation is complete to the evidence currently
-  available. `make check` passes 131 Python/C integration tests, browser
+  available. `make check` passes 140 Python/C integration tests, browser
   validation, three ARM build profiles, hardware-fact checks and the public-tree
   safety audit.
 - Two independent reads of the installed 32-MiB Macronix SPI NOR are
@@ -49,10 +49,14 @@ image generation is disabled.
   manifest-preserving paired-region plan. It CRC-balances both replacement
   regions against the unchanged stock manifest, inserts a symmetric build-pair
   guard, invalidates both regions before dense staging, and commits core0 last.
-  The CLI has only offline `build` and `simulate` operations: it contains no USB
-  executor, reports `flash_approved=false`, and does not make a custom-firmware
-  hardware trial safe. See the
-  [offline updater design](docs/USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md).
+  Its CLI has only offline `build` and `simulate` operations and reports
+  `flash_approved=false`. A separate executor scaffold now provides only
+  read-only live `preflight` and `reconcile`: it binds two exact full-chip reads,
+  loader identity, USB topology and a durable journal, while its mutation path
+  remains hard-disabled and unreachable from the CLI. Neither tool makes a
+  custom-firmware hardware trial safe. See the
+  [offline updater design](docs/USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md) and
+  [executor scaffold status](docs/USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md).
 - No custom firmware has been installed. USB, display, touch, RGB, MCU2/Hall,
   pinmux, cold-start memory setup and a legitimate USB identity still require
   board validation. `flash_approved` remains false.
@@ -85,8 +89,8 @@ records the completed fixed hardware experiment and its recovery boundary.
   32-MiB dump; raw images and reports remain outside the repository.
 - `tools/flash-access/` — ESP32/`flashrom` recovery notes, read-only USB-ISP
   verification tools, F6 command analysis and fixed guarded USB write-path
-  experiments, plus a non-executing V1.22 updater planner/checker. It contains
-  no stock bytes and no supported USB flasher.
+  experiments, plus a V1.22 updater planner/checker and read-only executor
+  scaffold. It contains no stock bytes and no supported USB flasher.
 - `tools/check_public_tree.py` — rejects compiled/vendor artifacts, archive and
   executable formats, symlinks, build directories, and prohibited artifact
   filenames.
