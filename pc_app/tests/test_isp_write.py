@@ -68,16 +68,19 @@ def make_valid_image():
 
 
 def accepted_identity(path="7-2.3"):
-    identify = isp.LOADER_IDENT_PREFIX + bytes(8 - len(isp.LOADER_IDENT_PREFIX))
-    descriptor = bytearray(36)
-    descriptor[4:4 + len(isp.LOADER_DESCRIPTOR_MARKER)] = (
-        isp.LOADER_DESCRIPTOR_MARKER)
+    identify = isp.LOADER_IDENT
+    descriptor = bytearray(isp.LOADER_DESCRIPTOR_LENGTH)
+    descriptor[:16] = isp._verify.LOADER_DESCRIPTOR_VERSION
+    descriptor[16:28] = isp._verify.LOADER_DESCRIPTOR_DEVICE
+    descriptor[28:32] = b"\xa1\xb2\xc3\xd4"
+    descriptor[32:36] = isp._verify.LOADER_DESCRIPTOR_MAGIC
+    stable_descriptor = isp.stable_loader_descriptor(bytes(descriptor))
     return identify, bytes(descriptor), {
         "device_path": path,
         "identify_hex": identify.hex(),
-        "descriptor_sha256": isp.sha256_bytes(bytes(descriptor)),
+        "descriptor_sha256": isp.sha256_bytes(stable_descriptor),
         "loader_fingerprint_sha256": isp.sha256_bytes(
-            identify + bytes(descriptor)),
+            identify + stable_descriptor),
     }
 
 
@@ -88,6 +91,7 @@ class FakeDevice:
         self.device_path = path
         self.fail_erase = fail_erase
         self.commands = []
+        self.command_lengths = []
         self.program_calls = []
         self.closed = False
         self.identify, self.descriptor, _identity = accepted_identity(path)
@@ -95,6 +99,7 @@ class FakeDevice:
     def cmd(self, cdb, data_len=0):
         subcode = cdb[1]
         self.commands.append(subcode)
+        self.command_lengths.append((subcode, data_len))
         if subcode == isp.SUB_IDENTIFY:
             return self.identify, 0, 0
         if subcode == isp.SUB_DESC:
@@ -226,6 +231,61 @@ class IspWriteTests(unittest.TestCase):
         with self.assertRaisesRegex(isp.SafetyError, "loader identity"):
             isp.query_loader_identity(device)
 
+        padded = FakeDevice()
+        padded.identify = isp.LOADER_IDENT + bytes(6)
+        with self.assertRaisesRegex(isp.SafetyError, "loader identity"):
+            isp.query_loader_identity(padded)
+
+        accepted = FakeDevice()
+        accepted_result = isp.query_loader_identity(accepted)
+        self.assertEqual(
+            accepted.command_lengths,
+            [(isp.SUB_IDENTIFY, 2),
+             (isp.SUB_DESC, isp.LOADER_DESCRIPTOR_LENGTH)])
+
+        # Bytes 28..31 come from an uninitialized loader stack tail. They must
+        # not break state binding across reconnects, while every stable field
+        # remains exact.
+        changed_tail = FakeDevice()
+        changed = bytearray(changed_tail.descriptor)
+        changed[28:32] = b"\x10\x20\x30\x40"
+        changed_tail.descriptor = bytes(changed)
+        changed_result = isp.query_loader_identity(changed_tail)
+        self.assertEqual(
+            changed_result["descriptor_sha256"],
+            accepted_result["descriptor_sha256"])
+        self.assertEqual(
+            changed_result["loader_fingerprint_sha256"],
+            accepted_result["loader_fingerprint_sha256"])
+
+        bad_stable_field = FakeDevice()
+        changed = bytearray(bad_stable_field.descriptor)
+        changed[16] ^= 1
+        bad_stable_field.descriptor = bytes(changed)
+        with self.assertRaisesRegex(isp.SafetyError, "loader descriptor"):
+            isp.query_loader_identity(bad_stable_field)
+
+        # Hard-coded loader vector: do not construct this from production
+        # constants, so a typo in those constants cannot make the fixture and
+        # implementation agree accidentally.
+        canonical = bytes.fromhex(
+            "76 30 2e 30 30 31 20 74 65 73 74 21 00 00 00 00 "
+            "53 4e 43 37 33 32 30 42 00 00 00 00 de ad be ef "
+            "fc cf ab ba")
+        stable = bytes.fromhex(
+            "76 30 2e 30 30 31 20 74 65 73 74 21 00 00 00 00 "
+            "53 4e 43 37 33 32 30 42 00 00 00 00 fc cf ab ba")
+        self.assertEqual(isp.stable_loader_descriptor(canonical), stable)
+        for index in (0, 16, 32):
+            corrupted = bytearray(canonical)
+            corrupted[index] ^= 1
+            with self.subTest(index=index), self.assertRaises(RuntimeError):
+                isp.stable_loader_descriptor(bytes(corrupted))
+        for length in (35, 37):
+            malformed = canonical[:length] if length < 36 else canonical + b"\x00"
+            with self.subTest(length=length), self.assertRaises(RuntimeError):
+                isp.stable_loader_descriptor(malformed)
+
     def test_target_requires_the_entire_sector_to_be_erased(self):
         programmed_tail = bytearray(self.baseline)
         # Outside the 512-byte marker window, but inside its 4-KiB sector.
@@ -245,7 +305,7 @@ class IspWriteTests(unittest.TestCase):
 
         replacements = {
             "device_path": "9-9",
-            "identify_hex": "00" * 8,
+            "identify_hex": "0000",
             "descriptor_sha256": "0" * 64,
             "loader_fingerprint_sha256": "1" * 64,
             "manifest_sha256": "2" * 64,
@@ -368,6 +428,42 @@ class IspWriteTests(unittest.TestCase):
         for raw in invalid:
             with self.subTest(raw=raw), self.assertRaises(RuntimeError):
                 isp.parse_csw(raw, tag)
+
+        # The loader's F6 path reports the original CBW data length as residue
+        # even after an exact data phase. Accept only the precisely expected
+        # value, never an arbitrary nonzero residue.
+        quirky = struct.pack("<IIIB", 0x53425355, tag, 8, 0)
+        self.assertEqual(isp.parse_csw(quirky, tag, 8), (0, 8))
+        for expected in (7, 9):
+            with self.subTest(expected=expected), self.assertRaises(RuntimeError):
+                isp.parse_csw(quirky, tag, expected)
+
+    def test_f6_transports_require_exact_loader_residue(self):
+        read_device = object.__new__(isp.Device)
+        read_device.tag = 0
+        read_device.ep_in = 0x81
+        read_device.ep_out = 0x02
+        read_device._xfer_exact = mock.Mock()
+        with mock.patch.object(
+                isp._verify, "parse_csw", return_value=(0, 2)) as parser:
+            payload, status, residue = read_device._command(
+                isp.cdb_simple(isp.SUB_IDENTIFY), 2, isp._verify._ALLOWED)
+        self.assertEqual((len(payload), status, residue), (2, 0, 2))
+        self.assertEqual(parser.call_args.kwargs["expected_residue"], 2)
+
+        write_device = object.__new__(isp.WriteDevice)
+        write_device.tag = 0
+        write_device.ep_in = 0x81
+        write_device.ep_out = 0x02
+        write_device._xfer_exact = mock.Mock()
+        with mock.patch.object(
+                isp, "parse_csw", return_value=(0, isp.BLOCK)) as parser:
+            self.assertEqual(
+                write_device.program(
+                    isp.cdb_program(TARGET, isp.BLOCK), isp.MARKER),
+                (0, isp.BLOCK))
+        self.assertEqual(
+            parser.call_args.kwargs["expected_residue"], isp.BLOCK)
 
     def test_short_bulk_and_short_read_are_fatal(self):
         class ShortTransfer:

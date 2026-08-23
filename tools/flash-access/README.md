@@ -89,12 +89,24 @@ endpoint fails above 4 KB per transfer, so keep reads at ≤ 0x1000.
 
 | Cmd | Function | Encoding |
 |---|---|---|
-| `F6 00` | Identify | returns `01 01 …` |
+| `F6 00` | Identify | 2 bytes, exactly `01 01` |
 | `F6 01` | Read status | 1 byte; bit 0 = WIP |
 | `F6 05` | **NOR read** | `CDB[3:7]` = BE32 **raw byte address** (`0x60000000` + offset); `CDB[7:9]` = BE16 count in **512-byte blocks** |
 | `F6 06` | **NOR program** | `CDB[3:7]` = BE32 **raw byte address** (`0x60000000` + offset in the official path); `CDB[7:9]` = BE16 count in **512-byte blocks** |
 | `F6 17` | Enter 4-byte addressing | no operands |
 | `F6 F1` | Device descriptor | 36 bytes |
+
+The V1.22 loader has one confirmed Bulk-Only Transport quirk: for every `F6`
+command it leaves CSW `dCSWDataResidue` equal to the requested CBW data length,
+even after completing an exact data phase. The tools check this exact value per
+command (for example 2 for `F6 00`, 4096 for a 4-KiB `F6 05`, and 0 for a
+no-data command). They do not generally permit nonzero or arbitrary residue.
+
+`F6 F1` transfers 36 bytes, but the V1.22 handler explicitly initializes only
+bytes 0–27 and 32–35; bytes 28–31 are an uninitialized stack tail included by
+its final fixed-size copy. The tools require the exact stable version, device
+and magic fields and exclude only that four-byte tail from state hashes. They
+still require the complete 36-byte USB transfer.
 
 Static tracing of the vendor orchestration additionally establishes that it
 selects `F6 17` when the program or erase range crosses the absolute

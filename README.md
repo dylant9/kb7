@@ -18,7 +18,7 @@ flash-image generation is disabled.
 ## Current status — 2026-08-22
 
 - The offline/software implementation is complete to the evidence currently
-  available. `make check` passes 90 Python/C integration tests, browser
+  available. `make check` passes 107 Python/C integration tests, browser
   validation, three ARM build profiles, hardware-fact checks and the public-tree
   safety audit.
 - Two independent reads of the installed 32-MiB Macronix SPI NOR are

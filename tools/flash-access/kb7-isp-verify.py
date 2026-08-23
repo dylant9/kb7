@@ -46,6 +46,12 @@ CHUNK = 0x1000
 # ---- the only subcodes this tool can emit (all read-only) --------------------
 SUB_IDENTIFY, SUB_STATUS, SUB_READ, SUB_EN4B, SUB_DESC = 0x00, 0x01, 0x05, 0x17, 0xF1
 _ALLOWED = {SUB_IDENTIFY, SUB_STATUS, SUB_READ, SUB_EN4B, SUB_DESC}
+LOADER_IDENT = b"\x01\x01"
+LOADER_DESCRIPTOR_LENGTH = 36
+LOADER_DESCRIPTOR_MARKER = b"v0.001 test!"
+LOADER_DESCRIPTOR_VERSION = LOADER_DESCRIPTOR_MARKER + bytes(4)
+LOADER_DESCRIPTOR_DEVICE = b"SNC7320B" + bytes(4)
+LOADER_DESCRIPTOR_MAGIC = struct.pack("<I", 0xBAABCFFC)
 
 # ---- minimal libusb-1.0 ctypes binding --------------------------------------
 # Load lazily so command builders and transport validators remain testable on
@@ -114,8 +120,17 @@ def _load_libusb():
     return api
 
 
-def parse_csw(raw, expected_tag):
-    """Validate a complete USB mass-storage CSW and fail closed."""
+def parse_csw(raw, expected_tag, expected_residue=0):
+    """Validate a complete USB mass-storage CSW and fail closed.
+
+    The KB7 loader has a proven F6-specific BOT quirk: it leaves residue equal
+    to the CBW transfer length even after completing the exact data phase. A
+    caller handling one of those commands must supply that exact expected
+    value; this function never accepts an arbitrary nonzero residue.
+    """
+    if (not isinstance(expected_residue, int)
+            or not 0 <= expected_residue <= 0xFFFFFFFF):
+        raise ValueError("expected CSW residue must be a 32-bit unsigned integer")
     if len(raw) != 13:
         raise RuntimeError(f"short CSW: got {len(raw)}/13 bytes")
     sig, tag, residue, status = struct.unpack("<IIIB", raw)
@@ -123,11 +138,33 @@ def parse_csw(raw, expected_tag):
         raise RuntimeError(f"bad CSW signature 0x{sig:08x}")
     if tag != expected_tag:
         raise RuntimeError(f"CSW tag mismatch ({tag} != {expected_tag})")
-    if residue != 0:
-        raise RuntimeError(f"unexpected CSW residue {residue}")
+    if residue != expected_residue:
+        raise RuntimeError(
+            f"unexpected CSW residue {residue} (expected {expected_residue})")
     if status != 0:
         raise RuntimeError(f"command failed with CSW status {status}")
     return status, residue
+
+
+def stable_loader_descriptor(raw):
+    """Validate F6 F1 and return only its initialized identity fields.
+
+    V1.22 constructs bytes 0..27 and 32..35 explicitly, but its final 16-byte
+    copy also includes four uninitialized stack bytes at 28..31. Those bytes
+    must be transferred, but must not be treated as identity or state-binding
+    material.
+    """
+    if len(raw) != LOADER_DESCRIPTOR_LENGTH:
+        raise RuntimeError(
+            f"unexpected F6 F1 descriptor length {len(raw)}; "
+            f"expected {LOADER_DESCRIPTOR_LENGTH}")
+    if raw[:16] != LOADER_DESCRIPTOR_VERSION:
+        raise RuntimeError("unexpected F6 F1 loader version field")
+    if raw[16:28] != LOADER_DESCRIPTOR_DEVICE:
+        raise RuntimeError("unexpected F6 F1 loader device field")
+    if raw[32:36] != LOADER_DESCRIPTOR_MAGIC:
+        raise RuntimeError("unexpected F6 F1 loader descriptor magic")
+    return raw[:28] + raw[32:36]
 
 
 class Device:
@@ -229,7 +266,12 @@ class Device:
             out = bytes(b.raw[:data_len])
         csw = ct.create_string_buffer(13)
         self._xfer_exact(self.ep_in, csw, 13, "CSW")
-        status, residue = parse_csw(bytes(csw.raw[:13]), self.tag)
+        # V1.22 loader 0x5bac-0x5bb4 initializes residue from the CBW length;
+        # its F6 wrapper returns zero at 0x6288, so 0x4f18-0x4f22 deducts no
+        # bytes. Require that exact quirk, while all physical transfers above
+        # remain exact-length and status/tag/signature remain strictly checked.
+        status, residue = parse_csw(
+            bytes(csw.raw[:13]), self.tag, expected_residue=data_len)
         return out, status, residue
 
     def close(self):
@@ -282,10 +324,19 @@ def main():
         print(f"connected: {VID:04x}:{PID:04x}  iface {dev.iface}  "
               f"ep_in 0x{dev.ep_in:02x} ep_out 0x{dev.ep_out:02x}")
 
-        ident, st, _ = dev.cmd(cdb_simple(SUB_IDENTIFY), 8)
-        print(f"  F6 00 identify : {ident.hex(' ')}  (status {st})")
-        desc, st, _ = dev.cmd(cdb_simple(SUB_DESC), 36)
-        print(f"  F6 F1 descript.: {desc[:16].hex(' ')}...  (status {st})")
+        ident, st, residue = dev.cmd(
+            cdb_simple(SUB_IDENTIFY), len(LOADER_IDENT))
+        if ident != LOADER_IDENT:
+            raise RuntimeError(
+                f"unexpected F6 00 identity {ident.hex(' ')}; "
+                f"expected {LOADER_IDENT.hex(' ')}")
+        print(f"  F6 00 identify : {ident.hex(' ')}  "
+              f"(status {st}, expected loader residue {residue})")
+        desc, st, residue = dev.cmd(
+            cdb_simple(SUB_DESC), LOADER_DESCRIPTOR_LENGTH)
+        stable_loader_descriptor(desc)
+        print(f"  F6 F1 descript.: {desc[:16].hex(' ')}...  "
+              f"(status {st}, expected loader residue {residue})")
 
         _, st, _ = dev.cmd(cdb_simple(SUB_EN4B))
         print(f"  F6 17 enter 4-byte addressing: status {st}")

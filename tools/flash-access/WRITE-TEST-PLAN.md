@@ -1,6 +1,6 @@
 # KB7 USB-ISP write-path validation plan
 
-Status: **offline-reviewed; not run on hardware**.
+Status: **offline-reviewed; destructive stages not run on hardware**.
 
 `kb7-isp-write2.py` is a destructive laboratory validator, not a supported
 flasher. It is dry-run by default. Its purpose is to validate the loader's
@@ -75,6 +75,22 @@ toggle. Verification intentionally covers the settings areas too: the
 application is not running in ISP mode, so it cannot create mid-session settings
 churn.
 
+The loader is non-standard in one precisely characterized BOT detail. For every
+`F6` command, its CSW residue remains equal to the CBW data length even after an
+exact successful data phase. The first read-only baseline attempt exposed this
+as residue 8 because the old verifier also requested the wrong 8-byte length for
+the 2-byte `F6 00` identity. Static loader tracing independently proves both
+behaviors. The corrected tools request exactly `01 01` and require residue 2;
+they likewise require residue 1 for the one-byte status poll, the exact read or
+program length for data commands, and zero for commands with no data phase.
+Any other residue, short transfer, tag mismatch, nonzero status, or bad signature
+remains fatal. This is exact quirk validation, not a general relaxation.
+
+The 36-byte `F6 F1` response has four uninitialized stack-tail bytes at offsets
+28–31. The tool still requires all 36 bytes to transfer, validates the exact
+initialized version/device/magic fields, and binds state to those stable fields;
+the four undefined bytes are not used as a device fingerprint.
+
 The program stage is:
 
 1. Validate the connected loader with `F6 00` and `F6 F1`.
@@ -126,6 +142,9 @@ misunderstood device handler from causing it. The material residual risks are:
 - an ambiguous USB disconnect, short transfer, failed CSW, busy timeout, power
   loss, or reset after mutation can leave the flash state unknown; the strict
   transport aborts, but cannot undo a command already accepted by the loader;
+- the loader's non-standard CSW residue behavior is statically proven and now
+  checked exactly, but is another reason not to treat it as a general-purpose
+  standards-compliant mass-storage programming transport;
 - the first absolute-address program at this exact target remains a destructive
   operation even though its encoding is recovered and the earlier handler
   behavior is known;

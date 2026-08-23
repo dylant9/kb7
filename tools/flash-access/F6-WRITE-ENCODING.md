@@ -12,6 +12,28 @@ disassembly listing, or bulk decompilation is included in this tree.
 
 All commands use a 16-byte CDB and leave unspecified bytes zero.
 
+## Loader BOT residue behavior
+
+The KB7 loader completes `F6` data phases but does not decrement the BOT CSW
+residue counter. It initializes that counter from CBW
+`dCBWDataTransferLength`, the common `F6` wrapper returns zero to the accounting
+path, and the unchanged value is copied into `dCSWDataResidue`. A read-only
+hardware attempt corroborated the trace: an old 8-byte `F6 00` request returned
+all eight bytes and residue 8, although the command's canonical response is only
+the first two bytes, `01 01`.
+
+The tools therefore request the canonical 2-byte identity and require the exact
+loader-specific residue for every reviewed command: requested data length for a
+data phase, zero for a no-data command. Transfer length, CSW signature, tag,
+status, and that exact residue are all checked independently. Arbitrary nonzero
+residue is never accepted.
+
+The same handler explicitly initializes descriptor bytes 0–27 and 32–35 but
+copies four uninitialized stack bytes into `F6 F1` offsets 28–31. The transport
+still requires all 36 bytes. Identity validation and stage-state hashing use the
+exact initialized version, device and magic fields and deliberately exclude
+only that undefined four-byte tail.
+
 | Command | Function | Address | Count |
 |---|---|---|---|
 | `F6 05` | read | `CDB[3:7]` = BE32 raw byte address | `CDB[7:9]` = BE16 512-byte blocks |

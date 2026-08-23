@@ -90,7 +90,7 @@ succeeded, but no replacement firmware has run on hardware.
 
 The latest offline verification pass completed successfully on 2026-08-22:
 
-- `make check`: 106 Python/C integration tests passed, browser JavaScript syntax
+- `make check`: 107 Python/C integration tests passed, browser JavaScript syntax
   and executable validator checks passed, and the default, guarded-audit, and
   all-branches integration firmware profiles built and passed ELF verification;
 - the largest all-branches profile used 8,108 bytes of core0 text, 12 bytes of

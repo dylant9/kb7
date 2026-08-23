@@ -50,6 +50,7 @@ Device = _verify.Device
 cdb_read = _verify.cdb_read
 cdb_simple = _verify.cdb_simple
 parse_csw = _verify.parse_csw
+stable_loader_descriptor = _verify.stable_loader_descriptor
 fwin = _verify.fwin
 
 FLASH_BASE = _verify.FLASH_BASE
@@ -75,12 +76,12 @@ BOOT_CONFIGURATION_OFFSET = 0x200
 BOOT_CONFIGURATION_MAGIC = b"SN_BCFG\x00"
 MANIFEST_PREFIX = b"SN_FWIN\x00v1.0.00\x00"
 HEADER_MAGIC = b"SNC7320A"
-LOADER_IDENT_PREFIX = b"\x01\x01"
-LOADER_DESCRIPTOR_MARKER = b"v0.001 test!"
+LOADER_IDENT = _verify.LOADER_IDENT
+LOADER_DESCRIPTOR_LENGTH = _verify.LOADER_DESCRIPTOR_LENGTH
 EXPECTED_LOADS = (0x00000000, 0x10000000, 0x60100000, 0x18000000)
 MANIFEST_ENTRIES = (0x20, 0x30, 0x40, 0x50)
 
-STATE_SCHEMA = "kb7-isp-write2-state-v2"
+STATE_SCHEMA = "kb7-isp-write2-state-v3"
 STATE_READY = "program_verified"
 STATE_ERASE_STARTED = "erase_started"
 DEFAULT_STATE = os.path.expanduser("~/.kb7-isp-write2-state.json")
@@ -331,7 +332,8 @@ class WriteDevice(Device):
             len(data), "data-OUT")
         csw = ct.create_string_buffer(13)
         self._xfer_exact(self.ep_in, csw, 13, "CSW")
-        return parse_csw(bytes(csw.raw[:13]), self.tag)
+        return parse_csw(
+            bytes(csw.raw[:13]), self.tag, expected_residue=len(data))
 
 
 def set_address_mode_for_range(dev, offset, length):
@@ -396,20 +398,25 @@ def poll_ready(dev, timeout=30.0, interval=0.02,
 
 
 def query_loader_identity(dev):
-    identify, _status, _residue = dev.cmd(cdb_simple(SUB_IDENTIFY), 8)
-    descriptor, _status, _residue = dev.cmd(cdb_simple(SUB_DESC), 36)
-    if len(identify) != 8 or not identify.startswith(LOADER_IDENT_PREFIX):
+    identify, _status, _residue = dev.cmd(
+        cdb_simple(SUB_IDENTIFY), len(LOADER_IDENT))
+    descriptor, _status, _residue = dev.cmd(
+        cdb_simple(SUB_DESC), LOADER_DESCRIPTOR_LENGTH)
+    if identify != LOADER_IDENT:
         raise SafetyError("unexpected F6 00 loader identity")
-    if len(descriptor) != 36 or LOADER_DESCRIPTOR_MARKER not in descriptor:
-        raise SafetyError("unexpected F6 F1 loader descriptor")
+    try:
+        stable_descriptor = stable_loader_descriptor(descriptor)
+    except RuntimeError as exc:
+        raise SafetyError(f"unexpected F6 F1 loader descriptor: {exc}") from exc
     device_path = getattr(dev, "device_path", "")
     if not device_path:
         raise SafetyError("USB topology path is unavailable; device binding is impossible")
     return {
         "device_path": device_path,
         "identify_hex": identify.hex(),
-        "descriptor_sha256": sha256_bytes(descriptor),
-        "loader_fingerprint_sha256": sha256_bytes(identify + descriptor),
+        "descriptor_sha256": sha256_bytes(stable_descriptor),
+        "loader_fingerprint_sha256": sha256_bytes(
+            identify + stable_descriptor),
     }
 
 
@@ -554,7 +561,7 @@ def validate_static_state(state, manifest, baseline_hash, offset, programmed_has
         raise SafetyError("stage state device_path is malformed")
 
     hexadecimal_fields = {
-        "identify_hex": 16,
+        "identify_hex": len(LOADER_IDENT.hex()),
         "descriptor_sha256": 64,
         "loader_fingerprint_sha256": 64,
     }
