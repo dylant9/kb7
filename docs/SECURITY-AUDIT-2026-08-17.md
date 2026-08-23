@@ -48,17 +48,20 @@ distinct dry-run-default scratch executor wires only the fixed 22-operation
 V1.22 scratch plan and accepts no firmware bundle or caller-selected operation.
 Its v1 plan completed once on the development unit with exact final baseline
 restoration and an operator-reported return to normal keyboard operation. The
-current v2 source is offline-tested and hardware-unrun. It makes one fixed
-active-intent checkpoint mandatory after `program-09` and WIP-ready polling,
-before postread, and requires a fresh process with a mutation-incapable backend
-to reconcile. The historical run and proposed checkpoint stay outside all
-firmware regions; neither physically interrupts a command or tests power loss,
+current v2 plan has also completed once. Its fixed active-intent checkpoint
+followed `program-09` and WIP-ready polling, before postread; the process exited
+4 and a fresh process with a mutation-incapable backend classified two full-chip
+reads as the exact postimage without retry. The plan then restored the baseline,
+cleared state, passed all three region CRCs in a separate verifier invocation,
+and returned to operator-reported normal operation. Both runs stayed outside all
+firmware regions; neither physically interrupted a command or tested power loss,
 and neither unlocks the paired executor. See
 `USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md` and
 `USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md`, plus
 `USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md` and
 `USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md`; the v1 result is in
-`USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md`.
+`USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md` and the v2 result is in
+`USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md`.
 
 The full SNC7320 datasheet review on 2026-08-18 added a critical correction:
 AIRCR/software reset restarts PRAM, not mask ROM. The former mailbox-marker plus

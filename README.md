@@ -68,21 +68,26 @@ image generation is disabled.
   cleared the journal at the byte-exact stock baseline, and a separate verifier
   entry point reproduced SHA-256
   `2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f`;
-  the owner then reported normal keyboard operation. The current v2 plan is
-  offline-tested but hardware-unrun. It makes `program-09` a mandatory durable-
-  intent checkpoint: the command and WIP-ready poll complete, then the process
-  closes without postread or boundary advance; only a fresh process using a
-  mutation-incapable transport may reconcile. Both historical and proposed
-  reads use the same loader/SoC flash-controller path. This is not a physical
-  command interruption or power cut, and no firmware region is touched. The
+  the owner then reported normal keyboard operation. The current v2 plan has
+  now also completed one hardware run. At its mandatory `program-09` durable-
+  intent checkpoint, the command and WIP-ready poll completed, then the process
+  closed without postread or boundary advance and exited 4. A fresh process
+  using the mutation-incapable verifier backend classified two full-chip reads
+  as the exact boundary-10 postimage without retry. The remaining fixed plan
+  restored the exact baseline, final reconciliation cleared state, a separate
+  verifier reproduced the same 32-MiB hash with all three region CRCs valid,
+  and the owner confirmed normal boot. Both executor and verifier reads use the
+  same loader/SoC `F6 05` flash-controller path. This is not a physical command
+  interruption or power cut, and no firmware region is touched. The
   harness cannot accept a firmware bundle or caller-selected mutation; the
   paired-firmware executor remains mutation-locked. None of these paths makes
   a custom-firmware hardware trial safe. See the
   [offline updater design](docs/USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md) and
   [executor scaffold status](docs/USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md),
   plus the separate
-  [fixed scratch executor status](docs/USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md)
-  and [mandatory-checkpoint test plan](docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md).
+  [fixed scratch executor status](docs/USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md),
+  [mandatory-checkpoint test plan](docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md),
+  and [v2 validation record](docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md).
 - No custom firmware has been installed. USB, display, touch, RGB, MCU2/Hall,
   pinmux, cold-start memory setup and a legitimate USB identity still require
   board validation. `flash_approved` remains false.
@@ -107,8 +112,8 @@ and its
 record the current control harness and the exact limits of its historical v1
 development-unit run. The
 [mandatory active-intent test plan](docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md)
-records the offline-tested, hardware-unrun v2 checkpoint and its narrower proof
-boundary.
+and [v2 validation record](docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md)
+record the checkpoint sequence, observed result and its narrower proof boundary.
 
 ## Repository contents
 

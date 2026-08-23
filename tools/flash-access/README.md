@@ -208,10 +208,12 @@ executor scaffold can only preflight and reconcile through read-only full-chip
 captures. A separate dry-run-default scratch executor can replay only 22 fixed
 non-firmware operations. Its preceding v1 plan completed once on the development
 unit and restored the byte-exact baseline. The current v2 plan adds a mandatory
-command-complete/no-postread active-intent checkpoint; it passes offline tests
-but has not run on hardware. This remains bounded laboratory evidence, not a
-general update path. Treat anything here that writes over USB as experimental
-and capable of destroying your bootloader.
+command-complete/no-postread active-intent checkpoint; that exact plan has now
+also completed once on the development unit, reconciled its exact postimage in
+a fresh read-only process, restored the baseline and returned to normal
+operation. This remains bounded laboratory evidence, not a general update path.
+Treat anything here that writes over USB as experimental and capable of
+destroying your bootloader.
 
 Host-side address validation **cannot** protect against device-side
 misaddressing. An earlier host tool correctly refused intended targets outside
@@ -282,8 +284,9 @@ default after writing; add `-N` to verify only the written region.
 | `kb7-isp-scratch-restart.py` | Fixed two-sector experiment with two deliberate no-readback/reconciliation checkpoints | **destructive; dry-run by default; passed once at the fixed plan** |
 | `kb7-updater-plan.py` | V1.22-only paired-region planner and interruption-model checker | **offline only; no device I/O; not an executor** |
 | `kb7-updater-executor.py` | Two-read live preflight, durable journal binding and image-derived reconciliation | **read-only CLI; mutation hard-disabled; not an installer** |
-| `kb7-updater-scratch-executor.py` | One-operation-per-process replay of the fixed 22-command V1.22 scratch plan, with a mandatory boundary-9 active-intent checkpoint | **destructive; dry-run by default; current v2 is offline-tested and hardware-unrun** |
+| `kb7-updater-scratch-executor.py` | One-operation-per-process replay of the fixed 22-command V1.22 scratch plan, with a mandatory boundary-9 active-intent checkpoint | **destructive; dry-run by default; current v2 passed once on the development unit** |
 | `../../docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md` | Exact v2 checkpoint sequence, stop rules and proof boundary | documentation only |
+| `../../docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md` | Observed v2 checkpoint, completion evidence and limits | documentation only |
 | `WRITE-TEST-PLAN.md` | Exact experimental sequence, remaining failure modes and SPI recovery procedure | documentation only |
 | `ERASE-GRANULARITY-TEST-PLAN.md` | Fixed target, exact four-stage sequence, proof limits and SPI recovery procedure | documentation only |
 | `F6-ERASE-ENCODING.md` | Calibrated static proof of the erase address units and CDB layouts | documentation only |
@@ -370,21 +373,27 @@ Committed commands also hold one persistent, private per-journal lock from the
 authoritative state read through USB close and publication; a concurrent
 invocation refuses before opening USB.
 
-The current harness and its fake-transport/journal tests pass offline, but its
-v2 mandatory-checkpoint plan has not run on hardware. The preceding v1
-22-operation plan passed once through the earlier orchestration path on the
-development unit: every ordinary exact boundary was accepted, final new-process
+The current harness and its fake-transport/journal tests pass offline. Its v2
+mandatory-checkpoint plan has now also completed once on the development unit:
+the fixed command and WIP poll completed without postread, a fresh process using
+the verifier-only backend classified two reads as the exact boundary-10
+postimage without retry, and the remaining plan restored the exact baseline.
+Final reconciliation cleared state and a separate verifier reproduced the same
+32-MiB hash with all three region CRCs valid. The owner also confirmed normal
+operation. The preceding v1 22-operation plan passed once through the
+earlier orchestration path: every ordinary exact boundary was accepted, final
+new-process
 reconciliation cleared the journal at SHA-256
 `2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f`,
 and the separate read-only verifier entry point reproduced the same 32-MiB
 image before the owner reported normal keyboard operation. Both live readers use
-the same loader and SoC flash controller. The run did not physically interrupt
-a command, create the v2 active-intent checkpoint, test power loss or touch
-firmware regions. Read the
+the same loader and SoC `F6 05` flash-controller path. Neither run physically
+interrupted a command, tested power loss or touched firmware regions. Read the
 [fixed scratch executor status and test plan](../../docs/USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md)
 for its exact sequence and stop rules, the
 [mandatory active-intent test plan](../../docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md)
-for the current hardware-unrun campaign, and the
+and [v2 validation record](../../docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md)
+for the completed current campaign, and the
 [completed validation record](../../docs/USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md)
 for the historical v1 evidence and proof boundary.
 

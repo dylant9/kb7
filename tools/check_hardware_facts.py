@@ -121,7 +121,7 @@ def validate_pin_map(pinmap: dict[str, object]) -> None:
 
 
 def validate_stock_flash(stock: dict[str, object]) -> None:
-    require(stock["schema_version"] == 6 and
+    require(stock["schema_version"] == 7 and
             stock["updated_on"] == "2026-08-23",
             "stock-flash evidence schema must describe the recovery and USB-ISP results")
     acquisition = stock["acquisition"]
@@ -396,6 +396,130 @@ def validate_stock_flash(stock: dict[str, object]) -> None:
             executor["flash_approved"] is False and
             executor["custom_firmware_booted"] is False,
             "do not broaden the scratch-executor proof or authorization boundary")
+
+    active = stock["usb_updater_scratch_active_intent_validation"]
+    require(active["device_count"] == 1 and
+            active["manifest_header_version"] == "v1.0.00" and
+            active["loader_window_sha256"] ==
+            "9cc33333a88641b633bb5a4c0d55425c757e0fbdbe70eb99e9a9e40b76378a56" and
+            active["fixed_plan_sha256"] ==
+            "f0a8acfcdc7ab5fb7a7dc2753ed8bdca0e381a9433f64fe311348442a8bbdb32" and
+            active["source_scratch_plan_sha256"] ==
+            "d784f036e06a972d9688d15c76a41cbd7e90ca806d5ced1aeab5aae16745085b",
+            "unexpected active-intent executor device, loader, or plan identity")
+    require(active["baseline_size_bytes"] == 0x02000000 and
+            active["baseline_sha256"] ==
+            "2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f" and
+            active["containment_envelope_start"] == "0x000c0000" and
+            active["containment_envelope_end_exclusive"] == "0x00100000" and
+            active["initial_preflight_read_count"] == 2 and
+            active["initial_preflight_reads_bit_identical"] is True and
+            active["initial_preflight_classification"] ==
+            "exact_stock_or_complete" and
+            active["initial_boundary_index"] == 0,
+            "active-intent executor baseline or initial preflight changed")
+    require(active["address_mode_command_before_each_mutation"] == "f6 18" and
+            active["operation_count"] == 22 and
+            active["program_operation_count"] == 18 and
+            active["erase_operation_count"] == 4 and
+            active["one_state_derived_operation_per_process"] is True,
+            "active-intent executor fixed operation protocol changed")
+    require(active["mandatory_checkpoint_operation"] == "program-09" and
+            active["mandatory_checkpoint_input_boundary_index"] == 9 and
+            active["mandatory_checkpoint_expected_post_boundary_index"] == 10 and
+            active["mandatory_checkpoint_offset"] == "0x000c6000" and
+            active["mandatory_checkpoint_length_bytes"] == 0x200 and
+            active["mandatory_checkpoint_cdb"] ==
+            "f6 06 00 60 0c 60 00 00 01 00 00 00 00 00 00 00" and
+            active["mandatory_checkpoint_payload_sha256"] ==
+            "ed41dcb56145068e569b99ca07c7827889e163f5cccc444b128512da244cf380" and
+            active["mandatory_checkpoint_operation_descriptor_sha256"] ==
+            "dbba0199b94c9ee3fd8d50c9aaac37f33acead94d8ac299a793c3cc7f53d5455",
+            "active-intent checkpoint command identity changed")
+    require(active["mandatory_checkpoint_preimage_sha256"] ==
+            "ea8f9c343781027db13ad221a63784fe52e4689f1543f10562ff7504c8b6f7b6" and
+            active["mandatory_checkpoint_expected_postimage_sha256"] ==
+            "f67fb2f28944d13d82ffcc7f15514558c757db0e6e0a0f261866043093afa3e7" and
+            active["mandatory_checkpoint_intent_durable_before_command"] is True and
+            active["mandatory_checkpoint_command_completed"] is True and
+            active["mandatory_checkpoint_wip_poll_reported_ready"] is True and
+            active["mandatory_checkpoint_same_session_postread_performed"] is False and
+            active["mandatory_checkpoint_intent_left_active"] is True and
+            active["mandatory_checkpoint_step_exit_code"] == 4,
+            "active-intent checkpoint completion boundary changed")
+    require(active["checkpoint_reconciliation_in_fresh_process"] is True and
+            active["checkpoint_reconciliation_mutation_incapable_transport"] is True and
+            active["checkpoint_reconciliation_read_count"] == 2 and
+            active["checkpoint_reconciliation_reads_bit_identical"] is True and
+            active["checkpoint_reconciliation_classification"] ==
+            "exact_postimage_completed" and
+            active["checkpoint_reconciliation_observed_sha256"] ==
+            active["mandatory_checkpoint_expected_postimage_sha256"] and
+            active["checkpoint_reconciliation_boundary_index"] == 10 and
+            active["checkpoint_reconciliation_next_operation"] == "program-10" and
+            active["checkpoint_automatic_retry"] is False and
+            active["checkpoint_command_replayed_during_reconciliation"] is False and
+            active["checkpoint_exact_preimage_reconciliation_branch_tested"] is False and
+            active["execution_continued_from_boundary_10"] is True,
+            "active-intent fresh-process reconciliation evidence changed")
+    require(active["final_step_classification"] ==
+            "exact_baseline_restored_pending_finalize" and
+            active["final_step_boundary_index"] == 22 and
+            active["final_step_sha256"] == active["baseline_sha256"] and
+            active["final_reconciliation_in_new_process"] is True and
+            active["final_reconciliation_read_count"] == 2 and
+            active["final_reconciliation_classification"] ==
+            "exact_stock_or_complete" and
+            active["final_reconciliation_state_cleared"] is True,
+            "active-intent executor completion or state closure changed")
+    require(active["separate_post_cycle_verifier_capture_size_bytes"] ==
+            0x02000000 and
+            active["separate_post_cycle_verifier_capture_sha256"] ==
+            active["baseline_sha256"] and
+            active["separate_post_cycle_verifier_capture_matches_baseline"] is True and
+            active["separate_post_cycle_manifest_region_checksums_passed"] is True and
+            active["separate_post_cycle_manifest_region_checksums"] == [
+                {
+                    "index": 0,
+                    "declared": "0xc3f43a6f",
+                    "computed": "0xc3f43a6f",
+                    "matches": True,
+                },
+                {
+                    "index": 1,
+                    "declared": "0xc8ed2815",
+                    "computed": "0xc8ed2815",
+                    "matches": True,
+                },
+                {
+                    "index": 2,
+                    "declared": "0xaa83e9a3",
+                    "computed": "0xaa83e9a3",
+                    "matches": True,
+                },
+            ] and
+            active["post_test_normal_boot_owner_confirmed"] is True and
+            active["post_test_keyboard_working_owner_confirmed"] is True and
+            active["post_test_5038_enumeration_transcript_captured"] is False,
+            "active-intent final verifier or functional closure changed")
+    require(active["physical_mid_command_interruption_tested"] is False and
+            active["physical_power_cut_during_mutation_tested"] is False and
+            active["arbitrary_torn_nor_recovery_tested"] is False and
+            active["full_chip_read_address_mode_command"] == "f6 17" and
+            active["above_16mib_f6_17_mutation_path_tested"] is False and
+            active["f6_19_mutation_tested"] is False and
+            active["above_16mib_mutation_tested"] is False and
+            active["firmware_region_mutation_enabled"] is False and
+            active["firmware_region_mutation_tested"] is False and
+            active["custom_firmware_booted"] is False and
+            active["general_usb_updater_validated"] is False and
+            active["flash_approved"] is False and
+            active[
+                "all_usb_byte_verification_used_same_preserved_loader_f6_05_read_path"
+            ] is True and
+            active["independent_electrical_flash_verification_performed"] is False and
+            active["raw_images_or_transcripts_included"] is False,
+            "do not broaden the active-intent executor proof boundary")
 
     regions = stock["manifest"]["regions"]
     require([region["index"] for region in regions] == [0, 1, 2],

@@ -4,8 +4,9 @@
 > `491b06c1beb66fa606639e1d420109dcf856c91b50ad02d5fbd0e6bafe1cc797`
 > and the source revision used for that run. The current v2 executor makes a
 > boundary-9 active-intent checkpoint mandatory and has a different plan and
-> journal schema. V2 is offline-tested but hardware-unrun; see the
-> [mandatory-checkpoint test plan](USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md).
+> journal schema. V2 has since completed its own hardware run; see the
+> [mandatory-checkpoint test plan](USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md)
+> and [v2 validation record](USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md).
 
 ## Result
 

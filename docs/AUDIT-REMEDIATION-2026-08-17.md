@@ -75,10 +75,13 @@ hard-disabled. A distinct dry-run-default scratch executor can replay only 22
 fixed non-firmware operations in the reviewed V1.22 erased gap. Its v1 plan
 passed once on the development unit with exact baseline restoration and a
 subsequent operator-reported normal keyboard operation. Its current v2 plan
-passes offline fake-transport/state tests but is hardware-unrun; it mandates a
-fixed command-complete/no-postread active intent and fresh-process read-only
-reconciliation. Neither revision physically interrupts an operation, tests
-power loss or touches firmware regions, and neither unlocks firmware mutation.
+passes offline fake-transport/state tests and has also completed once on the
+development unit. Its mandatory fixed command-complete/no-postread active intent
+exited 4 after WIP ready; fresh-process verifier-only reconciliation accepted two
+exact postimage reads without retry; and the fixed continuation restored the
+baseline, cleared state and returned to normal operation. Neither revision
+physically interrupts an operation, tests power loss or touches firmware
+regions, and neither unlocks firmware mutation.
 Header dependencies use `-MMD -MP`.
 
 Any future image-producing release pipeline must, before it is enabled:
@@ -111,7 +114,7 @@ The latest offline verification pass completed successfully on 2026-08-23:
   4 bytes of data and 19,312 bytes of BSS;
 - neither ELF contains unresolved relocations, and core0's vector table is
   exactly `0x13c` bytes;
-- the public-tree policy check accepted 185 UTF-8 source/documentation files and
+- the public-tree policy check accepted 186 UTF-8 source/documentation files and
   found no firmware blobs, generated binaries, or disallowed material; and
 - independent warning passes using GCC `-fanalyzer` and strict conversion,
   shadowing, and undefined-macro diagnostics completed without findings.

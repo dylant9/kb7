@@ -220,13 +220,16 @@ These are not honest candidates for further offline coding:
    SHA-256
    `2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f`,
    after which the owner reported normal `5038` operation. The current v2
-   executor is offline-tested and hardware-unrun; it mandates one
-   command-complete/no-postread active intent and fresh-process read-only
-   reconciliation. Both verifier and executor use the same loader/SoC read path.
-   Neither the historical run nor the planned v2 checkpoint tests physical
-   mid-command interruption or power loss, and neither touches firmware regions.
+   executor has also completed once. Its mandatory
+   command-complete/no-postread active intent exited 4 after `program-09` and
+   WIP ready; a fresh verifier-only process accepted two exact boundary-10
+   postimage reads without retry; the remaining plan restored the exact
+   baseline and cleared state; a separate verifier passed all three region CRCs;
+   and the owner confirmed normal operation. Both verifier and executor use the
+   same loader/SoC `F6 05` read path. Neither run tests physical mid-command
+   interruption or power loss, and neither touches firmware regions.
    See `USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md` and
-   `USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md`.
+   `USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md`.
 
 ## Build and test profiles
 

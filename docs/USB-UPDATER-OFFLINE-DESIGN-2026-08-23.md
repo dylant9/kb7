@@ -31,10 +31,14 @@ cleared the journal at the exact baseline, and a separate verifier entry point
 reproduced the same 32-MiB image before operator-reported normal keyboard
 operation. The current v2 plan adds a mandatory active intent after
 `program-09` completes and WIP reports ready, then closes without postread; only
-a fresh process with a mutation-incapable backend may reconcile. V2 is
-offline-tested and hardware-unrun. This is fixed scratch work only; it does not
-authorize firmware-region execution. See the
-[v2 test plan](USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md) and
+a fresh process with a mutation-incapable backend may reconcile. V2 has now
+completed once: two exact postimage reads were accepted without retry, the
+remaining fixed plan restored the baseline, final reconciliation cleared state,
+a separate verifier passed every region CRC, and the owner confirmed normal
+operation. This is fixed scratch work only; it does not authorize firmware-
+region execution. See the
+[v2 test plan](USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md),
+[v2 validation record](USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md) and
 [historical validation record](USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md).
 
 The planner was exercised offline against two matching V1.22 full-chip inputs
@@ -158,9 +162,10 @@ implements restart classification and a durable-intent model with fake
 transports, but live firmware mutation remains unavailable. The separate
 scratch executor wires the same principles only to its immutable, non-firmware
 22-operation command set. Its v1 plan completed once on the tested physical
-loader; its v2 mandatory active-intent policy currently has offline evidence
-only. The historical run exercised exact command boundaries, and the planned
-v2 checkpoint ends after command completion and WIP ready. Neither is a
+loader; its v2 mandatory active-intent plan has now also completed once on that
+unit. The historical run exercised ordinary exact command boundaries, and the
+v2 checkpoint ended after command completion and WIP ready, before postread; a
+fresh verifier-only process accepted two exact postimage reads. Neither is a
 physical mid-command or power-loss event. None of these components claims
 power-loss atomicity. They
 cannot prove behavior for an interrupted NOR erase pulse, program disturb,
@@ -213,9 +218,9 @@ image or an early-valid mixed state.
    new processes and restored the exact baseline. A new separate harness now
    expresses that geometry as 22 one-operation, state-derived invocations. Its
    v1 plan passed once on hardware, including final new-process reconciliation
-   and exact baseline restoration. Its current v2 plan passes offline tests and
-   mandates a boundary-9 active-intent checkpoint followed by fresh-process,
-   read-only reconciliation, but that revision has not run on hardware. Both
+   and exact baseline restoration. Its current v2 plan also passed once: its
+   mandatory boundary-9 active-intent checkpoint was followed by fresh-process,
+   read-only exact-postimage reconciliation and fixed baseline restoration. Both
    the executor and separate verifier read through the same USB loader/SoC
    controller. Physical mid-command, power-loss and
    arbitrary torn-NOR reconciliation remain separate gates before reviewing

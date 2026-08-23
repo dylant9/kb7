@@ -2,12 +2,14 @@
 
 ## Status
 
-The current `kb7-updater-scratch-executor.py` source is **offline-tested and
-hardware-unrun**. It retains the same 18 fixed programs and four fixed erases
-as the earlier executor, but its v2 plan makes one active-intent checkpoint a
-mandatory part of execution. That safety policy is included in the plan
-descriptor and journal schema rather than treated as an operator-selected
-fault-injection option.
+**Completed successfully on the development KB7.** The current
+`kb7-updater-scratch-executor.py` source retains the same 18 fixed programs and
+four fixed erases as the earlier executor, but its v2 plan makes one
+active-intent checkpoint a mandatory part of execution. That safety policy is
+included in the plan descriptor and journal schema rather than treated as an
+operator-selected fault-injection option. See the
+[v2 hardware validation record](USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md)
+for the observed hashes, state transitions and proof limits.
 
 The preceding v1 executor plan, SHA-256
 `491b06c1beb66fa606639e1d420109dcf856c91b50ad02d5fbd0e6bafe1cc797`,
@@ -93,9 +95,10 @@ At the mandatory checkpoint:
 - unstable or incomplete reads leave the intent unresolved. Do not infer an
   outcome and do not issue another USB mutation.
 
-## Proposed hardware sequence
+## Hardware sequence
 
-The experiment must use two distinct, byte-identical owner captures, the
+The completed experiment used the following guarded sequence. Any separately
+authorized repeat must use two distinct, byte-identical owner captures, the
 reviewed V1.22 loader, the erased `[0x000c0000,0x00100000)` containment
 envelope, and a new owner-local v2 journal. Keep the rehearsed 3.3-V external
 SPI recovery path immediately available and physically disconnect any
@@ -136,9 +139,10 @@ unpowered programmer from the flash bus during USB operation.
 Do not automate past exit 4 or any unexpected status. Preserve the complete
 console output outside the public repository for later evidence review.
 
-## What a successful run would prove
+## What the completed run proves
 
-For one unit, loader, baseline and exact v2 source, the run would show that:
+For one unit, loader, baseline and tested v2 plan/checkout, the completed run
+shows that:
 
 - the executor itself durably publishes the fixed active intent before its
   mutation;
@@ -150,7 +154,7 @@ For one unit, loader, baseline and exact v2 source, the run would show that:
   execution can continue from boundary 10; and
 - the fixed cleanup returns every loader-visible byte to the baseline.
 
-It would not prove safety under a physical cable removal, host or device power
+It does not prove safety under a physical cable removal, host or device power
 loss, a torn program or erase pulse, disturb, device-side misaddressing, another
 loader or flash revision, `F6 17`/`F6 19` mutation, firmware-region writes,
 replacement-firmware correctness, or a production updater. Both executor and

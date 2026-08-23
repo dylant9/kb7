@@ -10,11 +10,15 @@ tools/flash-access/kb7-updater-scratch-executor.py
 
 It is **dry-run by default**, is restricted to the reviewed V1.22 loader and
 scratch layout, and can replay only the 22 operations listed below. The current
-v2 source and fake-transport tests pass offline, but this source and plan have
-**not run on hardware**. V2 adds a mandatory active-intent checkpoint after the
-fixed `program-09` command and WIP-ready poll, before any postread or verified
-boundary publication. Reconciliation must then occur in a fresh process using
-a mutation-incapable transport.
+v2 source and fake-transport tests pass offline, and the exact v2 plan has now
+completed once on the development KB7. Its mandatory active-intent checkpoint
+followed the fixed `program-09` command and WIP-ready poll, before any postread
+or verified boundary publication. The process exited 4 with intent active; a
+fresh process using the mutation-incapable verifier backend then classified two
+full-chip reads as the exact postimage without retry. The remaining operations
+restored the exact baseline, final reconciliation cleared state, a separate
+verifier reproduced the same full-chip hash with all three region CRCs valid,
+and the owner confirmed normal boot.
 
 The preceding v1 plan, SHA-256
 `491b06c1beb66fa606639e1d420109dcf856c91b50ad02d5fbd0e6bafe1cc797`,
@@ -24,7 +28,8 @@ evidence for the unchanged commands and geometry; it is not a hardware result
 for the current v2 state machine. See the
 [historical validation record](USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md)
 and the separate
-[v2 checkpoint test plan](USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md).
+[v2 checkpoint test plan](USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md)
+and [v2 validation record](USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md).
 
 The current canonical v2 descriptor has SHA-256
 `f0a8acfcdc7ab5fb7a7dc2753ed8bdca0e381a9433f64fe311348442a8bbdb32`.
@@ -38,8 +43,8 @@ This is not the paired-firmware updater. The general
 and `reconcile`, its mutation adapter remains hard-disabled, and firmware-region
 mutation remains unavailable. The scratch harness accepts no bundle, operation,
 address, length, CDB, payload, device selector, retry, force or skip option.
-Neither the historical run nor the current offline-tested revision changes
-`flash_approved=false`.
+Neither the historical run nor the current validated scratch-only revision
+changes `flash_approved=false`.
 
 ## Fixed operation domain
 
@@ -154,10 +159,11 @@ python3 tools/flash-access/kb7-updater-scratch-executor.py reconcile \
   --journal /path/to/owner-local-scratch-journal.json
 ```
 
-One owner-authorized v1 hardware run is documented separately; it is historical
-evidence for the same fixed operation list, not evidence that v2's mandatory
-active-intent path has run and not standing approval to broaden the mutation
-domain. `--commit` is the only switch that opens USB.
+The owner-authorized v1 and v2 hardware runs are documented separately. V1 is
+historical evidence for the same fixed operation list; v2 additionally exercised
+the mandatory active-intent path. Neither is standing approval to repeat the
+experiment or broaden the mutation domain. `--commit` is the only switch that
+opens USB.
 `preflight --commit` remains read-only; every `step --commit` is destructive
 and normally advances exactly one operation; the mandatory boundary-9 step
 instead exits 4 with intent active. `reconcile --commit` remains read-only.
@@ -191,12 +197,19 @@ Offline tests cover the fixed operation construction, rejection of non-scratch
 and firmware-domain operations, transport ordering, two-read gates, durable
 state binding, the mandatory no-postread checkpoint, fresh-process nonce,
 mutation-incapable reconciliation backend, one-operation process boundary,
-reconciliation and journal faults. The current v2 plan remains hardware-unrun.
+reconciliation and journal faults. The exact v2 plan then completed once on the
+development unit: `program-09` and WIP-ready completed, the process exited 4
+without postread, and a fresh verifier-only process classified two exact
+32-MiB postimage reads at boundary 10 without retry. The fixed continuation
+restored the baseline at boundary 22; final reconciliation cleared state; a
+separate verifier reproduced the baseline and passed every region CRC; and the
+owner confirmed normal boot. See the
+[v2 validation record](USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md).
 
 The historical v1 hardware run proved traversal of all 22 ordinary exact
 command boundaries and finalization on the tested loader, unit and geometry. It
-never left an intent unresolved or exercised active-intent reconciliation. A
-successful v2 run would add only controlled command-complete/no-postread
+never left an intent unresolved or exercised active-intent reconciliation. The
+completed v2 run adds only controlled command-complete/no-postread
 reconciliation and continuation evidence. Neither
 revision physically interrupts CBW, data, CSW, WIP polling, a NOR program pulse
 or an erase pulse. They therefore do not prove

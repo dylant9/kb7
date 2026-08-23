@@ -39,11 +39,12 @@ that the contributor does not possess.
   executor can derive only its 22 reviewed non-firmware operations. Its v1 plan
   completed once on the development unit, restored the exact 32-MiB baseline,
   and returned to operator-reported normal keyboard operation. Its current v2
-  plan is offline-tested and hardware-unrun; it adds only a mandatory
-  command-complete/no-postread active-intent checkpoint and fresh-process,
-  mutation-incapable reconciliation. The public tree records only
-  independently authored source, hashes, classifications and summarized
-  results from that run. No vendor DLL, disassembly listing, general USB
+  plan has also completed once: its mandatory command-complete/no-postread
+  active-intent checkpoint reconciled the exact postimage in a fresh process
+  over a mutation-incapable backend, then the fixed cleanup restored the exact
+  baseline and the keyboard returned to normal operation. The public tree
+  records only independently authored source, hashes, classifications and
+  summarized results from those runs. No vendor DLL, disassembly listing, general USB
   firmware flasher, raw transcript, capture, journal or stock byte payload is
   included.
 - Apache-2.0 license and project/trademark notice.

@@ -23,14 +23,16 @@ A second tool now exists with a deliberately different domain:
 `kb7-updater-scratch-executor.py`. It can replay only the fixed 22-operation
 V1.22 scratch experiment, is dry-run by default, and has no firmware-bundle or
 caller-selected mutation interface. Its preceding v1 plan completed once on the
-development unit. The current v2 plan is offline-tested and hardware-unrun; it
-requires a fixed boundary-9 command-complete/no-postread checkpoint followed by
-fresh-process reconciliation over a mutation-incapable transport. Neither
-revision unlocks this paired-firmware executor; the two tools use distinct plans
+development unit. The current v2 plan has also completed once: its fixed
+boundary-9 command-complete/no-postread checkpoint exited 4, a fresh process
+over a mutation-incapable transport accepted two exact postimage reads without
+retry, and the fixed continuation restored the baseline and normal operation.
+Neither revision unlocks this paired-firmware executor; the two tools use distinct plans
 and journal schemas. See the
 [fixed scratch executor plan](USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md) and
 [mandatory checkpoint plan](USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md),
-plus the [historical v1 validation record](USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md).
+the [v2 validation record](USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md),
+and the [historical v1 validation record](USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md).
 
 ## Transaction reconstruction
 
@@ -197,18 +199,26 @@ plan and separate scratch journal. This provides an offline-testable bridge
 between the earlier one-off scratch script and a state-derived executor without
 placing any mutation code in the paired-firmware executor.
 
-The current v2 source and fake-transport/state tests pass offline but have not
-run on hardware. The preceding v1 harness completed one full hardware cycle on
-the development unit. All 22 ordinary exact operation boundaries passed; a
+The current v2 source and fake-transport/state tests pass offline, and its exact
+plan has now completed one hardware cycle on the development unit. The fixed
+`program-09` command and WIP-ready poll completed without a postread; the
+process exited 4 with intent active; and a fresh process using the verifier-only
+backend classified two exact 32-MiB postimage reads without retry. The remaining
+plan restored the baseline, final reconciliation cleared the journal, a separate
+verifier passed all three region CRCs, and the owner confirmed normal operation.
+
+The preceding v1 harness also completed one full hardware cycle on the
+development unit. All 22 ordinary exact operation boundaries passed; a
 final new-process read-only reconciliation
 verified the restored complete baseline twice and cleared the journal; and a
 separate verifier entry point reproduced complete-image SHA-256
 `2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f`
 before the owner reported normal keyboard operation. Both live readers use the
-same USB loader and SoC controller. This remains destructive laboratory tooling
-rather than an updater qualification. V1 never left an intent unresolved or
-entered active-intent reconciliation; the planned v2 checkpoint ends only after
-its command and WIP poll complete. Neither physically interrupts a command,
+same USB loader and SoC `F6 05` controller path. This remains destructive
+laboratory tooling rather than an updater qualification. V1 never left an
+intent unresolved or entered active-intent reconciliation; the completed v2
+checkpoint ended only after its command and WIP poll completed. Neither
+physically interrupts a command,
 tests power loss or touches firmware regions.
 
 ## Remaining gates
@@ -225,9 +235,10 @@ are separately completed and reviewed:
    completed experiment did not interrupt CBW/data/CSW, WIP, erase or program.
 3. Re-review the exact operation transport, intent/restart behavior and source
    freeze. The separate scratch harness has no raw mutation interface; its v1
-   plan passed once on hardware, while its v2 mandatory active-intent plan is
-   offline-tested and hardware-unrun. Physical mid-command and power-loss
-   behavior remain untested. Any future paired-firmware executor
+   plan passed once on hardware, and its v2 mandatory active-intent plan has now
+   also passed once at a command-complete/no-postread boundary. Physical
+   mid-command and power-loss behavior remain untested. Any future
+   paired-firmware executor
    must remain independently locked until its own review and must likewise
    expose no raw mutation interface.
 4. Add release authenticity: the present owner-local bundle is content-hashed
