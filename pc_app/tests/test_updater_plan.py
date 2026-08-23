@@ -233,6 +233,14 @@ class UpdaterPlanTests(unittest.TestCase):
 
     def test_manifest_and_all_immutable_bytes_are_preserved(self) -> None:
         self.assertEqual(self.descriptor["manifest_operations"], 0)
+        simulation = json.loads(
+            (self.bundle_dir / "simulation.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(simulation["preserved_boot_region_operation_count"], 0)
+        self.assertEqual(
+            simulation["preserved_boot_regions"],
+            UPDATER.preserved_boot_regions(self.baseline),
+        )
         image = bytearray(self.baseline)
         operations, _ = UPDATER.build_operations(
             self.baseline,

@@ -41,6 +41,19 @@ the historical
 the [v2 validation record](USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md),
 and the [historical v1 validation record](USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md).
 
+A third tool pair is separately bounded to the
+[minimal loader-reentry proof](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md):
+an offline campaign derivation/verifier and a one-fixed-operation-per-process
+executor. The stable proof target contains the checksum-valid proof Core0 and
+byte-exact stock V1.22 Core1; a fixed Core1 sector is only a temporary
+checksum-invalid transition barrier, and a rank-32 sparse Core0 gate is the
+last commit. The executor has no general bundle, offset, CDB or payload
+authority. Its fake-transport and fault-state suite passes, but its live-enable
+constant is false even though the required owner campaign identifier is now
+pinned from two independently checked exact baselines. It has
+not opened hardware. Nothing in that separate domain enables this paired
+executor's mutation adapter.
+
 ## Transaction reconstruction
 
 Before opening USB, the scaffold independently reloads the owner-local bundle

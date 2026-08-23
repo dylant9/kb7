@@ -15,6 +15,13 @@ The subsequent implementation wave is summarized in
 complete, gated clean-room drivers and persistent profiles. The tables below
 are retained as the original remediation ledger.
 
+The later
+[stock-loader audit](STOCK-LOADER-REENTRY-2026-08-23.md) supersedes only the
+recovery evidence available to that ledger: the original marker-plus-AIRCR
+claim was still wrong, but stock's additional SRAM relocation and
+loader-to-PRAM copy are now statically proved. The custom equivalent passes
+offline, defaults off and has not run on hardware.
+
 ## Source defects repaired
 
 | Finding | Disposition and evidence |
@@ -31,7 +38,7 @@ are retained as the original remediation ledger.
 | Screen parser accepted noncanonical input | Fixed. C, Python, and browser paths require exact length/layout, zero v1 flags/reserved fields, exact screen/widget partitioning, unique IDs, known opcodes, action-specific ranges/navigation targets, and valid UTF-8. `test_c_parser.py` compares C and Python over every truncation and a deterministic mutation corpus. |
 | Host server omitted documented behavior/statuses | Fixed at the protocol layer: validation distinguishes version from CRC failures; BEGIN/WRITE/COMMIT are strict; READ, runtime SELECT, and confirmed FACTORY RESET are implemented. The C host-server test exercises the state machine against simulated NOR. |
 | Touch SCL was driven high | Fixed. Both I²C lines now use release-for-high/open-drain behavior and SCL release has a bounded clock-stretch wait. Touch remains disabled by default pending electrical validation. |
-| Faults slept forever/recovery check was late | Reclassified after the full datasheet review. AIRCR/software reset restarts PRAM and cannot prove entry to the preserved loader. The compatibility helper now records the recovered mailbox request, disables interrupts, and parks for external reset. Faults reach that fail-closed park; the recovery chord now defaults off because its GPIO configuration is also unproven. A ROM-entering reset and external recovery are still required. |
+| Faults slept forever/recovery check was late | Reclassified after the full datasheet review. At that remediation stage, the only supported conclusion was that marker plus AIRCR restarts the custom PRAM image, so the helper changed to marker-and-park and faults reached that fail-closed path. A later three-version audit recovered stock's missing SRAM relocation and loader-to-PRAM copy. The clean-room equivalent now passes offline behind a default-off gate, but hardware still must prove `10f5:5037`; the recovery chord separately defaults off. |
 
 ## Findings still handled by fail-closed boundaries
 
@@ -55,9 +62,23 @@ hardware measurements:
   restore/verification rehearsal are now demonstrated. The labeled `MCU_RST`
   pad is operationally sufficient for that proven isolation procedure; direct
   lead-88 continuity would add documentation, not a prerequisite.
-- Autonomous loader entry remains unavailable. The recovered mailbox marker's
-  lifetime and consumer are unproven, and software reset is explicitly a PRAM
-  restart. See `BOOT-RECOVERY-MODEL.md`.
+- Stock software loader entry is statically proved across V1.22, V1.24 and
+  V1.33: the marker is followed by an SRAM-executed loader-to-PRAM copy before
+  software reset, and the copied loader consumes it. The default-off custom
+  proof passes offline but is hardware-unrun, so ordinary builds still
+  marker-and-park. See the
+  [stock loader-reentry proof](STOCK-LOADER-REENTRY-2026-08-23.md) and
+  [boot/recovery model](BOOT-RECOVERY-MODEL.md).
+- The fixed proof campaign now derives a checksum-valid proof Core 0 with
+  byte-exact stock Core 1 and a reverse sequence to the exact baseline. A
+  temporary one-sector Core-1 checksum poison protects every dense Core-0
+  prefix, and the final Core-0 word is a rank-32 checksum gate. Its separate
+  executor is dry-run-default, has terminal pre-USB intent states and no raw
+  flash fields. Supporting source/policy pins and 33 focused campaign/executor
+  tests pass. Two exact owner baselines independently reproduce its pinned
+  168-operation identity and exact proof/stock closure, but live commit remains
+  independently hard-disabled. See the
+  [fixed proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md).
 - The recovery chord defaults off. Its input choice and boot-time semantics
   still need a dedicated review; generic `SYS0_PINCTRL` uncertainty is no
   longer the blocker.
@@ -98,6 +119,9 @@ CRCs and returned to operator-confirmed normal `5038` keyboard operation. No
 revision physically interrupts a
 flash command or pulse, tests device power loss or touches firmware regions,
 and none unlocks firmware mutation.
+The additional fixed loader-reentry executor is not a general updater: it can
+accept only one independently rederived proof campaign, its owner-specific
+campaign pin is exact, and `LIVE_PROOF_CAMPAIGN_ENABLED` remains false.
 Header dependencies use `-MMD -MP`.
 
 Any future image-producing release pipeline must, before it is enabled:
@@ -122,21 +146,25 @@ incorporated, but the public firmware is still a non-flashable engineering
 implementation. Remaining blockers are functional board validation, cold-start
 proof and an assigned USB identity; none is silently enabled. The
 external-SPI stock restore/verification rehearsal is complete and remains the
-required rollback route, but no replacement firmware has run on hardware.
+final rollback route. The minimal loader-reentry profile passes offline and is
+planner-compatible, not a checksum-compatible or hardware-approved image; no
+replacement firmware has run on hardware. The fixed installer/restorer is also
+offline-ready but live-locked and does not change `flash_approved=false`.
 
 ## Verification record
 
 The latest offline verification pass completed successfully on 2026-08-23:
 
-- `make check`: 209 Python tests passed, browser JavaScript syntax
-  and executable validator checks passed, and the default, guarded-audit, and
-  all-branches integration firmware profiles built and passed ELF verification;
-- the largest all-branches profile used 8,344 bytes of core0 text, 12 bytes of
+- `make check`: 256 Python tests passed, browser JavaScript syntax
+  and executable validator checks passed, and the default, guarded-audit,
+  all-branches integration and minimal recovery-proof firmware profiles built
+  and passed ELF verification;
+- the largest all-branches profile used 8,564 bytes of core0 text, 12 bytes of
   core0 data and 3,792 bytes of core0 BSS; core1 used 19,128 bytes of text,
   4 bytes of data and 19,312 bytes of BSS;
 - neither ELF contains unresolved relocations, and core0's vector table is
   exactly `0x13c` bytes;
-- the public-tree policy check accepted 193 UTF-8 source/documentation files and
+- the public-tree policy check accepted 204 UTF-8 source/documentation files and
   found no firmware blobs, generated binaries, or disallowed material; and
 - independent warning passes using GCC `-fanalyzer` and strict conversion,
   shadowing, and undefined-macro diagnostics completed without findings.

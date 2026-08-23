@@ -98,6 +98,12 @@ SIMULATION_FORMAT = "KB7 USB updater interruption model v1"
 PAIR_DOMAIN = b"KB7 paired replacement firmware v1\0"
 STATE_DOMAIN = b"KB7 updater modeled state v1\0"
 
+PRESERVED_BOOT_REGIONS = (
+    ("header", HEADER_START, LOADER_START),
+    ("loader", LOADER_START, MANIFEST_START),
+    ("manifest", MANIFEST_START, CORE0_START),
+)
+
 
 def require(condition: bool, message: str) -> None:
     if not condition:
@@ -106,6 +112,18 @@ def require(condition: bool, message: str) -> None:
 
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def preserved_boot_regions(image: bytes) -> list[dict[str, object]]:
+    return [
+        {
+            "name": name,
+            "start": f"0x{start:08x}",
+            "end_exclusive": f"0x{end:08x}",
+            "sha256": sha256(image[start:end]),
+        }
+        for name, start, end in PRESERVED_BOOT_REGIONS
+    ]
 
 
 def canonical_bytes(value: object) -> bytes:
@@ -810,6 +828,14 @@ def simulate(baseline: bytes, targets: dict[str, bytes], staged: dict[str, bytes
         final_expected[spec.start + spec.length:spec.envelope_end] = \
             b"\xff" * (spec.envelope_end - spec.start - spec.length)
     require(current == final_expected, "simulator final image is not exact target")
+    preserved_operation_count = sum(
+        1
+        for operation in operations
+        for _name, start, end in PRESERVED_BOOT_REGIONS
+        if operation.offset < end and operation.offset + operation.length > start
+    )
+    require(preserved_operation_count == 0,
+            "an operation overlaps the header, loader, or manifest")
     report = {
         "format": SIMULATION_FORMAT,
         "offline_only": True,
@@ -831,6 +857,8 @@ def simulate(baseline: bytes, targets: dict[str, bytes], staged: dict[str, bytes
         "journal_authority_variants_checked": journal_states_checked,
         "body_operations_with_opposite_invalid_barrier": body_partial_barriers,
         "early_checksum_valid_non_target_states": both_valid_early,
+        "preserved_boot_region_operation_count": preserved_operation_count,
+        "preserved_boot_regions": preserved_boot_regions(baseline),
         "gate_subset_proof": (
             "Each final four-byte gate has GF(2) rank 32. Under requested-bit-subset "
             "program behavior, only all 32 clears can restore that region checksum."
@@ -842,7 +870,7 @@ def simulate(baseline: bytes, targets: dict[str, bytes], staged: dict[str, bytes
         ),
         "final_full_sha256": sha256(final_expected),
         "invariants_passed": [
-            "manifest has zero operations",
+            "header, loader, and manifest have zero operations",
             "all operations remain inside the two core sector envelopes",
             "immutable bytes remain exact",
             "both checksums never validate early",
@@ -1069,6 +1097,16 @@ def load_descriptor(bundle_dir: Path) -> dict[str, object]:
                                 parse_constant=reject_json_constant)
     except (json.JSONDecodeError, UnicodeDecodeError) as error:
         raise PlanError("simulation.json is not strict JSON") from error
+    source_anchors = descriptor.get("source_anchors")
+    declared_boot_regions = [
+        {
+            "name": name,
+            "start": f"0x{start:08x}",
+            "end_exclusive": f"0x{end:08x}",
+            "sha256": source_anchors.get(name) if isinstance(source_anchors, dict) else None,
+        }
+        for name, start, end in PRESERVED_BOOT_REGIONS
+    ]
     require(isinstance(simulation, dict) and
             simulation.get("format") == SIMULATION_FORMAT and
             simulation.get("offline_only") is True and
@@ -1076,7 +1114,9 @@ def load_descriptor(bundle_dir: Path) -> dict[str, object]:
             simulation.get("flash_approved") is False and
             type(simulation.get("operation_count")) is int and
             simulation.get("operation_count") == len(descriptor.get("operations", [])) and
-            simulation.get("early_checksum_valid_non_target_states") == 0,
+            simulation.get("early_checksum_valid_non_target_states") == 0 and
+            simulation.get("preserved_boot_region_operation_count") == 0 and
+            simulation.get("preserved_boot_regions") == declared_boot_regions,
             "simulation report does not carry the required fail-closed result")
     return descriptor
 

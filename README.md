@@ -19,9 +19,8 @@ image generation is disabled.
 ## Current status — 2026-08-23
 
 - The offline/software implementation is complete to the evidence currently
-  available. `make check` passes 209 Python tests, browser
-  validation, three ARM build profiles, hardware-fact checks and the public-tree
-  safety audit.
+  available. `make check` passes 256 Python tests, browser validation, four ARM
+  build profiles, hardware-fact checks and the public-tree safety audit.
 - Two independent reads of the installed 32-MiB Macronix SPI NOR are
   bit-identical. They match the earlier USB-extracted V1.22 components and
   exposed stock-owned configuration/upload partitions that the custom storage
@@ -32,6 +31,30 @@ image generation is disabled.
   The owner has since completed the full-chip restore/verification rehearsal and
   retained matching post-repair captures. External SPI is the demonstrated
   rollback path for this development unit.
+- A read-only, hash-pinned audit now proves that stock V1.22, V1.24 and V1.33
+  deliberately return to the preserved loader by writing its mailbox marker,
+  running a relocation routine from SRAM, copying `0x10000` bytes from
+  `0x60001000` to PRAM and only then requesting an AIRCR reset. AIRCR alone
+  still restarts the current PRAM image and is not loader entry. An
+  independently authored, default-off `recovery-proof` profile passes its
+  offline byte, relocation, stack, vector and no-mutation checks, but has not
+  run on hardware and does not yet establish a custom-firmware return to
+  `10f5:5037`. See the
+  [preserved-loader proof](docs/STOCK-LOADER-REENTRY-2026-08-23.md).
+- A new fixed proof-campaign builder now turns that minimal Core-0 ELF plus two
+  exact owner baselines into a private install-and-exact-stock-restore plan.
+  Its stable proof target is checksum-valid custom Core 0 plus byte-exact stock
+  Core 1; a single temporary Core-1 sector poison supplies the opposite-core
+  barrier while Core 0 is rebuilt and is restored before the final Core-0
+  commit. A separate one-operation executor has exhaustive offline
+  state/transport fault coverage, no caller-selected flash fields, and pinned
+  policy/source identities. The two owner baselines now independently rederive
+  the exact 168-operation campaign ID
+  `3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f`,
+  including exact proof-image and stock-restoration closure. Live execution
+  remains independently hard-disabled. The general paired-firmware executor
+  remains locked and `flash_approved=false`. See the
+  [fixed proof campaign](docs/LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md).
 - The flash-access tooling adds proven external SPI recovery workflows,
   read-only USB-ISP diagnostics and fixed, dry-run-default USB mutation
   experiments. On 2026-08-23 one guarded V1.22 cycle at offset `0x0008e000`
@@ -135,6 +158,11 @@ See the [firmware completion status](docs/FIRMWARE-COMPLETION-2026-08-18.md),
 [full-flash acquisition record](docs/FULL-FLASH-ACQUISITION-2026-08-22.md), and
 [boot/recovery model](docs/BOOT-RECOVERY-MODEL.md) for the firmware evidence
 boundaries. The
+[stock loader-reentry audit and proof profile](docs/STOCK-LOADER-REENTRY-2026-08-23.md)
+records the exact static result and its still-unrun hardware gate. The
+[fixed proof campaign and runbook](docs/LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md)
+records the owner-bound, independently reverified offline installer/restorer
+and its separate live-enable lock. The
 [bounded USB-ISP validation record](docs/USB-ISP-WRITE-VALIDATION-2026-08-23.md),
 [guarded erase-footprint result](docs/USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md),
 [flash-access guide](tools/flash-access/README.md), and
@@ -176,8 +204,9 @@ result and stricter stop rules.
 - `tools/flash-access/` — ESP32/`flashrom` recovery notes, read-only USB-ISP
   verification tools, F6 command analysis and fixed guarded USB write-path
   experiments, plus a V1.22 updater planner/checker, read-only firmware
-  executor scaffold and separate fixed scratch-only executor. It contains no
-  stock bytes and no supported USB firmware flasher.
+  executor scaffold, separate fixed scratch-only executor, and a live-locked
+  fixed loader-reentry proof campaign. It contains no stock bytes and no
+  supported or general USB firmware flasher.
 - `tools/check_public_tree.py` — rejects compiled/vendor artifacts, archive and
   executable formats, symlinks, build directories, and prohibited artifact
   filenames.
@@ -212,14 +241,21 @@ With GNU Make and an `arm-none-eabi` GCC/binutils toolchain:
 make -C replacement_fw clean all
 make -C replacement_fw audit-profile
 make -C replacement_fw integration-check
+make -C replacement_fw recovery-proof
 ```
 
 The default, guarded audit, and all-branches integration profiles create ignored
 ELF/disassembly files for local inspection. `integration-check` compiles board-
-verified branches but is not evidence that a board passed those gates. `make
+verified branches but is not evidence that a board passed those gates. The
+`recovery-proof` target creates a planner-compatible, immediate-loader-reentry
+ELF and verifies its minimal linked form; it neither makes that ELF
+checksum-compatible by itself nor emits a bundle or touches hardware. `make
 bundle` deliberately fails: no installable package can be produced by that
-target. The separate planner emits only owner-local, non-executing sector
-payloads and model metadata.
+target. The fixed loader-reentry campaign builder can balance this exact proof
+ELF against two exact owner baselines, but emits only private, execution-
+unapproved sector payloads and model metadata. Its separate executor is
+dry-run-default, pins the exact reviewed owner campaign ID, and remains
+independently live-locked.
 
 ## Public-repository boundary
 
@@ -230,7 +266,8 @@ hardware-facing code. Then review
 [AUDIT-REMEDIATION-2026-08-17.md](docs/AUDIT-REMEDIATION-2026-08-17.md) and the
 later [firmware completion status](docs/FIRMWARE-COMPLETION-2026-08-18.md),
 [SNC7320 datasheet audit](docs/SOC-DATASHEET-AUDIT-2026-08-18.md), and
-[boot/recovery model](docs/BOOT-RECOVERY-MODEL.md). The
+[boot/recovery model](docs/BOOT-RECOVERY-MODEL.md), including the later
+[stock loader-reentry proof](docs/STOCK-LOADER-REENTRY-2026-08-23.md). The
 [full-flash acquisition record](docs/FULL-FLASH-ACQUISITION-2026-08-22.md)
 supersedes all earlier assumptions that the erased flash tail was generally
 available for custom storage. Run this immediately before every commit or

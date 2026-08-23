@@ -86,7 +86,7 @@ void kb7_usb_consumer_usage(uint16_t usage);
 void kb7_usb_consumer_action(uint16_t usage, bool pressed);
 void kb7_usb_consumer_pulse(uint16_t usage);
 
-/* Legacy name: records a recovery request and parks for external ROM reset. */
+/* Default: marker-and-park. Gated proof: relocate and enter preserved loader. */
 void kb7_enter_loader(void) KB7_NORETURN;
 
 #endif

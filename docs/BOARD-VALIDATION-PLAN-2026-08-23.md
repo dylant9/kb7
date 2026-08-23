@@ -9,9 +9,13 @@ stock recovery and both MCU datasheets now establish the pin modes offline;
 power-off continuity and stock-powered passive captures are optional diagnostic
 tools, not prerequisites for rediscovering those modes.
 
-No paired-firmware write is authorized by this plan. `flash_approved` remains
-false, the paired executor remains mutation-locked, and `make bundle` continues
-to fail.
+No general paired-firmware write is authorized by this plan. `flash_approved`
+remains false, the paired executor remains mutation-locked, and `make bundle`
+continues to fail. A separately bounded
+[minimal loader-reentry proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md)
+now passes offline derivation, symbolic ordering checks and executor fault
+tests. Its exact owner-specific 168-operation campaign pin is now independently
+rederived, but live commit remains hard-disabled.
 
 ## Entry conditions
 
@@ -45,6 +49,7 @@ The recovery wiring and electrical cautions in
 | RGB | Electrical mode/latch behavior and 101-position physical correlation | `KB7_ENABLE_RGB=0` | closed |
 | Encoder/action bar | Continuity, pull state, polarity, debounce and release behavior | encoder disabled; action bar plus board-profile gates disabled | closed |
 | Persistent flash | Board behavior and recovery proven before any custom storage mutation | `KB7_ENABLE_FLASH_MUTATION=0` | closed |
+| Minimal loader re-entry | Two exact owner baselines, independently rederived fixed campaign/pins, proof-only Core0 plus exact stock Core1, full SPI rollback ready, and a separate reviewed live-enable decision | separate one-operation executor; no general bundle authority | offline ready; live locked |
 | Paired install | Every prerequisite above, provisioned release trust root, reviewed exact bundle, and rehearsed SPI rollback | paired executor has no mutation command | prohibited |
 
 `audit-profile` and `integration-check` compile closed branches to prevent code
@@ -140,3 +145,10 @@ distributed fingerprint are provisioned, the exact offline bundle and detached
 authentication verify, and the SPI recovery rehearsal is repeated in the final
 bench configuration. Even then, authorization must be a separate reviewed
 decision; neither a green build nor a valid signature supplies it implicitly.
+
+The minimal loader-reentry proof is intentionally not a paired-image trial: it
+starts only Core0's proof entry, keeps Core1 byte-exact stock at every stable
+target, and uses a temporary checksum-invalid barrier during transition. Its
+offline readiness does not authorize hardware execution. Enabling its separate
+executor still requires the already-pinned exact owner campaign to reverify and
+a distinct reviewed live-enable decision under the linked runbook.

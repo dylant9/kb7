@@ -88,6 +88,43 @@ class PublicTreeTests(unittest.TestCase):
                 3,
             )
 
+    def test_loader_reentry_proof_journal_names_and_schema_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "kb7-loader-reentry-proof-journal.json").write_text(
+                "{}\n")
+            (root / ".kb7-loader-reentry-proof-journal.ABC123").write_text(
+                "{}\n")
+            (root / "renamed-state.json").write_text(
+                '{"schema":"kb7-loader-reentry-proof-journal-v1"}\n')
+
+            result = MODULE.inspect(root)
+
+            self.assertFalse(result["passed"])
+            self.assertEqual(
+                sum("prohibited artifact filename" in failure
+                    for failure in result["failures"]),
+                2,
+            )
+            self.assertEqual(
+                sum("owner-local updater journal" in failure
+                    for failure in result["failures"]),
+                1,
+            )
+
+    def test_loader_reentry_private_campaign_format_is_rejected_when_renamed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "renamed-proof-campaign.json").write_text(
+                '{"format":"KB7 V1.22 fixed loader-reentry proof campaign v1"}\n')
+
+            result = MODULE.inspect(root)
+
+            self.assertFalse(result["passed"])
+            self.assertTrue(any(
+                "owner-local updater metadata" in failure
+                for failure in result["failures"]))
+
     def test_updater_authentication_and_private_keys_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -117,7 +154,7 @@ class PublicTreeTests(unittest.TestCase):
                 2,
             )
             self.assertEqual(
-                sum("owner-local updater authentication" in failure
+                sum("owner-local updater metadata" in failure
                     for failure in result["failures"]),
                 1,
             )

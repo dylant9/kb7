@@ -53,11 +53,15 @@ void reset_handler(void) {
     const uint32_t active_wdt =
         KB7_MMIO32(SNC_SYS0_BASE + SNC_SYS0_OSC_CONTROL) == 0U &&
                 KB7_MMIO32(SNC_SYS0_BASE + SNC_SYS0_CLOCK_SELECT) == 0U
-            ? SNC_WDT0_BASE
-            : SNC_WDT1_BASE;
+            ? SNC_WDT1_BASE
+            : SNC_WDT0_BASE;
     KB7_MMIO32(active_wdt + SNC_WDT_FEED) = UINT32_C(0x5afa55aa);
-    KB7_MMIO32(SNC_WDT1_BASE + SNC_WDT_CONFIGURATION) = UINT32_C(0x5afa0000);
     KB7_MMIO32(SNC_WDT0_BASE + SNC_WDT_CONFIGURATION) = UINT32_C(0x5afa0000);
+    KB7_MMIO32(SNC_WDT1_BASE + SNC_WDT_CONFIGURATION) = UINT32_C(0x5afa0000);
+#if KB7_BUILD_LOADER_REENTRY_PROOF
+    /* Deliberately bypass every application subsystem in the proof profile. */
+    kb7_enter_loader();
+#endif
     core0_main();
 }
 
@@ -68,9 +72,13 @@ const handler_t vectors[79] = {
     [1] = reset_handler,
     [2] = default_handler,
     [3] = hardfault_handler,
+#if KB7_BUILD_LOADER_REENTRY_PROOF
+    [4 ... 78] = default_handler,
+#else
     [4 ... 14] = default_handler,
     [15] = systick_handler,
     [16 ... 21] = default_handler,
     [22] = kb7_usb_irq_handler, /* recovered USB device IRQ6 */
     [23 ... 78] = default_handler,
+#endif
 };

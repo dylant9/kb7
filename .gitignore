@@ -10,6 +10,7 @@ build/
 # Owner-local updater plans, authentication material, and state
 # (payloads are already covered by *.bin)
 bundle.json
+campaign.json
 simulation.json
 *updater-authentication*.json
 *updater-auth*.json
@@ -17,6 +18,8 @@ simulation.json
 *.key
 *updater-journal*.json
 *updater-scratch-journal*
+*loader-reentry-proof-journal*
+*loader-reentry-proof-campaign*/
 *scratch-restart-state*.json
 
 # Firmware/reference material must never enter the public repository

@@ -39,6 +39,7 @@ DENIED_NAMES = {
     ".kb7-usb-updater-scratch-journal-v2.json",
     ".kb7-usb-updater-scratch-journal-v3.json",
     "updater-scratch-journal.json",
+    "kb7-loader-reentry-proof-journal.json",
     ".kb7-isp-scratch-restart-state.json",
     "scratch-restart-state.json",
 }
@@ -46,6 +47,7 @@ DENIED_NAME_PATTERNS = {
     "*updater-authentication*.json",
     "*updater-auth*.json",
     "*updater-scratch-journal*",
+    "*loader-reentry-proof-journal*",
 }
 DENIED_JSON_SCHEMAS = {
     "kb7-isp-scratch-restart-state-v1",
@@ -53,9 +55,11 @@ DENIED_JSON_SCHEMAS = {
     "kb7-usb-updater-scratch-journal-v1",
     "kb7-usb-updater-scratch-journal-v2",
     "kb7-usb-updater-scratch-journal-v3",
+    "kb7-loader-reentry-proof-journal-v1",
 }
 DENIED_JSON_FORMATS = {
     "KB7 offline updater detached authentication v1",
+    "KB7 V1.22 fixed loader-reentry proof campaign v1",
 }
 DENIED_TEXT = (
     "Ghidra " + "decompiler output",
@@ -127,7 +131,7 @@ def inspect(root: Path) -> dict[str, object]:
                 failures.append(f"owner-local updater journal: {relative}")
             if (isinstance(structured, dict) and
                     structured.get("format") in DENIED_JSON_FORMATS):
-                failures.append(f"owner-local updater authentication: {relative}")
+                failures.append(f"owner-local updater metadata: {relative}")
         for marker in DENIED_TEXT:
             if marker in text:
                 failures.append(f"prohibited content marker {marker!r}: {relative}")

@@ -27,7 +27,7 @@ struct kb7_runtime_api {
     int32_t (*flash_read)(uint32_t offset, void *data, uint32_t length);
     int32_t (*flash_erase_4k)(uint32_t offset);
     int32_t (*flash_program)(uint32_t offset, const void *data, uint32_t length);
-    /* Legacy ABI name; current implementation parks for external ROM reset. */
+    /* Legacy ABI name; defaults to park, with gated preserved-loader re-entry. */
     void (*enter_loader)(void);
 };
 

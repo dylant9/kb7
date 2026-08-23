@@ -74,10 +74,17 @@ READ the active store to resolve the result.
 | 0x16 | FACTORY RESET both custom screen and profile stores; requires flags `a5`, transfer ID `0x4b423752`, payload prefix `RESETKB7` |
 | 0x40 | device→host widget event; flags are down=0, move=1, up=2 |
 | 0x41 | device→host action-bar edge; payload key index/state and flags state |
-| 0x7e | reserved; returns `UNSUPPORTED` because no autonomous ROM/loader reset is proven |
+| 0x7e | reserved; returns `UNSUPPORTED`; no remotely callable, hardware-validated loader transition is authorized |
 
 Statuses: `0 OK`, `1 BAD_VERSION`, `2 BAD_CRC`, `3 BAD_LENGTH`, `4 BAD_STATE`,
 `5 RANGE`, `6 STORAGE`, `7 UNSUPPORTED`.
+
+The stock application-side loader route is now statically proved across V1.22,
+V1.24 and V1.33, and a default-off clean-room proof passes offline. That does
+not enable opcode `0x7e`: the custom route has not run on hardware, ordinary
+builds still use marker-and-park, and a host command would be a materially
+different authorization and failure surface. See the
+[stock loader-reentry proof](STOCK-LOADER-REENTRY-2026-08-23.md).
 
 The 0x02 response payload is: width/height (`u16,u16`), max screens/widgets
 (`u8,u8`), screen-slot bytes (`u32`), KBS1 version, KBP1 version, max profile

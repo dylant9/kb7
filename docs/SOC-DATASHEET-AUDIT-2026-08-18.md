@@ -1,6 +1,6 @@
 # SNC7320 datasheet audit and physical pin map
 
-Review date: 2026-08-18
+Review date: 2026-08-18; loader-reentry finding reconciled 2026-08-23
 
 ## Executive result
 
@@ -22,7 +22,8 @@ memory and interrupt assumptions, and exposes additional release blockers:
 - SysTick is now derived from the reconstructed active clock rather than a
   fixed 120-MHz assumption, while the PLL sequence still requires board proof;
 - AIRCR/software reset restarts from PRAM, so it cannot by itself enter the
-  preserved ROM/flash loader; and
+  preserved flash loader; a later stock audit recovered the missing SRAM-based
+  loader-to-PRAM copy that makes the complete stock route valid; and
 - the documented PPU limit and an SPIFC/touch pin collision leave two important
   board-specific questions unresolved.
 
@@ -314,20 +315,35 @@ loads PRAM, and uses software reset to enter user code; absence of an identifyin
 mark leads to USB-ISP mode (p. 44).
 
 The previous `kb7_enter_loader()` implementation wrote a recovered mailbox
-marker and issued AIRCR `SYSRESETREQ`. The datasheet proves that this does not
-by itself reach ROM, and the custom PRAM reset path never consumes the marker.
-The public helper now records the marker, disables interrupts, and parks for an
-external reset instead of falsely claiming recovery. The boot-time recovery
-chord also defaults off because its chosen input and boot-time semantics remain
-unverified. A genuine autonomous loader route still requires one of:
+marker and issued AIRCR `SYSRESETREQ`. The datasheet proves that this pair of
+operations does not by itself reach the loader, because it merely restarts the
+custom PRAM image. The immediate remediation therefore changed the public
+helper to marker-and-park. That was the correct fail-closed conclusion from the
+evidence available at the time, but it was not the end of the stock path.
 
-- a proven watchdog configuration that resets through ROM;
-- a documented/remapped ROM reset path;
-- external RSTN or power cycling; or
-- direct external-flash recovery with the SoC held reset.
+A later hash-pinned audit of V1.22, V1.24 and V1.33 recovered the complete
+sequence. Stock writes the marker, disables interrupts, copies a byte-identical
+88-byte routine to SRAM, copies exactly `0x10000` bytes from flash XIP
+`0x60001000` to PRAM zero, and only then requests AIRCR reset. The copied loader
+consumes, clears and reads back the marker before entering its updater. This is
+consistent with the datasheet: AIRCR still restarts PRAM, but PRAM now contains
+the preserved loader.
 
-See `BOOT-RECOVERY-MODEL.md` for the operational procedure and remaining
-unknowns.
+An independently authored equivalent and minimal proof profile pass offline
+byte, relocation, stack, vector and no-mutation checks. Both feature gates
+default off and the proof has not run on hardware. Thus the stock route is
+statically proved, while early XIP access, executable shared SRAM, reset/marker
+behavior and `10f5:5037` enumeration from custom code remain one bounded
+hardware test. The boot-time recovery chord separately remains default-off
+until its input and boot-time semantics pass. See the
+[stock loader-reentry proof](STOCK-LOADER-REENTRY-2026-08-23.md) and
+[boot/recovery model](BOOT-RECOVERY-MODEL.md). The
+[fixed proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md) now supplies
+the owner-bound, independently reverified offline install/exact-restore
+sequence. Its exact campaign identity is pinned, but its independent live
+enable remains false. External SPI remains the final
+recovery route for an image that never reaches the early stage or damages
+hardware first.
 
 ## Datasheet limits and contradictions
 
@@ -374,9 +390,11 @@ datasheet is self-inconsistent.
    IRQ mapping, and ownership/coherency across both cores.
 6. Prove SRAM and OPI bounds, static stack requirements, stack high-water, and
    non-overlap with the loader, mailbox, both cores, DMA, and framebuffers.
-7. Implement real fault capture and deterministic recovery, including stacked
-   PC/LR retention, watchdog boot-attempt rollback, and an independently proven
-   path back to the preserved loader.
+7. Retain the implemented stacked PC/LR fault capture and the default-off,
+   independently authored preserved-loader relocation proof. Require its
+   bounded hardware run before treating it as deterministic recovery; watchdog
+   boot-attempt rollback remains an optional secondary design, not a substitute
+   for that proof.
 8. Complete USB EP0 enumeration and endpoint lifecycle, the exact key map, LCD
    and RGB board profiles, and NOR mutation. All remain fail-closed publicly.
 9. Keep image generation disabled until an image is derived from its named ELF,
@@ -393,9 +411,14 @@ datasheet is self-inconsistent.
 3. Functionally validate one gated subsystem at a time with explicit abort and
    recovery criteria. Dynamic panel, touch, Hall, RGB and USB behavior cannot
    be established solely by static recovery.
-4. Prefer initial custom-code execution from Core0 PRAM/shared SRAM over SWD
-   when a no-flash route is available. A power cycle then restores stock
-   without changing external flash.
+4. Before any general replacement profile, separately review and enable only
+   the exact fixed minimal loader-reentry proof campaign, with the demonstrated
+   SPI setup immediately available.
+   Require `10f5:5037`, unchanged header/loader/manifest hashes, exact stock
+   restoration and normal `10f5:5038` behavior. Its owner campaign ID is pinned
+   from two exact baselines, but its live-enable flag is false and the paired-
+   firmware executor remains mutation-locked; the static/offline result does
+   not authorize either live path.
 
 ### External-flash recovery gate
 
@@ -428,7 +451,10 @@ datasheet alone cannot approve a specific programmer or in-circuit wiring.
 The datasheet improves confidence in package pins, memory capacity, interrupt
 coverage, reset behavior, and peripheral base addresses. It simultaneously
 disproves the old Cortex-M4/single-core model, the inferred identities of two
-storage controllers, and the former software-reset loader claim. The public
-tree remains useful for offline architecture, parser, protocol, storage, UI,
-and build testing, but no current ELF should be converted to a device image or
-flashed.
+storage controllers, and the former claim that marker plus AIRCR alone enters
+the loader. The later stock audit proves the complete relocation-before-reset
+route, and the custom minimal proof passes offline, but no replacement ELF has
+run on hardware. The public tree remains useful for offline architecture,
+parser, protocol, storage, UI, and build testing; the proof ELF is only
+planner-compatible and must not be treated as a directly flashable or
+hardware-validated image.

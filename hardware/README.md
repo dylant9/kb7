@@ -12,6 +12,13 @@ output, PCB captures, or copied vendor tables.
 - `kb7-stock-flash.json` records hashes, ranges and independently derived format
   facts from two bit-identical owner-supplied 32-MiB reads. It contains no dump,
   log, firmware bytes or extracted asset.
+- `kb7-stock-loader-reentry.json` records hash-bound static facts for the
+  version-stable stock SRAM relocation and preserved-loader request path, plus
+  the default-off custom proof profile, its fixed offline install/restore
+  campaign, and their still-unmet hardware gates. The campaign is simulation-
+  and fault-test-complete, bound to the independently rederived owner campaign,
+  and still has no live execution authorization. It contains no stock
+  instruction bytes, owner-local paths, campaign payloads or journal data.
 
 ## Current physical evidence — 2026-08-23
 
@@ -53,7 +60,8 @@ Evidence classes:
 
 - `datasheet`: explicitly stated by the manufacturer;
 - `firmware_recovery`: independently recovered from lawfully held reference
-  firmware, summarized without copied code or vendor implementation addresses;
+  firmware, summarized without copied code or full implementation listings;
+  minimal hash-bound interoperability offsets may be included;
 - `user_observation`: reported marking or PCB label;
 - `inference`: a joined conclusion that still requires measurement; and
 - `unverified`: a field reserved for a physical result that has not been

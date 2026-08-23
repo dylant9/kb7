@@ -12,6 +12,22 @@
 #ifndef KB7_ENABLE_UNVERIFIED_RECOVERY_CHORD
 #define KB7_ENABLE_UNVERIFIED_RECOVERY_CHORD 0
 #endif
+/*
+ * Re-enter the preserved flash loader using the stock sequence: relocate the
+ * loader from its XIP window into PRAM, then request a PRAM software reset.
+ * This remains off in ordinary builds until the dedicated proof image has
+ * passed on hardware.
+ */
+#ifndef KB7_ENABLE_UNVERIFIED_LOADER_REENTRY
+#define KB7_ENABLE_UNVERIFIED_LOADER_REENTRY 0
+#endif
+/* Build-only profile which invokes loader re-entry before core0_main(). */
+#ifndef KB7_BUILD_LOADER_REENTRY_PROOF
+#define KB7_BUILD_LOADER_REENTRY_PROOF 0
+#endif
+#if KB7_BUILD_LOADER_REENTRY_PROOF && !KB7_ENABLE_UNVERIFIED_LOADER_REENTRY
+#error "the loader re-entry proof requires its explicit unverified feature gate"
+#endif
 #ifndef KB7_ENABLE_DISPLAY
 #define KB7_ENABLE_DISPLAY 0
 #endif

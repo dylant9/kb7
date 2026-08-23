@@ -2,7 +2,7 @@
 
 Review date: 2026-08-17; remediation additions reviewed 2026-08-18; full-flash
 and public-repository status reviewed 2026-08-22; bounded USB-ISP and fixed
-scratch-executor results reviewed 2026-08-23
+scratch-executor results plus stock loader-reentry evidence reviewed 2026-08-23
 Scope: this repository directory only
 
 ## Decision
@@ -32,6 +32,23 @@ that the contributor does not possess.
 - Independently derived full-flash hashes, ranges, format observations and
   recovery measurements. No raw dump, programmer log or repair image is
   included.
+- Independently authored loader-reentry verifier logic, a clean-room 84-byte
+  stackless relocation bridge and 72-byte loader-copy blob, minimal
+  interoperability hashes/offsets in
+  `hardware/kb7-stock-loader-reentry.json`, and the prose evidence boundary in
+  the [stock loader-reentry proof](STOCK-LOADER-REENTRY-2026-08-23.md). The
+  offsets identify only the request, relocation, reset and marker-consumer facts
+  needed to reproduce the protocol; no stock instruction bytes, raw binary,
+  disassembly or decompiler output is included.
+- Independently authored fixed proof-campaign and live-locked executor source.
+  The builder derives a checksum-valid clean-room Core 0 plus exact stock Core 1
+  and an exact-stock reverse sequence; the executor exposes no raw flash fields
+  and pins the independently rederived owner campaign identity while retaining
+  a separate false live-enable flag. The public machine record includes only
+  hashes, operation counts, fixed geometry, false authorization flags and the
+  hardware-unrun boundary. Private campaign descriptors, sector images,
+  baselines and journals remain excluded. See the
+  [fixed proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md).
 - Independently authored external-SPI recovery helpers, read-only USB-ISP
   diagnostics, two guarded dry-run-default USB write-path validation
   experiments, a separate fixed dry-run-default scratch executor, and
@@ -90,6 +107,13 @@ No external scripts, fonts, images, packages, or vendored libraries are bundled.
   or operation. Its current v3 checkpoint is fixed in the hash-bound plan
   rather than exposed as a runtime selector. The completed v2 plan remains a
   historical validation record. Neither changes the paired executor's lock.
+- The default-off loader-reentry proof is a local build profile, not an
+  installable image. Its ELF is only planner-compatible; the ordinary Makefile
+  still cannot emit a bundle, and the paired-firmware executor remains
+  mutation-locked. The separate fixed proof executor now pins the independently
+  rederived private campaign ID but retains an independent false live-enable
+  constant. Static proof of the stock route and an exact offline campaign do
+  not authorize a device run or host recovery opcode.
 
 ## Excluded and retained only outside the public repository
 
@@ -101,10 +125,13 @@ No external scripts, fonts, images, packages, or vendored libraries are bundled.
   decompiler output.
 - USB/SPI/I2C captures, screenshots or assets extracted from vendor software,
   raw pin-map evidence, ROM traces, and decompiler-level reports.
-- The stock-core patch experiments and their exact vendor function addresses.
-- Generated manifests, full-image-bound plans, sector images, paired-executor
-  or scratch-executor journals, scratch-restart state, prefixes and any package
-  containing stock bytes.
+- Stock-core patch experiments, raw function listings, instruction-byte
+  sequences and full vendor symbol maps. Minimal hash-pinned interoperability
+  offsets and verifier predicates are included as described above; raw
+  binaries, disassembly and decompiler output remain excluded.
+- Generated manifests, full-image-bound plans, proof-campaign descriptors and
+  simulations, sector images, paired/proof/scratch executor journals,
+  scratch-restart state, prefixes and any package containing stock bytes.
 - Updater authentication envelopes and private signing keys. A reviewed public
   key/fingerprint may be considered only after the release trust policy is
   separately approved.

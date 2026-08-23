@@ -39,9 +39,11 @@ are not runnable images: the offline V1.22 planner must patch one derived ID
 into both targets. Core0 validates the pair before USB attach, and the region-1
 entry validates it again before data/BSS initialization or board I/O. The
 linkers also reserve the CRC correction and sparse commit-gate blocks used by
-the offline transaction model. This makes a checksum-compatible mixed build
-fail-stop for external reset; it is not a proven transition back to USB ISP and
-does not show that either paired image works on the board.
+the offline transaction model. These ELFs are planner-compatible, not
+checksum-compatible images by themselves: the separate planner must derive and
+apply the pair ID, checksum correction and commit gate. Its symmetric pair
+guard makes a mixed planned pair fail-stop for external reset; it does not show
+that either paired image works on the board.
 
 Requirements: GNU Make, Python 3, and `arm-none-eabi-gcc`/binutils.
 
@@ -57,6 +59,25 @@ flash-mutation gates closed. `make integration-check` additionally compiles
 those gated branches. Neither touches a device or constitutes an installation
 profile.
 
+`make recovery-proof` builds a deliberately minimal, planner-compatible Core-0
+ELF that takes the independently authored preserved-loader route before
+`core0_main()`. The target verifies the exact 84-byte stackless relocation
+bridge, 72-byte loader-copy blob, their hashes and relocation-free code, the
+stack reserve, reset/vector shape, and absence of application, USB-init,
+C-copy and flash-mutation symbols. It does not CRC-balance the ELF, emit a
+bundle, open a device, or establish hardware behavior. The stock route is
+statically proved
+across V1.22, V1.24 and V1.33; the custom proof remains default-off and has not
+run on hardware. See
+[`../docs/STOCK-LOADER-REENTRY-2026-08-23.md`](../docs/STOCK-LOADER-REENTRY-2026-08-23.md).
+The separate
+[`fixed proof campaign`](../docs/LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md)
+can balance this exact Core-0 ELF while retaining stock Core 1 and derive an
+exact-stock reverse plan. The supplied owner baselines now reproduce the pinned
+168-operation campaign ID and exact proof/stock closures. Its source/policy
+gates pass offline, but the independent live-enable constant remains false and
+commit remains disabled.
+
 `make bundle` intentionally exits with an error. The offline-correctable audit
 findings have regression-tested repairs, described in
 `../docs/FIRMWARE-COMPLETION-2026-08-18.md`. USB/MCU2 identities and board
@@ -68,12 +89,13 @@ stock-loader scratch targets (including an observable exact 4-KiB footprint at
 one target), a read-only updater preflight/reconciliation scaffold, and the
 proven external-SPI recovery notes live in
 [`../tools/flash-access/`](../tools/flash-access/README.md); none is an
-installation route for these ELFs. Do not install them.
+authorized installation route for these ELFs. Do not install them.
 
-The compatibility function named `kb7_enter_loader()` does not claim an
-autonomous loader transition. The datasheet establishes that AIRCR/software
-reset restarts PRAM, so the helper records the recovered request marker, disables
-interrupts, and parks for an external reset. A proven ROM-entering watchdog,
-remap, or external-reset path is still required. The recovery chord also
-defaults off until its chosen physical inputs and boot-time semantics are
-validated.
+The compatibility function named `kb7_enter_loader()` remains fail-closed in
+ordinary builds: it records and reads back the request marker, disables
+interrupts, and parks. With the separate unverified loader-reentry gate enabled,
+it instead reproduces the stock sequence by relocating the preserved loader
+into PRAM from SRAM before AIRCR reset. A marker plus AIRCR alone is still a
+false route because software reset restarts whatever is already in PRAM. The
+custom sequence and the recovery chord both remain default-off until their
+dedicated hardware validations pass; external SPI remains the final fallback.

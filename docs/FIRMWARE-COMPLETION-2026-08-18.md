@@ -5,6 +5,8 @@ Updated with recovery and USB-ISP validation evidence: 2026-08-23
 Scope: independently authored public source after the missing-function work
 Replacement firmware exercised on hardware: none
 Stock recovery exercised: full-chip external ESP32-C3 restore/verification and boot
+Stock loader re-entry: statically proved in V1.22/V1.24/V1.33; custom proof hardware-unrun
+Fixed proof install/restore campaign: owner-bound and independently reverified offline; live disabled
 
 ## Verdict and primary LCD answer
 
@@ -39,6 +41,27 @@ exact 4-KiB programmed-data footprint at that target; cleanup restored the full
 baseline and the keyboard then cold-booted normally. These remain bounded stock-
 loader results, not an installation route for these replacement images.
 
+The stock application-side path back to that loader is now statically closed as
+well. Hash-pinned V1.22, V1.24 and V1.33 evidence proves the marker write,
+SRAM-relocated routine, exact 64-KiB XIP-to-PRAM copy, AIRCR reset and early
+loader marker consumer. An independently authored minimal proof profile passes
+offline and contains no application, USB-init or flash-mutation path. It is
+default-off and has not run on hardware, so this result does not yet claim a
+custom-firmware transition to `10f5:5037`. See the
+[stock loader-reentry proof](STOCK-LOADER-REENTRY-2026-08-23.md).
+
+The exact proof-install and stock-restore software is now also present. It keeps
+the stable Core-1 target byte-exact stock, uses one temporary fixed Core-1
+sector checksum poison while rebuilding Core 0, commits a rank-32 Core-0 gate
+last, and derives the reverse sequence to the exact full baseline. Its separate
+executor has terminal pre-USB intents, two exact pre/post full-chip reads,
+strict close-before-publication, no raw flash fields and no ordinary USB
+reconciliation. Supporting source and policy hashes are pinned, but live
+execution is hard-disabled. The supplied pair of exact owner baselines now
+reproduces the pinned 168-operation campaign, its checksum-valid proof target,
+and its byte-exact stock-restoration target. See the
+[fixed proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md).
+
 ## Completed software-owned work
 
 ### Boot, clocks, memory and recovery
@@ -53,8 +76,11 @@ loader results, not an installation route for these replacement images.
   second core is not falsely claimed to be started.
 - Fault record containing stacked registers and SCB fault state in reserved
   mailbox RAM.
-- Recovery request records the stock mailbox marker and parks for external
-  reset. AIRCR is not used because the datasheet proves that it restarts PRAM.
+- Ordinary recovery requests record and read back the stock mailbox marker,
+  disable interrupts and park. Behind a separate default-off validation gate,
+  the clean-room proof instead follows stock: execute from shared SRAM, replace
+  PRAM with the preserved loader, then request AIRCR reset. AIRCR alone still
+  only restarts the current PRAM image.
 - SFC reads plus gated sector erase/page program with finite waits, status/
   protection checks, source/destination constraints and complete readback.
   Mutation is restricted to screen and profile A/B ranges.
@@ -220,11 +246,19 @@ execution and no firmware-region write.
 8. Verify action-bar GPIO continuity, active-low polarity and safe pulls before
    enabling its board-profile gate.
 9. Maintain the successful external-SPI reset/programmer recovery runbook before
-   any combined image is written. Autonomous software loader entry remains
-   intentionally unavailable. The narrow marker and guarded erase-footprint
-   experiments passed at their fixed stock-loader scratch targets, but are not
-   a supported flasher and do not install these replacement images; external
-   SPI remains the required recovery route. A separate fixed multi-sector and
+   any combined image is written. The stock software loader-entry route is now
+   statically proved across three releases, and its default-off clean-room proof
+   passes offline, but the required bounded hardware run has not occurred. Until
+   `10f5:5037`, immutable-region hashes, exact stock restoration and normal
+   `10f5:5038` are observed, it is not an operational recovery claim. The
+   fixed proof campaign and executor now pass owner-bound offline simulation,
+   exact operation rederivation and fault testing. The exact campaign ID is
+   pinned, but live commit remains independently hard-disabled. The general
+   paired-firmware executor remains mutation-locked
+   and external SPI remains the final recovery route. The narrow marker and guarded erase-
+   footprint experiments passed at their fixed stock-loader scratch targets,
+   but are not a supported flasher and do not install these replacement images.
+   A separate fixed multi-sector and
    process-restart scratch experiment has now passed once: two
    command-complete/no-readback operations reconciled to exact postimages in
    new processes, cleanup restored the complete baseline, and normal `5038`
@@ -270,8 +304,14 @@ execution and no firmware-region write.
 - `make -C replacement_fw integration-check`: compile every hardware branch,
   including explicit board-profile and flash-mutation gates. This is code
   coverage, not board approval.
+- `make -C replacement_fw recovery-proof`: build and structurally verify the
+  minimal planner-compatible loader-reentry ELF. It produces no bundle, does
+  not make the ELF checksum-compatible by itself, and touches no device.
+- `python3 tools/flash-access/kb7-loader-reentry-campaign.py`: privately derive
+  or reverify the exact fixed proof-install/stock-restore campaign from two
+  owner baselines; it has no device I/O and does not authorize execution.
 - `make check`: Python/browser tests, host-compiled C component/protocol tests,
-  all three ARM profiles, hardware-fact validation and public-tree policy.
+  all four ARM profiles, hardware-fact validation and public-tree policy.
 
 No build target flashes a device. Generated ELFs/maps/disassemblies are ignored,
 and the public-tree checker rejects binaries, archives, vendor artifacts and the

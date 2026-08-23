@@ -63,6 +63,18 @@ historical [v2 test plan](USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23
 [v2 validation record](USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md) and
 [historical validation record](USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md).
 
+A third, non-general domain now exists for the
+[minimal loader-reentry proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md).
+Its offline builder derives only one proof-Core0/exact-stock-Core1 install and
+the exact-stock restore, with a temporary Core1 checksum barrier and a sparse
+rank-32 Core0 gate committed last. Its separate executor accepts exactly one
+campaign operation per process and no caller-selected address, payload, CDB or
+firmware bundle. The two exact owner baselines now independently reproduce its
+pinned 168-operation campaign and exact proof/stock closures. Offline
+simulation and fault tests pass, but live commit is independently
+hard-disabled and no proof image has run on hardware. This does not alter or unlock the
+general paired executor described above.
+
 The planner was exercised offline against two matching V1.22 full-chip inputs
 and the current locally built ELFs. An independent `simulate` pass reproduced
 the same 161-operation plan, preserved every immutable byte, found no early

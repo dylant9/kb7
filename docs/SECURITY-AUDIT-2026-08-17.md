@@ -89,7 +89,32 @@ gates now have a staged powered-off/passive-first plan in
 The full SNC7320 datasheet review on 2026-08-18 added a critical correction:
 AIRCR/software reset restarts PRAM, not mask ROM. The former mailbox-marker plus
 software-reset helper therefore did not prove entry to the preserved loader.
-The public helper now parks for external reset; see `BOOT-RECOVERY-MODEL.md`.
+The public helper consequently changed to marker-and-park. That historical
+finding remains correct: marker plus AIRCR alone is not loader entry.
+
+A later hash-pinned audit recovered the missing stock operations. V1.22, V1.24
+and V1.33 copy a small routine to SRAM; that routine replaces PRAM with the
+preserved loader before AIRCR reset, after which the loader consumes the
+marker. The stock route is now statically proved, and an independently authored
+default-off proof profile passes offline. It has not run on hardware, so it
+does not change this audit's no-install verdict or unlock the general firmware
+executor. See the
+[stock loader-reentry proof](STOCK-LOADER-REENTRY-2026-08-23.md) and
+[boot/recovery model](BOOT-RECOVERY-MODEL.md).
+
+A later fixed campaign closes the remaining offline orchestration gap without
+enabling hardware. It builds a checksum-valid proof Core 0 while retaining
+exact stock Core 1, uses one temporary Core-1 sector poison as the independent
+barrier during Core-0 rebuild, and derives the reverse exact-stock sequence.
+Its separate executor persists terminal state before every USB open, permits
+one internally derived mutation per CLI invocation, requires two exact
+full-chip pre/post reads and strict close-before-publication, and has no USB
+reconciliation for an ordinary intent. The supporting sources/policy are
+pinned, and two exact owner baselines now independently reproduce the pinned
+168-operation campaign ID and both stable targets. Live execution remains
+independently hard-disabled. This is an offline mechanism, not a reduction in the hardware
+severity of finding 12. See the
+[fixed proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md).
 
 ## Critical and high-severity findings
 
@@ -139,14 +164,19 @@ The public helper now parks for external reset; see `BOOT-RECOVERY-MODEL.md`.
     than releasing it open-drain, preventing clock stretching and risking
     contention.
 
-12. **A validly checksummed bad core0 had no proven recovery route.** The loader
-    protects against invalid checksums, not early faults in accepted firmware.
-    The recovery chord ran after unsafe clock code, fault handlers slept forever,
-    and USB recovery was unavailable.
+12. **At audit time, a validly checksummed bad core0 had no proven recovery
+    route.** The loader protects against invalid checksums, not early faults in
+    accepted firmware. The recovery chord ran after unsafe clock code, fault
+    handlers slept forever, and USB recovery was unavailable. The later static
+    loader-reentry result supplies a viable early-stage design, and the later
+    fixed install/restore campaign supplies a fail-closed offline test route,
+    but its custom proof is still hardware-unrun and live-locked.
 
 13. **Software reset was incorrectly treated as loader entry.** The later
-    datasheet review proved that it restarts PRAM. A ROM-entering watchdog,
-    remap, external reset, or direct programmer path is still required.
+    datasheet review proved that it restarts PRAM. The subsequent stock audit
+    did not reverse that fact: it proved that stock first copies the preserved
+    loader into PRAM from SRAM and only then resets. External SPI remains the
+    final independent fallback.
 
 ## Release-pipeline findings
 
@@ -192,5 +222,6 @@ The public helper now parks for external reset; see `BOOT-RECOVERY-MODEL.md`.
 5. Repair storage fallback, parser parity, host protocol conformance, and UI
    press/release/state handling.
 6. Prove an external recovery route and full backup/restore, then prove a
-   ROM-entering reset/loader route, before any hardware test of an independent
-   core0.
+   loader route before any general hardware test of an independent core0. The
+   external-SPI half is complete; the later relocation route is complete
+   offline but still awaits its bounded custom-proof hardware run.

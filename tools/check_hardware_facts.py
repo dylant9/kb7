@@ -742,15 +742,249 @@ def validate_stock_flash(stock: dict[str, object]) -> None:
     ], "custom slots no longer match the full-flash-derived safe map")
 
 
+def validate_loader_reentry(evidence: dict[str, object]) -> None:
+    require(evidence["schema"] ==
+            "kb7.hardware.stock-loader-reentry-static-analysis" and
+            evidence["schema_version"] == 3 and
+            evidence["analyzed_on"] == "2026-08-23" and
+            evidence["evidence_class"] == "firmware_recovery",
+            "unexpected stock loader-reentry evidence identity")
+
+    mailbox = evidence["mailbox"]
+    require(mailbox == {
+        "address": "0x20000ffc",
+        "value": "0x73207320",
+        "loader_clears_twice": True,
+        "loader_verifies_clear": True,
+    }, "stock loader mailbox semantics changed")
+
+    relocation = evidence["stock_relocation"]
+    require(relocation == {
+        "source_start": "0x60001000",
+        "destination_start": "0x00000000",
+        "copy_bytes": 0x10000,
+        "executes_outside_pram": True,
+        "interrupts_disabled": True,
+        "aircr_address": "0xe000ed0c",
+        "aircr_expression": "(AIRCR & 0x00000700) | 0x05fa0004",
+        "trampoline_bytes": 88,
+        "trampoline_sha256":
+            "570dc848c53aad3d18ae090580c2dd0687f7273c22693b4860e18dbf99a46315",
+        "identical_in_all_analyzed_releases": True,
+    }, "stock loader relocation semantics changed")
+
+    releases = evidence["releases"]
+    require(isinstance(releases, list) and len(releases) == 3,
+            "loader-reentry evidence must retain three releases")
+    require([
+        (
+            release["version"], release["core1_size_bytes"],
+            release["core1_sha256"], release["loader_size_bytes"],
+            release["loader_sha256"], release["request_handler_offset"],
+            release["request_marker_write_offset"], release["marker_poll_offset"],
+            release["relocation_wrapper_offset"], release["stock_trampoline_offset"],
+            release["loader_marker_consumer_offset"],
+            release["loader_marker_call_offset"],
+            release["marker_updater_call_offset"],
+            release["app_failure_updater_call_offset"],
+            release["loader_updater_offset"],
+        )
+        for release in releases
+    ] == [
+        (
+            "V1.22", 438632,
+            "b2869bc657ba896474e760f513e4514fac678a951364efc29cbf9b6bb5e2ba72",
+            61440,
+            "9cc33333a88641b633bb5a4c0d55425c757e0fbdbe70eb99e9a9e40b76378a56",
+            "0x000581fc", "0x00058230", "0x0004a740", "0x00019a98",
+            "0x00059158", "0x000047ec", "0x00005922", "0x00005934",
+            "0x0000594c", "0x0000a5c0",
+        ),
+        (
+            "V1.24", 439372,
+            "dcb06f976dcaff81d0c5ccd1fdfebcb5b6ca4ec3d7e003ad1e90f896a4139aa7",
+            61440,
+            "9cc33333a88641b633bb5a4c0d55425c757e0fbdbe70eb99e9a9e40b76378a56",
+            "0x000584e0", "0x00058514", "0x0004a9dc", "0x00019cdc",
+            "0x0005943c", "0x000047ec", "0x00005922", "0x00005934",
+            "0x0000594c", "0x0000a5c0",
+        ),
+        (
+            "V1.33", 487404,
+            "d64df057dbdd125b12f156b57de5ad75a9a0d5804e30a16bb9ef1a56830d101f",
+            61440,
+            "453753e431609116e303a12548ec21c2efd500af4569034bd7947eb5bf43b298",
+            "0x000626f8", "0x0006272c", "0x000545aa", "0x00022ee0",
+            "0x00063a98", "0x000047ec", "0x00005922", "0x00005964",
+            "0x0000597c", "0x0000a5f0",
+        ),
+    ], "loader-reentry release identity or offsets changed")
+
+    proof = evidence["custom_offline_proof"]
+    require(proof["feature_gate"] == "KB7_ENABLE_UNVERIFIED_LOADER_REENTRY" and
+            proof["feature_gate_default"] is False and
+            proof["proof_profile"] == "KB7_BUILD_LOADER_REENTRY_PROOF" and
+            proof["proof_profile_default"] is False and
+            proof["enters_before_application_main"] is True and
+            proof["core1_started"] is False and
+            proof["flash_mutation_code_reachable"] is False and
+            proof["usb_device_init_code_reachable"] is False and
+            proof["stackless_relocator_bytes"] == 84 and
+            proof["stackless_relocator_sha256"] ==
+            "a8c82aa423cc089a563fed7bf2f319f39b2945addf065b47849c04c4d7c793eb" and
+            proof["stackless_relocator_modifies_sp"] is False and
+            proof["linker_symbol_distance_uses_checked_integer_addresses"] is True and
+            proof["trampoline_bytes"] == 72 and
+            proof["trampoline_sha256"] ==
+            "43bde11ee9089c930b8e67c6b7d569aec736d719f59f24c6b207d80309a2f539" and
+            proof["allocated_code_relocation_count"] == 0 and
+            proof["stack_reserve_bytes"] == 256 and
+            proof["minimum_live_stack_gap_bytes"] == 64 and
+            proof["mailbox_readback_before_relocation"] is True and
+            proof["planner_balancing_required"] is True,
+            "custom offline loader-reentry proof changed")
+    require(proof["hardware_validated"] is False and
+            proof["checksum_valid_custom_pair_booted"] is False and
+            proof["preserved_loader_enumerated_from_custom_stage"] is False and
+            proof["immutable_loader_readback_after_custom_install_verified"] is False and
+            proof["paired_firmware_write_authorized"] is False and
+            proof["flash_approved"] is False,
+            "offline loader-reentry evidence must not authorize hardware")
+
+    campaign = evidence["fixed_install_restore_campaign"]
+    require(
+        campaign["status"] == "owner_bound_offline_verified_hardware_unrun" and
+        campaign["campaign_tool"] ==
+        "tools/flash-access/kb7-loader-reentry-campaign.py" and
+        campaign["executor_tool"] ==
+        "tools/flash-access/kb7-loader-reentry-executor.py" and
+        campaign["campaign_format"] ==
+        "KB7 V1.22 fixed loader-reentry proof campaign v1" and
+        campaign["journal_schema"] ==
+        "kb7-loader-reentry-proof-journal-v1" and
+        campaign["expected_baseline_sha256"] ==
+        "2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f" and
+        campaign["proof_core0_raw"] == {
+            "entry": "0x00000175",
+            "length": 1228,
+            "sha256":
+                "dde05f5274952a30afb0d315ab21628da8ab0361b17aab9906f84216d364656c",
+        },
+        "fixed proof campaign identity changed")
+    require(campaign["stable_proof_target"] == {
+        "core0": "checksum-valid minimal loader-reentry proof",
+        "core1": "exact stock V1.22 Core1",
+        "header_loader_manifest": "exact stock V1.22",
+        "proof_full_sha256":
+            "d08e8e32af512abf0d2a73248f88d08a5520348af64ad699a67194ee3db40bac",
+        "core0_target_sha256":
+            "e743e967cf33d6de25c5494693e61c2dd00ee19d5bf169edfefcb1b30f3d2fa2",
+        "core0_envelope_sha256":
+            "5b05b5e03d6c803d8b43d89d1a9f724f06b6e94d0c980d82df636c5684ff7b8a",
+    }, "fixed proof stable target changed")
+    require(campaign["mutation_domain"] == {
+        "core0_envelope": ["0x00011000", "0x00021000"],
+        "temporary_core1_barrier_sector_count": 1,
+        "temporary_core1_barrier_sector": "0x00022000",
+        "header_loader_manifest_operation_count": 0,
+        "all_flash_after_core1_operation_count": 0,
+    }, "fixed proof mutation domain changed")
+    safety = campaign["safety_model"]
+    require(all(safety[key] is True for key in (
+        "core0_poisoned_before_core1",
+        "opposite_core_checksum_invalid_during_staging",
+        "core1_restored_exact_before_core0_commit",
+        "one_operation_per_cli_invocation",
+        "durable_terminal_intent_before_backend_or_usb",
+        "two_exact_full_chip_reads_before_and_after_each_mutation",
+        "strict_close_before_authorizing_publication",
+    )) and safety["final_core0_gate_rank"] == 32 and
+        safety["automatic_retry"] is False and
+        safety["ordinary_intent_usb_reconciliation"] is False and
+        safety["transport_or_verification_anomaly"] ==
+        "external_spi_no_further_usb",
+        "fixed proof safety policy changed")
+    authorization = campaign["authorization"]
+    require(
+        authorization["live_proof_campaign_enabled"] is False and
+        authorization["expected_campaign_id"] ==
+        "3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f" and
+        authorization["owner_campaign_generated"] is True and
+        authorization["owner_campaign_independently_reverified"] is True and
+        authorization["two_owner_baselines_distinct_and_byte_identical"] is True and
+        authorization["supporting_source_hashes_pinned"] is True and
+        authorization["implementation_source_sha256"] == {
+            "campaign":
+                "085dd0c2087e258d880824f657e37ecde08f4fd05234ab14d948af245d8de765",
+            "planner":
+                "618bed76c236390c8203ef5395db2317dfce9cce620035bda05231fc05727d0a",
+            "strict_transport":
+                "55cacc77b4902827c47e45fa0be77b55bac8d552bae08dbe48b9aa8942c16076",
+            "verifier":
+                "9b19d393cf64c66168e08de2f3d4fe352a85a2fd69545e374dee0fa015dea338",
+            "writer":
+                "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
+        } and
+        authorization["policy_sha256"] ==
+        "340c1d3fe3075286bee33d36cf367bcc2989ac4bf754af46dc09c89ae1615a4d" and
+        authorization["executor_descriptor_sha256"] ==
+        "f9806840c78debae5137448157706cf12c031d0a81b86395219bf3b662a33fc9" and
+        authorization["executor_source_sha256"] ==
+        "b8fcac0158a051f0121f2ef94cb7cfa89e4cc17004a35dc80f58b1807ac09ee7" and
+        authorization["generic_firmware_executor_mutation_enabled"] is False and
+        authorization["flash_approved"] is False,
+        "fixed proof campaign must remain live-locked")
+    offline = campaign["offline_validation"]
+    require(offline["focused_campaign_and_executor_tests_passed"] == 33 and
+            offline["exact_campaign_operation_count"] == 168 and
+            offline["install_operation_count"] == 32 and
+            offline["restore_operation_count"] == 136 and
+            offline["program_operation_count"] == 148 and
+            offline["erase_operation_count"] == 20 and
+            offline["core1_barrier_operation_count"] == 20 and
+            offline["preserved_boot_region_operation_count"] == 0 and
+            offline["command_boundaries_checked"] == 169 and
+            offline["modeled_byte_prefix_states_checked"] == 157528 and
+            offline["opposite_barrier_prefix_states_checked"] == 154462 and
+            offline["single_bit_poison_prefix_states_checked"] == 2044 and
+            offline["sparse_gate_subset_proofs"] == 2 and
+            offline["early_loader_valid_non_target_states"] == 0 and
+            all(offline[key] is True for key in (
+                "canonical_internal_cdbs_and_payload_hashes_reverified",
+                "install_target_exact_proof_full_image",
+                "install_then_restore_exact_full_baseline",
+                "symbolic_poison_prefix_model",
+                "opposite_core_barrier_prefix_model",
+                "rank32_final_gate_subset_proof",
+                "fault_and_atomic_journal_matrix",
+                "private_artifact_publication_guards",
+            )), "fixed proof offline validation changed")
+    require(all(value is False for value in
+                campaign["hardware_validation"].values()),
+            "fixed proof campaign hardware status must remain unvalidated")
+
+    require(evidence["planner_immutability"] == {
+        "header": ["0x00000000", "0x00001000"],
+        "loader": ["0x00001000", "0x00010000"],
+        "manifest": ["0x00010000", "0x00011000"],
+        "operation_count_over_all_three_regions": 0,
+        "checked_at_every_modeled_operation_boundary": True,
+    }, "preserved boot-region geometry changed")
+    require(evidence["raw_vendor_bytes_included"] is False,
+            "loader-reentry facts must not contain raw vendor bytes")
+
+
 def main() -> int:
     try:
         validate_soc(load("snc7320-soc.json"))
         validate_pin_map(load("kb7-pin-map.json"))
         validate_stock_flash(load("kb7-stock-flash.json"))
+        validate_loader_reentry(load("kb7-stock-loader-reentry.json"))
     except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
         print(f"hardware facts check: {error}")
         return 1
-    print("hardware facts check: SoC, IRQ, package, and stock-flash mappings pass")
+    print("hardware facts check: SoC, IRQ, package, stock-flash, and "
+          "loader-reentry mappings pass")
     return 0
 
 

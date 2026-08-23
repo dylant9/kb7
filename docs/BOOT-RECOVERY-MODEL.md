@@ -30,6 +30,24 @@ On 2026-08-23 the preserved V1.22 flash loader also completed one guarded
 returned byte-for-byte to the baseline. This validates one narrow command
 sequence, not a supported USB flasher or recovery substitute.
 
+A later read-only audit recovered the stock application's deliberate return to
+that preserved loader. V1.22, V1.24 and V1.33 all write the same mailbox
+marker, copy an identical 88-byte routine to SRAM, copy the preserved loader
+from flash XIP into PRAM, and only then issue AIRCR `SYSRESETREQ`. The exact
+stock software path is therefore statically proved. The independently authored
+replacement-firmware proof passes offline and defaults off, but it has not run
+on hardware; it does not yet prove that custom code reaches `10f5:5037`. See
+[`STOCK-LOADER-REENTRY-2026-08-23.md`](STOCK-LOADER-REENTRY-2026-08-23.md).
+
+The fixed install/restore campaign for that proof now passes offline simulation
+and fault testing. Its stable target is the checksum-valid proof Core 0 plus
+exact stock Core 1; one temporary Core-1 sector checksum poison protects the
+Core-0 rebuild and is restored before final commit. Two exact owner baselines
+now reproduce the reviewed 168-operation campaign ID and both stable images.
+The separate executor pins that identity but remains independently live-locked.
+See the
+[`fixed proof campaign`](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md).
+
 The board pad labeled `MCU_RST` is a strong candidate for active-low `RSTN`,
 which is package lead 88 on the presumed SNC73200 LQFP128. It measured about
 3.2 V released and 0.2 V when grounded through 1 kΩ during the successful reads.
@@ -46,10 +64,12 @@ flowchart TD
     B --> C["Scan supported boot devices for identifying mark"]
     C -->|"no mark"| D["USB-ISP mode"]
     C -->|"valid source"| E["Parse load table and copy user code to PRAM at address 0"]
-    E --> F["Software reset"]
-    F --> G["Execute PRAM user vector"]
-    G -->|"AIRCR SYSRESETREQ"| F
-    G -. "Core 0-controlled, details unpublished" .-> H["Core 1 / shared I-cache execution"]
+    E --> F["Software reset into current PRAM image"]
+    F --> G["Execute application PRAM vector"]
+    G -->|"bare AIRCR SYSRESETREQ"| F
+    G -->|"marker + copy preserved loader from XIP while executing in SRAM"| H["PRAM now contains preserved loader"]
+    H -->|"AIRCR SYSRESETREQ"| I["Loader consumes marker and enters 10f5:5037"]
+    G -. "Core 0-controlled, details unpublished" .-> J["Core 1 / shared I-cache execution"]
 ```
 
 The ROM scan and load-table path are documented on p. 44. Reset destinations
@@ -58,10 +78,13 @@ format, USB identity/protocol, second-core release fields, and failure behavior
 for a partly corrupt valid container are not published.
 
 The key correction is the PRAM loop: an ARM AIRCR software reset restarts PRAM,
-not mask ROM. A mailbox flag plus `SYSRESETREQ` therefore cannot be called a
-proven loader-entry path. The public `kb7_enter_loader()` compatibility helper
-now records the recovered request marker and parks with interrupts disabled for
-an external reset; it no longer issues the misleading software reset.
+not mask ROM. A mailbox flag plus `SYSRESETREQ` alone therefore cannot be called
+loader entry. The later stock audit supplies the missing operation: stock runs
+from SRAM while replacing the complete 64-KiB PRAM window with
+`0x60001000..0x60011000`, then resets. The copied loader consumes, clears and
+reads back the marker before selecting its updater entry. Ordinary public builds
+still use marker-and-park; the equivalent relocation is behind a separate,
+default-off hardware-validation gate.
 
 ## Recovery layers
 
@@ -71,9 +94,10 @@ an external reset; it no longer issues the misleading software reset.
 | External `RSTN` | Release restarts through ROM; SNC73200 lead 88 (pp. 21 and 43) | `MCU_RST` voltage behavior, repeated read isolation and a full restore are demonstrated; direct continuity/waveform are optional documentation |
 | ROM USB-ISP | ROM enters it when no boot identifying mark is found (p. 44) | Identity/protocol and behavior with a corrupt-but-present identifying mark remain unknown |
 | Preserved flash loader | Recovered loader is separate from mask ROM | Observed over USB as `10f5:5037`; exact full-chip reads, a marker cycle, and a guarded exact-footprint cycle at one target passed. It remains an experimental path, not a supported flasher or recovery substitute |
+| Stock preserved-loader re-entry | Not specified by the datasheet; compatible with its PRAM-reset rule | Hash-pinned instruction semantics prove the complete marker/SRAM-copy/PRAM-copy/reset/consumer route in V1.22, V1.24 and V1.33. The clean-room custom proof and fixed install/restore campaign pass offline; live commit defaults off and the proof remains hardware-unrun |
 | SWD | One SWD port; SNC73200 SWO/SWCLK/SWDIO are leads 11/12/13 (pp. 1, 11 and 19) | Connect-under-reset and core visibility are untested; no erase operation is authorized |
-| Watchdog reset | Underflow can reset through ROM; WDT uses the 32-kHz ILRC (pp. 43 and 57–58) | Potential autonomous ROM route, but usable register fields are absent from this data sheet |
-| Software reset | Restarts PRAM (p. 43) | Explicitly not a loader recovery route |
+| Watchdog reset | Underflow can reset through ROM; WDT uses the 32-kHz ILRC (pp. 43 and 57–58) | Stock proves two instances and feed/disable/reset-trigger writes despite the omitted register table; mailbox retention and a complete custom policy remain unvalidated secondary options |
+| Software reset | Restarts PRAM (p. 43) | Not loader entry by itself; it completes the stock route only after the preserved loader has replaced PRAM |
 
 ## External flash and reset pins
 
@@ -182,7 +206,8 @@ must be rehearsed again if any of those conditions change.
 - SWD accessibility/core routing under reset;
 - mask-ROM USB-ISP identity and protocol; the exercised preserved-loader subset
   is recorded separately;
-- ROM-entering watchdog/remap register semantics from `SNC7320_reg_vx.xx` or
-  independently validated stock-code recovery; and
-- whether the mailbox request marker survives each ROM-entering reset and is
-  actually consumed by the preserved loader.
+- optional watchdog/remap register semantics from `SNC7320_reg_vx.xx` if a
+  secondary recovery design is pursued; and
+- one bounded hardware run of the default-off custom re-entry proof, requiring
+  `10f5:5037`, unchanged header/loader/manifest hashes, valid application
+  checksums, exact stock restoration and normal `10f5:5038` operation.
