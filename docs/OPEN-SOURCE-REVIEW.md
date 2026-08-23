@@ -43,14 +43,17 @@ that the contributor does not possess.
   active-intent checkpoint reconciled the exact postimage in a fresh process
   over a mutation-incapable backend, then the fixed cleanup restored the exact
   baseline and the keyboard returned to normal operation. Its current v3 plan
-  is hardware-unrun; it fixes an abrupt self-`SIGKILL` after validated program
-  CSW and durable/read-back command-complete state, before WIP polling, postread
+  has also completed once; it fixes an abrupt self-`SIGKILL` after validated
+  program CSW and durable/read-back command-complete state, before WIP polling, postread
   or explicit USB close. Preflight-started and raw-intent markers are published
   before backend construction or USB and are terminal if left visible. Only
   exact command-complete and final-complete states are reconcilable; each
   consumes a one-shot started state before USB and closes strictly before final
   publication. Atomic ambiguity permits only local inspection, never USB.
-  Status 137 is operator-observed and not journal-bound. The public tree
+  Status 137 is operator-observed and not journal-bound. The v3 run observed
+  that status, rejected a duplicate step before USB, reconciled the exact
+  postimage without replay, restored the baseline and returned to operator-
+  confirmed normal `5038` keyboard operation. The public tree
   records only independently authored source, hashes, classifications and
   summarized results from those runs. No vendor DLL, disassembly listing, general USB
   firmware flasher, raw transcript, capture, journal or stock byte payload is

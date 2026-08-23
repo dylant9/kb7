@@ -53,8 +53,8 @@ followed `program-09` and WIP-ready polling, before postread; the process exited
 4 and a fresh process with a mutation-incapable backend classified two full-chip
 reads as the exact postimage without retry. The plan then restored the baseline,
 cleared state, passed all three region CRCs in a separate verifier invocation,
-and returned to operator-reported normal operation. The current v3 plan is
-hardware-unrun. It self-terminates with signal 9/status 137 after validated
+and returned to operator-reported normal operation. The current v3 plan has
+also completed once. It self-terminates with signal 9/status 137 after validated
 program CSW and durable/read-back command-complete state, before WIP polling,
 postread or explicit USB close. Preflight-started and raw-intent markers are
 published before backend construction or USB and are terminal if left visible.
@@ -62,13 +62,17 @@ Only exact command-complete and final-complete states are reconcilable; each
 consumes a one-shot started state before USB and closes strictly before final
 publication. Atomic ambiguity permits only local inspection, never USB. Status
 137 is operator-observed, not journal-bound; status 126 permits cleanup only and
-does not validate continuation.
+does not validate continuation. The observed v3 run produced status 137,
+reconciled the exact postimage in a fresh read-only process without replay,
+restored and cleared the exact baseline, passed all three region CRCs and
+returned to operator-confirmed normal `5038` keyboard operation.
 All plans stay outside firmware regions; none physically interrupts a command
 or flash pulse or tests device power loss, and none unlocks the paired executor.
 See `USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md`,
 `USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md`,
 `USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md` and
-`USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md`. The historical
+`USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md` and
+`USB-UPDATER-SCRATCH-HOST-TERMINATION-VALIDATION-2026-08-23.md`. The historical
 v2 plan is in `USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md`; the
 v1 result is in `USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md`, and the
 v2 result is in

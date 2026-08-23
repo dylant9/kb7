@@ -27,14 +27,15 @@ development unit. The historical v2 plan also completed once: its fixed
 boundary-9 command-complete/no-postread checkpoint exited 4, a fresh process
 over a mutation-incapable transport accepted two exact postimage reads without
 retry, and the fixed continuation restored the baseline and normal operation.
-The current v3 scratch plan is hardware-unrun. It self-terminates with signal
-9/status 137 after validated program CSW and durable/read-back
+The current v3 scratch plan has also completed once. It self-terminates with
+signal 9/status 137 after validated program CSW and durable/read-back
 `checkpoint_command_complete`, but before WIP polling, postread or explicit USB
 close; fresh-process read-only reconciliation supplies the omitted poll. No
 revision unlocks this paired-firmware executor; the two tools use
 distinct plans and journal schemas. See the
 [fixed scratch executor plan](USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md) and
 [v3 host-termination plan](USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md),
+the [v3 validation record](USB-UPDATER-SCRATCH-HOST-TERMINATION-VALIDATION-2026-08-23.md),
 the historical
 [v2 mandatory checkpoint plan](USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md),
 the [v2 validation record](USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md),
@@ -227,10 +228,13 @@ plan and separate scratch journal. This provides an offline-testable bridge
 between the earlier one-off scratch script and a state-derived executor without
 placing any mutation code in the paired-firmware executor.
 
-The current v3 source and fake-transport/state tests pass offline, but plan
+The current v3 source and fake-transport/state tests pass offline, and plan
 `c1aa9348e74d6d4590b0e9666a9daf83e5544c3b23292b3df217c34038d5b653`
-has not run on hardware. The historical v2 plan completed one hardware cycle
-on the development unit. The fixed
+has completed one hardware cycle on the development unit. It produced status
+137, rejected a duplicate `step` before USB, reconciled the exact postimage in
+a fresh read-only process without replay, restored the exact baseline, cleared
+state and returned to normal `5038` keyboard operation. The historical v2 plan
+also completed one hardware cycle on the development unit. The fixed
 `program-09` command and WIP-ready poll completed without a postread; the
 process exited 4 with intent active; and a fresh process using the verifier-only
 backend classified two exact 32-MiB postimage reads without retry. The remaining
@@ -249,7 +253,7 @@ laboratory tooling rather than an updater qualification. V1 never left an
 intent unresolved or entered active-intent reconciliation; the completed v2
 checkpoint ended only after its command and WIP poll completed. V3 moves abrupt
 host termination to after validated CSW and durable command-complete
-publication but before WIP polling; it has not run on hardware. None physically
+publication but before WIP polling. None physically
 interrupts a command or flash pulse, tests device power loss or touches firmware
 regions.
 
@@ -262,16 +266,17 @@ are separately completed and reviewed:
    both command-complete no-readback operations reconciled to their exact
    postimages in new processes, the complete baseline was restored, and normal
    `5038` operation returned. This closed only the host-session restart gate.
-2. Run and review the current v3 fixed durable-command-complete/pre-WIP host-
-   termination plan. It is narrower than physical disconnect or power loss and
+2. The current v3 fixed durable-command-complete/pre-WIP host-termination plan
+   has passed once. It is narrower than physical disconnect or power loss and
    must not be represented as either. Later work still needs deliberately
    modeled physical disconnect, power-loss and partial-operation outcomes at
    safe scratch addresses.
 3. Re-review the exact operation transport, intent/restart behavior and source
    freeze. The separate scratch harness has no raw mutation interface; its v1
-   plan passed once on hardware, and its v2 mandatory active-intent plan also
-   passed once at a WIP-ready/no-postread boundary. Its v3 plan has not run on
-   hardware. Physical mid-command and power-loss behavior remain untested. Any
+   plan passed once on hardware, its v2 mandatory active-intent plan passed once
+   at a WIP-ready/no-postread boundary, and its v3 plan passed once at the
+   durable-command-complete/pre-WIP host-termination boundary. Physical
+   mid-command and power-loss behavior remain untested. Any
    future paired-firmware executor
    must remain independently locked until its own review and must likewise
    expose no raw mutation interface.

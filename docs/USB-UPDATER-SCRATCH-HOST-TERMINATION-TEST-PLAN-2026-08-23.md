@@ -2,14 +2,15 @@
 
 ## Status
 
-**Implemented and tested offline; not yet run on hardware.** The current v3
-`kb7-updater-scratch-executor.py` plan retains the same 18 fixed programs and
-four fixed erases as the completed v1 and v2 campaigns. Its defining boundary-9
-change is that, after the complete `program-09` BOT exchange has returned with a
-validated CSW, the process locally abandons the USB handle, atomically publishes
-and reads back `checkpoint_command_complete`, then sends itself `SIGKILL`. It
-does not poll flash WIP, read flash, publish boundary 10 or explicitly close USB.
-V3 also binds the plan-wide state and failure policy described below.
+**Implemented, tested offline, and completed once on the development unit.**
+The current v3 `kb7-updater-scratch-executor.py` plan retains the same 18 fixed
+programs and four fixed erases as the completed v1 and v2 campaigns. Its
+defining boundary-9 change is that, after the complete `program-09` BOT exchange
+has returned with a validated CSW, the process locally abandons the USB handle,
+atomically publishes and reads back `checkpoint_command_complete`, then sends
+itself `SIGKILL`. It does not poll flash WIP, read flash, publish boundary 10 or
+explicitly close USB. V3 also binds the plan-wide state and failure policy
+described below.
 
 The canonical v3 plan SHA-256 is:
 
@@ -27,6 +28,16 @@ This is a destructive, dry-run-default laboratory harness. It is not a
 physical cable-disconnect or power-loss test, does not accept a firmware bundle
 or caller-selected mutation, and does not enable the paired-firmware executor.
 The general executor remains read-only and `flash_approved=false`.
+
+The hardware run produced the planned shell status 137. A second accidental
+`step` invocation was rejected from the exact command-complete journal before
+USB access, local-only `inspect` confirmed that state, and a fresh-process
+read-only reconciliation accepted two exact boundary-10 postimage reads without
+replay. The fixed continuation restored boundary 22 to the exact 32-MiB
+baseline, final reconciliation cleared state, a separate verifier reproduced
+that baseline with all three region CRCs valid, and the owner confirmed normal
+`10f5:5038` keyboard operation. See the
+[v3 validation record](USB-UPDATER-SCRATCH-HOST-TERMINATION-VALIDATION-2026-08-23.md).
 
 The v3 descriptor also binds a plan-wide failure policy. Committed preflight
 durably publishes `preflight_started` before constructing a backend or opening
@@ -344,9 +355,8 @@ firmware-region writes or general-updater execution.
 
 ## Proof boundary
 
-If the hardware-unrun v3 checkpoint later reconciles to its exact postimage and
-the fixed cleanup restores the baseline, it will demonstrate on that one unit
-that:
+The completed v3 checkpoint reconciled to its exact postimage and the fixed
+cleanup restored the baseline. On that one unit it demonstrates that:
 
 - the complete valid program BOT transaction and CSW finished before abrupt
   userspace death;

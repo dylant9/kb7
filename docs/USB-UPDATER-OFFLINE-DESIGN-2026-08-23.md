@@ -35,7 +35,7 @@ a fresh process with a mutation-incapable backend may reconcile. V2 has now
 completed once: two exact postimage reads were accepted without retry, the
 remaining fixed plan restored the baseline, final reconciliation cleared state,
 a separate verifier passed every region CRC, and the owner confirmed normal
-operation. The current v3 plan is hardware-unrun. It self-terminates with
+operation. The current v3 plan has also completed once. It self-terminates with
 signal 9/status 137 after validated `program-09` CSW and durable/read-back
 `checkpoint_command_complete`, but before WIP polling, postread or explicit USB
 close. Preflight publishes `preflight_started`, and every step publishes raw
@@ -45,9 +45,13 @@ Each read-only pass consumes a one-shot reconciliation-started state before USB,
 then classifies exactly and closes strictly before final publication. Atomic
 ambiguity permits only fresh local `inspect`, never USB. Status 137 is operator-
 observed rather than journal-bound; status 126 or ready-publication error permits
-cleanup only and cannot validate continuation. This is fixed scratch work only;
-it does not authorize firmware-region execution. See the
+cleanup only and cannot validate continuation. In the observed run, fresh-
+process reconciliation accepted the exact postimage without replay, cleanup
+restored the baseline, the separate verifier passed every region CRC, and the
+owner confirmed normal `5038` keyboard operation. This is fixed scratch work
+only; it does not authorize firmware-region execution. See the
 [v3 host-termination plan](USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md),
+[v3 validation record](USB-UPDATER-SCRATCH-HOST-TERMINATION-VALIDATION-2026-08-23.md),
 historical [v2 test plan](USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md),
 [v2 validation record](USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md) and
 [historical validation record](USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md).
@@ -178,9 +182,9 @@ that unit. V1 exercised ordinary exact command boundaries, and the v2
 checkpoint ended after command completion and WIP ready, before postread; a
 fresh verifier-only process accepted two exact postimage reads. The current v3
 plan moves abrupt userspace termination to after validated program CSW and
-durable command-complete publication but before WIP polling, and is hardware-
-unrun. None is a physical mid-command or power-loss event. None of these
-components claims
+durable command-complete publication but before WIP polling, and has completed
+once on the same unit. None is a physical mid-command or power-loss event. None
+of these components claims
 power-loss atomicity. They
 cannot prove behavior for an interrupted NOR erase pulse, program disturb,
 misaddressed device-side handler, unstable cell, loader defect or electrical
@@ -237,8 +241,9 @@ image or an early-valid mixed state.
    read-only exact-postimage reconciliation and fixed baseline restoration. Both
    the executor and separate verifier read through the same USB loader/SoC
    controller. The current v3 durable-command-complete/pre-WIP self-termination
-   plan is implemented and tested offline but has not run on hardware. Physical
-   mid-command, power-loss and arbitrary torn-NOR reconciliation remain
+   plan has also passed once: status 137 was observed, exact postimage
+   reconciliation continued without replay, and cleanup restored the baseline.
+   Physical mid-command, power-loss and arbitrary torn-NOR reconciliation remain
    separate gates before reviewing
    any source change that could enable firmware-region execution.
 4. Prove entry back to `5037` after a checksum-valid but nonfunctional custom

@@ -5,12 +5,13 @@
 > and the source revision used for that run. The current v3 executor makes a
 > boundary-9 durable-command-complete/pre-WIP self-termination checkpoint and
 > has a
-> different plan and journal schema; it is hardware-unrun. V2 subsequently
-> completed its own hardware run; see the historical
+> different plan and journal schema; it subsequently completed its own hardware
+> run. V2 also completed its own hardware run; see the historical
 > [mandatory-checkpoint test plan](USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md)
 > and [v2 validation record](USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md).
 > The current experiment is specified in the
-> [v3 host-termination plan](USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md).
+> [v3 host-termination plan](USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md)
+> and its [validation record](USB-UPDATER-SCRATCH-HOST-TERMINATION-VALIDATION-2026-08-23.md).
 
 ## Result
 

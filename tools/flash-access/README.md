@@ -12,7 +12,7 @@ makes the replacement firmware flash-approved.
 | Path | Transport | Reliability | Can write? |
 |---|---|---|---|
 | **SPI** | ESP32-C3 running `serprog` + `flashrom` | Proven, byte-exact | **Yes — proven** |
-| **USB ISP** | Bootloader mass-storage `F6` commands | Reads proven; one marker cycle and one guarded exact-footprint cycle passed on the V1.22 loader | **Narrow lab primitives validated; not a supported flasher** |
+| **USB ISP** | Bootloader mass-storage `F6` commands | Reads, fixed marker/erase cycles and fixed scratch restart/executor cycles passed on one V1.22 unit | **Narrow lab primitives validated; not a supported flasher** |
 
 ---
 
@@ -209,12 +209,14 @@ captures. A separate dry-run-default scratch executor can replay only 22 fixed
 non-firmware operations. Its preceding v1 plan completed once on the development
 unit and restored the byte-exact baseline. The historical v2 plan's mandatory
 WIP-ready/no-postread active-intent checkpoint also passed once, reconciled its
-exact postimage in a fresh read-only process, restored the baseline and returned
-to normal operation. The current v3 plan is hardware-unrun: after validated
-program CSW it locally abandons USB, durably publishes and reads back
+  exact postimage in a fresh read-only process, restored the baseline and returned
+  to normal operation. The current v3 plan has also completed once: after
+  validated program CSW it locally abandons USB, durably publishes and reads back
 `checkpoint_command_complete`, then self-terminates with signal 9/status 137
-before WIP polling, postread or explicit USB close. This remains bounded
-laboratory evidence, not a general update path.
+  before WIP polling, postread or explicit USB close. Fresh-process
+  reconciliation accepted the exact postimage without replay, cleanup restored
+  the baseline, and normal `5038` keyboard operation returned. This remains
+  bounded laboratory evidence, not a general update path.
 Treat anything here that writes over USB as experimental and capable of
 destroying your bootloader.
 
@@ -287,8 +289,9 @@ default after writing; add `-N` to verify only the written region.
 | `kb7-isp-scratch-restart.py` | Fixed two-sector experiment with two deliberate no-readback/reconciliation checkpoints | **destructive; dry-run by default; passed once at the fixed plan** |
 | `kb7-updater-plan.py` | V1.22-only paired-region planner and interruption-model checker | **offline only; no device I/O; not an executor** |
 | `kb7-updater-executor.py` | Two-read live preflight, durable journal binding and image-derived reconciliation | **read-only CLI; mutation hard-disabled; not an installer** |
-| `kb7-updater-scratch-executor.py` | One-operation-per-process replay of the fixed 22-command V1.22 scratch plan, mandatory boundary-9 host termination, and local-only state inspection | **destructive; dry-run by default; current v3 is hardware-unrun** |
+| `kb7-updater-scratch-executor.py` | One-operation-per-process replay of the fixed 22-command V1.22 scratch plan, mandatory boundary-9 host termination, and local-only state inspection | **destructive; dry-run by default; current v3 passed once at the fixed plan** |
 | `../../docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md` | Exact v3 durable-command-complete/pre-WIP self-termination sequence and stop rules | documentation only |
+| `../../docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-VALIDATION-2026-08-23.md` | Observed v3 host-termination, reconciliation, restoration and boot result | documentation only |
 | `../../docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md` | Historical exact v2 checkpoint sequence, stop rules and proof boundary | documentation only |
 | `../../docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md` | Observed v2 checkpoint, completion evidence and limits | documentation only |
 | `WRITE-TEST-PLAN.md` | Exact experimental sequence, remaining failure modes and SPI recovery procedure | documentation only |
@@ -420,11 +423,16 @@ Committed commands also hold one persistent, private per-journal lock from the
 authoritative state read through USB close and publication; a concurrent
 invocation refuses before opening USB.
 
-The current v3 harness and its fake-transport/journal tests pass offline, but
+The current v3 harness and its fake-transport/journal tests pass offline, and
 its plan SHA-256
 `c1aa9348e74d6d4590b0e9666a9daf83e5544c3b23292b3df217c34038d5b653`
-has not run on hardware. Its historical v2 mandatory-checkpoint plan completed
-once on the development unit:
+has completed once on the development unit. The checkpoint process ended with
+the planned status 137; an accidental duplicate `step` was rejected before USB;
+fresh-process reconciliation completed the omitted WIP poll and classified two
+reads as the exact boundary-10 postimage without replay; cleanup restored the
+exact baseline; and normal `5038` keyboard operation returned. See the
+[v3 validation record](../../docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-VALIDATION-2026-08-23.md).
+Its historical v2 mandatory-checkpoint plan also completed once:
 the fixed command and WIP poll completed without postread, a fresh process using
 the verifier-only backend classified two reads as the exact boundary-10
 postimage without retry, and the remaining plan restored the exact baseline.
@@ -442,6 +450,7 @@ interrupted a command, tested power loss or touched firmware regions. Read the
 [fixed scratch executor status and test plan](../../docs/USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md)
 for its exact sequence and stop rules, the
 [v3 host-termination test plan](../../docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md),
+[v3 validation record](../../docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-VALIDATION-2026-08-23.md),
 historical [mandatory active-intent test plan](../../docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md)
 and [v2 validation record](../../docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md)
 for the completed historical v2 campaign, and the

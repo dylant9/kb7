@@ -76,9 +76,10 @@ image generation is disabled.
   as the exact boundary-10 postimage without retry. The remaining fixed plan
   restored the exact baseline, final reconciliation cleared state, a separate
   verifier reproduced the same 32-MiB hash with all three region CRCs valid,
-  and the owner confirmed normal boot. The current v3 plan is hardware-unrun.
-  It moves the same mandatory checkpoint earlier: after the complete program
-  CBW/data exchange and validated CSW, the process locally abandons USB,
+  and the owner confirmed normal boot. The current v3 plan has also completed
+  one hardware run. It moves the same mandatory checkpoint earlier: after the
+  complete program CBW/data exchange and validated CSW, the process locally
+  abandons USB,
   durably publishes and reads back `checkpoint_command_complete`, then self-
   terminates with signal 9/status 137 before WIP polling, postread, boundary
   publication or explicit USB close. The journal `fsync` means this tests
@@ -94,7 +95,13 @@ image generation is disabled.
   state change permits only fresh local `inspect`, never USB. Status 137
   is operator-observed—not journal-bound—and status 126 or ready-publication
   error permits cleanup only, invalidating the experiment even if boundary 10
-  is observed.
+  is observed. The observed run ended with status 137, an accidental second
+  `step` was rejected before USB, local-only inspection confirmed the exact
+  ready state, and fresh-process reconciliation accepted two exact postimage
+  reads without replay. Cleanup restored the exact baseline, final
+  reconciliation cleared state, the separate verifier reproduced all three
+  region CRCs and the baseline hash, and the owner confirmed normal `5038`
+  keyboard operation.
   Both executor and verifier reads use the same loader/SoC `F6 05`
   flash-controller path. This is not a physical command
   interruption or power cut, and no firmware region is touched. The
@@ -106,6 +113,7 @@ image generation is disabled.
   plus the separate
   [fixed scratch executor status](docs/USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md),
   [v3 host-termination test plan](docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md),
+  [v3 validation record](docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-VALIDATION-2026-08-23.md),
   historical [v2 mandatory-checkpoint test plan](docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md),
   and [v2 validation record](docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md).
 - No custom firmware has been installed. USB, display, touch, RGB, MCU2/Hall,
@@ -134,10 +142,11 @@ development-unit run. The
 [mandatory active-intent test plan](docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md)
 and [v2 validation record](docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md)
 record the historical checkpoint sequence, observed result and its narrower
-proof boundary. The current hardware-unrun
+proof boundary. The current
 [v3 host-termination plan](docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md)
-records the new durable-command-complete/pre-WIP sequence and stricter stop
-rules.
+and [v3 validation record](docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-VALIDATION-2026-08-23.md)
+record the durable-command-complete/pre-WIP sequence, its completed one-unit
+result and stricter stop rules.
 
 ## Repository contents
 

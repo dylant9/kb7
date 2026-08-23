@@ -10,8 +10,8 @@ tools/flash-access/kb7-updater-scratch-executor.py
 
 It is **dry-run by default**, is restricted to the reviewed V1.22 loader and
 scratch layout, and can replay only the 22 operations listed below. The current
-v3 source and fake-transport tests pass offline, but v3 has **not** run on
-hardware. Its mandatory checkpoint completes the fixed `program-09` CBW,
+v3 source and fake-transport tests pass offline, and v3 has completed one
+hardware run. Its mandatory checkpoint completes the fixed `program-09` CBW,
 512-byte data-OUT and strictly validated CSW, locally abandons USB, atomically
 publishes and reads back `checkpoint_command_complete`, then self-terminates
 with `SIGKILL` before WIP polling, postread, boundary-10 publication or explicit
@@ -32,7 +32,9 @@ and the separate
 [v2 checkpoint test plan](USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md)
 and [v2 validation record](USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md).
 The current checkpoint is specified in the
-[v3 host-termination test plan](USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md).
+[v3 host-termination test plan](USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md),
+and its observed result is in the
+[v3 validation record](USB-UPDATER-SCRATCH-HOST-TERMINATION-VALIDATION-2026-08-23.md).
 
 The current canonical v3 descriptor has SHA-256
 `c1aa9348e74d6d4590b0e9666a9daf83e5544c3b23292b3df217c34038d5b653`.
@@ -47,8 +49,7 @@ This is not the paired-firmware updater. The general
 and `reconcile`, its mutation adapter remains hard-disabled, and firmware-region
 mutation remains unavailable. The scratch harness accepts no bundle, operation,
 address, length, CDB, payload, device selector, retry, force or skip option.
-Neither the historical runs nor the current hardware-unrun scratch-only revision
-changes `flash_approved=false`.
+None of the v1, v2 or v3 scratch-only runs changes `flash_approved=false`.
 
 ## Fixed operation domain
 
@@ -237,11 +238,12 @@ python3 tools/flash-access/kb7-updater-scratch-executor.py inspect \
   --journal /path/to/owner-local-scratch-journal.json
 ```
 
-The owner-authorized v1 and v2 hardware runs are documented separately. V1 is
-historical evidence for the same fixed operation list; v2 additionally
-exercised the WIP-ready/no-postread active-intent path. Neither is a hardware
-result for v3 or standing approval to repeat the experiment or broaden the
-mutation domain. `--commit` is the only switch that opens USB.
+The owner-authorized v1, v2 and v3 hardware runs are documented separately. V1
+is historical evidence for the same fixed operation list; v2 additionally
+exercised the WIP-ready/no-postread active-intent path; and v3 exercised the
+validated-CSW/durable-command-complete self-termination path. None is standing
+approval to repeat the experiment or broaden the mutation domain. `--commit`
+is the only switch that opens USB.
 `preflight --commit` remains read-only; every `step --commit` is destructive
 and normally advances exactly one operation; the mandatory boundary-9 step
 instead durably records `checkpoint_command_complete` and self-terminates with
@@ -309,8 +311,12 @@ complete publication before post-CSW/pre-poll termination, one-shot
 reconciliation-started gates, local-only state inspection, strict-close
 ordering, fresh-process nonce, mutation-incapable no-recovery reconciliation
 backend, one-operation process boundary, reconciliation and journal faults. The
-exact v3 plan is hardware-unrun. See the
-[v3 host-termination plan](USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md).
+exact v3 plan completed once on the development unit: status 137 was observed,
+fresh-process reconciliation accepted the exact postimage without replay,
+cleanup and final reconciliation restored and cleared the exact baseline, all
+three region CRCs passed, and normal `5038` keyboard operation returned. See the
+[v3 host-termination plan](USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md)
+and [v3 validation record](USB-UPDATER-SCRATCH-HOST-TERMINATION-VALIDATION-2026-08-23.md).
 
 The exact v2 plan completed once on the development unit: `program-09` and
 WIP-ready completed, the process exited 4 without postread, and a fresh

@@ -80,7 +80,7 @@ development unit. Its mandatory fixed command-complete/no-postread active intent
 exited 4 after WIP ready; fresh-process verifier-only reconciliation accepted two
 exact postimage reads without retry; and the fixed continuation restored the
 baseline, cleared state and returned to normal operation. The current v3 plan
-passes offline fake-transport/state tests but is hardware-unrun. It
+passes offline fake-transport/state tests and has completed once on hardware. It
 self-terminates with signal 9/status 137 after validated program CSW and
 durable/read-back command-complete state, before WIP polling, postread or
 explicit USB close. Preflight-started and raw-intent markers are published
@@ -89,7 +89,10 @@ command-complete and final-complete states are reconcilable; each consumes a
 one-shot started state before USB and closes strictly before final publication.
 Atomic ambiguity permits only local inspection, never USB. Status 137 is
 operator-observed, not journal-bound; status 126 permits cleanup only and does
-not validate continuation. No revision physically interrupts a
+not validate continuation. The v3 run observed status 137, reconciled the exact
+postimage without replay, restored the exact baseline, passed all three region
+CRCs and returned to operator-confirmed normal `5038` keyboard operation. No
+revision physically interrupts a
 flash command or pulse, tests device power loss or touches firmware regions,
 and none unlocks firmware mutation.
 Header dependencies use `-MMD -MP`.
@@ -124,7 +127,7 @@ The latest offline verification pass completed successfully on 2026-08-23:
   4 bytes of data and 19,312 bytes of BSS;
 - neither ELF contains unresolved relocations, and core0's vector table is
   exactly `0x13c` bytes;
-- the public-tree policy check accepted 187 UTF-8 source/documentation files and
+- the public-tree policy check accepted 188 UTF-8 source/documentation files and
   found no firmware blobs, generated binaries, or disallowed material; and
 - independent warning passes using GCC `-fanalyzer` and strict conversion,
   shadowing, and undefined-macro diagnostics completed without findings.

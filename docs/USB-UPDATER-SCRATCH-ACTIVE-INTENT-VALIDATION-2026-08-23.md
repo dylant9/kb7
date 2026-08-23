@@ -2,8 +2,10 @@
 
 > **Historical v2 hardware result.** It validates plan
 > `f0a8acf...ca0e`; it is not a hardware result for the current v3 source. The
-> hardware-unrun v3 self-`SIGKILL` checkpoint is specified in the
-> [host-termination test plan](USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md).
+> subsequently completed v3 self-`SIGKILL` checkpoint is specified in the
+> [host-termination test plan](USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md)
+> and recorded in the
+> [v3 validation record](USB-UPDATER-SCRATCH-HOST-TERMINATION-VALIDATION-2026-08-23.md).
 
 ## Result
 

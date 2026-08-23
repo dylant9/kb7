@@ -2,9 +2,10 @@
 
 > **Historical v2 plan.** This exact plan completed successfully and remains
 > the evidence record for the command-complete/WIP-ready/no-postread
-> checkpoint. The current source uses the hardware-unrun v3 self-`SIGKILL`
-> checkpoint documented in the
-> [host-termination test plan](USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md).
+> checkpoint. The current source uses the subsequently hardware-validated v3
+> self-`SIGKILL` checkpoint documented in the
+> [host-termination test plan](USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md)
+> and [v3 validation record](USB-UPDATER-SCRATCH-HOST-TERMINATION-VALIDATION-2026-08-23.md).
 
 ## Status
 

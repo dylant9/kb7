@@ -121,7 +121,7 @@ def validate_pin_map(pinmap: dict[str, object]) -> None:
 
 
 def validate_stock_flash(stock: dict[str, object]) -> None:
-    require(stock["schema_version"] == 7 and
+    require(stock["schema_version"] == 8 and
             stock["updated_on"] == "2026-08-23",
             "stock-flash evidence schema must describe the recovery and USB-ISP results")
     acquisition = stock["acquisition"]
@@ -520,6 +520,154 @@ def validate_stock_flash(stock: dict[str, object]) -> None:
             active["independent_electrical_flash_verification_performed"] is False and
             active["raw_images_or_transcripts_included"] is False,
             "do not broaden the active-intent executor proof boundary")
+
+    terminated = stock["usb_updater_scratch_host_termination_validation"]
+    require(terminated["observed_on"] == "2026-08-23" and
+            terminated["device_count"] == 1 and
+            terminated["manifest_header_version"] == "v1.0.00" and
+            terminated["loader_window_sha256"] ==
+            "9cc33333a88641b633bb5a4c0d55425c757e0fbdbe70eb99e9a9e40b76378a56" and
+            terminated["fixed_plan_sha256"] ==
+            "c1aa9348e74d6d4590b0e9666a9daf83e5544c3b23292b3df217c34038d5b653" and
+            terminated["source_scratch_plan_sha256"] ==
+            "d784f036e06a972d9688d15c76a41cbd7e90ca806d5ced1aeab5aae16745085b",
+            "unexpected host-termination executor device, loader, or plan identity")
+    require(terminated["baseline_capture_count"] == 2 and
+            terminated["baseline_captures_bit_identical"] is True and
+            terminated["baseline_size_bytes"] == 0x02000000 and
+            terminated["baseline_sha256"] ==
+            "2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f" and
+            terminated["containment_envelope_start"] == "0x000c0000" and
+            terminated["containment_envelope_end_exclusive"] == "0x00100000" and
+            terminated["initial_preflight_read_count"] == 2 and
+            terminated["initial_preflight_reads_bit_identical"] is True and
+            terminated["initial_preflight_classification"] ==
+            "exact_stock_or_complete" and
+            terminated["initial_boundary_index"] == 0,
+            "host-termination baseline or initial preflight evidence changed")
+    require(terminated["address_mode_command_before_each_mutation"] == "f6 18" and
+            terminated["operation_count"] == 22 and
+            terminated["program_operation_count"] == 18 and
+            terminated["erase_operation_count"] == 4 and
+            terminated["one_state_derived_operation_per_process"] is True,
+            "host-termination fixed operation protocol changed")
+    require(terminated["mandatory_checkpoint_operation"] == "program-09" and
+            terminated["mandatory_checkpoint_input_boundary_index"] == 9 and
+            terminated["mandatory_checkpoint_expected_post_boundary_index"] == 10 and
+            terminated["mandatory_checkpoint_offset"] == "0x000c6000" and
+            terminated["mandatory_checkpoint_length_bytes"] == 0x200 and
+            terminated["mandatory_checkpoint_cdb"] ==
+            "f6 06 00 60 0c 60 00 00 01 00 00 00 00 00 00 00" and
+            terminated["mandatory_checkpoint_payload_sha256"] ==
+            "ed41dcb56145068e569b99ca07c7827889e163f5cccc444b128512da244cf380" and
+            terminated["mandatory_checkpoint_operation_descriptor_sha256"] ==
+            "dbba0199b94c9ee3fd8d50c9aaac37f33acead94d8ac299a793c3cc7f53d5455",
+            "host-termination checkpoint command identity changed")
+    require(terminated["mandatory_checkpoint_preimage_sha256"] ==
+            "ea8f9c343781027db13ad221a63784fe52e4689f1543f10562ff7504c8b6f7b6" and
+            terminated["mandatory_checkpoint_expected_postimage_sha256"] ==
+            "f67fb2f28944d13d82ffcc7f15514558c757db0e6e0a0f261866043093afa3e7" and
+            terminated["mandatory_checkpoint_intent_durable_before_backend_or_usb"] is True and
+            terminated["mandatory_checkpoint_program_csw_validated"] is True and
+            terminated[
+                "mandatory_checkpoint_command_complete_state_durable_and_read_back"
+            ] is True and
+            terminated["mandatory_checkpoint_same_session_wip_poll_performed"] is False and
+            terminated["mandatory_checkpoint_same_session_postread_performed"] is False and
+            terminated["mandatory_checkpoint_explicit_usb_close_performed"] is False and
+            terminated["mandatory_checkpoint_self_signal"] == 9 and
+            terminated["mandatory_checkpoint_shell_status"] == 137 and
+            terminated[
+                "mandatory_checkpoint_shell_status_operator_observed_not_journal_bound"
+            ] is True,
+            "host-termination checkpoint boundary evidence changed")
+    require(terminated["duplicate_checkpoint_step_rejected_before_usb"] is True and
+            terminated["local_inspection_status"] ==
+            "checkpoint_command_complete" and
+            terminated["local_inspection_usb_opened"] is False,
+            "host-termination duplicate-step or local-inspection gate changed")
+    require(terminated["checkpoint_reconciliation_in_fresh_process"] is True and
+            terminated[
+                "checkpoint_reconciliation_mutation_incapable_transport"
+            ] is True and
+            terminated["checkpoint_reconciliation_wip_poll_completed"] is True and
+            terminated["checkpoint_reconciliation_read_count"] == 2 and
+            terminated["checkpoint_reconciliation_reads_bit_identical"] is True and
+            terminated["checkpoint_reconciliation_classification"] ==
+            "exact_postimage_completed" and
+            terminated["checkpoint_reconciliation_observed_sha256"] ==
+            terminated["mandatory_checkpoint_expected_postimage_sha256"] and
+            terminated["checkpoint_reconciliation_boundary_index"] == 10 and
+            terminated["checkpoint_reconciliation_next_operation"] == "program-10" and
+            terminated["checkpoint_automatic_retry"] is False and
+            terminated["checkpoint_command_replayed_during_reconciliation"] is False and
+            terminated["checkpoint_exact_preimage_reconciliation_branch_tested"] is False and
+            terminated["execution_continued_from_boundary_10"] is True,
+            "host-termination fresh-process reconciliation evidence changed")
+    require(terminated["final_step_classification"] ==
+            "exact_baseline_restored_pending_finalize" and
+            terminated["final_step_boundary_index"] == 22 and
+            terminated["final_step_sha256"] == terminated["baseline_sha256"] and
+            terminated["final_reconciliation_in_new_process"] is True and
+            terminated["final_reconciliation_read_count"] == 2 and
+            terminated["final_reconciliation_classification"] ==
+            "exact_stock_or_complete" and
+            terminated["final_reconciliation_wip_poll_completed"] is False and
+            terminated["final_reconciliation_state_cleared"] is True,
+            "host-termination completion or state closure changed")
+    require(terminated["separate_post_cycle_verifier_capture_size_bytes"] ==
+            0x02000000 and
+            terminated["separate_post_cycle_verifier_capture_sha256"] ==
+            terminated["baseline_sha256"] and
+            terminated["separate_post_cycle_verifier_capture_matches_baseline"] is True and
+            terminated["separate_post_cycle_manifest_region_checksums_passed"] is True and
+            terminated["separate_post_cycle_manifest_region_checksums"] == [
+                {
+                    "index": 0,
+                    "declared": "0xc3f43a6f",
+                    "computed": "0xc3f43a6f",
+                    "matches": True,
+                },
+                {
+                    "index": 1,
+                    "declared": "0xc8ed2815",
+                    "computed": "0xc8ed2815",
+                    "matches": True,
+                },
+                {
+                    "index": 2,
+                    "declared": "0xaa83e9a3",
+                    "computed": "0xaa83e9a3",
+                    "matches": True,
+                },
+            ] and
+            terminated["post_test_normal_boot_owner_confirmed"] is True and
+            terminated["post_test_5038_enumeration_owner_confirmed"] is True and
+            terminated["post_test_5038_enumeration_transcript_captured"] is False and
+            terminated["post_test_keyboard_working_owner_confirmed"] is True,
+            "host-termination final verifier or functional closure changed")
+    require(terminated["wip_busy_observed_at_termination"] is False and
+            terminated["physical_usb_disconnect_during_checkpoint_tested"] is False and
+            terminated["physical_mid_command_interruption_tested"] is False and
+            terminated["physical_power_cut_during_mutation_tested"] is False and
+            terminated["partial_cbw_or_data_out_interruption_tested"] is False and
+            terminated["missing_or_interrupted_csw_tested"] is False and
+            terminated["arbitrary_torn_nor_recovery_tested"] is False and
+            terminated["full_chip_read_address_mode_command"] == "f6 17" and
+            terminated["above_16mib_f6_17_mutation_path_tested"] is False and
+            terminated["f6_19_mutation_tested"] is False and
+            terminated["above_16mib_mutation_tested"] is False and
+            terminated["firmware_region_mutation_enabled"] is False and
+            terminated["firmware_region_mutation_tested"] is False and
+            terminated["custom_firmware_booted"] is False and
+            terminated["general_usb_updater_validated"] is False and
+            terminated["flash_approved"] is False and
+            terminated[
+                "all_usb_byte_verification_used_same_preserved_loader_f6_05_read_path"
+            ] is True and
+            terminated["independent_electrical_flash_verification_performed"] is False and
+            terminated["raw_images_or_transcripts_included"] is False,
+            "do not broaden the host-termination proof boundary")
 
     regions = stock["manifest"]["regions"]
     require([region["index"] for region in regions] == [0, 1, 2],
