@@ -74,14 +74,24 @@ also rejected from the public tree, and its mutation adapter remains
 hard-disabled. A distinct dry-run-default scratch executor can replay only 22
 fixed non-firmware operations in the reviewed V1.22 erased gap. Its v1 plan
 passed once on the development unit with exact baseline restoration and a
-subsequent operator-reported normal keyboard operation. Its current v2 plan
-passes offline fake-transport/state tests and has also completed once on the
+subsequent operator-reported normal keyboard operation. Its historical v2 plan
+passes offline fake-transport/state tests and also completed once on the
 development unit. Its mandatory fixed command-complete/no-postread active intent
 exited 4 after WIP ready; fresh-process verifier-only reconciliation accepted two
 exact postimage reads without retry; and the fixed continuation restored the
-baseline, cleared state and returned to normal operation. Neither revision
-physically interrupts an operation, tests power loss or touches firmware
-regions, and neither unlocks firmware mutation.
+baseline, cleared state and returned to normal operation. The current v3 plan
+passes offline fake-transport/state tests but is hardware-unrun. It
+self-terminates with signal 9/status 137 after validated program CSW and
+durable/read-back command-complete state, before WIP polling, postread or
+explicit USB close. Preflight-started and raw-intent markers are published
+before backend construction or USB and are terminal if left visible. Only exact
+command-complete and final-complete states are reconcilable; each consumes a
+one-shot started state before USB and closes strictly before final publication.
+Atomic ambiguity permits only local inspection, never USB. Status 137 is
+operator-observed, not journal-bound; status 126 permits cleanup only and does
+not validate continuation. No revision physically interrupts a
+flash command or pulse, tests device power loss or touches firmware regions,
+and none unlocks firmware mutation.
 Header dependencies use `-MMD -MP`.
 
 Any future image-producing release pipeline must, before it is enabled:
@@ -106,7 +116,7 @@ required rollback route, but no replacement firmware has run on hardware.
 
 The latest offline verification pass completed successfully on 2026-08-23:
 
-- `make check`: 171 Python/C integration tests passed, browser JavaScript syntax
+- `make check`: 201 Python tests passed, browser JavaScript syntax
   and executable validator checks passed, and the default, guarded-audit, and
   all-branches integration firmware profiles built and passed ELF verification;
 - the largest all-branches profile used 8,320 bytes of core0 text, 12 bytes of
@@ -114,7 +124,7 @@ The latest offline verification pass completed successfully on 2026-08-23:
   4 bytes of data and 19,312 bytes of BSS;
 - neither ELF contains unresolved relocations, and core0's vector table is
   exactly `0x13c` bytes;
-- the public-tree policy check accepted 186 UTF-8 source/documentation files and
+- the public-tree policy check accepted 187 UTF-8 source/documentation files and
   found no firmware blobs, generated binaries, or disallowed material; and
 - independent warning passes using GCC `-fanalyzer` and strict conversion,
   shadowing, and undefined-macro diagnostics completed without findings.

@@ -48,19 +48,30 @@ distinct dry-run-default scratch executor wires only the fixed 22-operation
 V1.22 scratch plan and accepts no firmware bundle or caller-selected operation.
 Its v1 plan completed once on the development unit with exact final baseline
 restoration and an operator-reported return to normal keyboard operation. The
-current v2 plan has also completed once. Its fixed active-intent checkpoint
+historical v2 plan also completed once. Its fixed active-intent checkpoint
 followed `program-09` and WIP-ready polling, before postread; the process exited
 4 and a fresh process with a mutation-incapable backend classified two full-chip
 reads as the exact postimage without retry. The plan then restored the baseline,
 cleared state, passed all three region CRCs in a separate verifier invocation,
-and returned to operator-reported normal operation. Both runs stayed outside all
-firmware regions; neither physically interrupted a command or tested power loss,
-and neither unlocks the paired executor. See
-`USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md` and
-`USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md`, plus
+and returned to operator-reported normal operation. The current v3 plan is
+hardware-unrun. It self-terminates with signal 9/status 137 after validated
+program CSW and durable/read-back command-complete state, before WIP polling,
+postread or explicit USB close. Preflight-started and raw-intent markers are
+published before backend construction or USB and are terminal if left visible.
+Only exact command-complete and final-complete states are reconcilable; each
+consumes a one-shot started state before USB and closes strictly before final
+publication. Atomic ambiguity permits only local inspection, never USB. Status
+137 is operator-observed, not journal-bound; status 126 permits cleanup only and
+does not validate continuation.
+All plans stay outside firmware regions; none physically interrupts a command
+or flash pulse or tests device power loss, and none unlocks the paired executor.
+See `USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md`,
+`USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md`,
 `USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md` and
-`USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md`; the v1 result is in
-`USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md` and the v2 result is in
+`USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md`. The historical
+v2 plan is in `USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md`; the
+v1 result is in `USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md`, and the
+v2 result is in
 `USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md`.
 
 The full SNC7320 datasheet review on 2026-08-18 added a critical correction:

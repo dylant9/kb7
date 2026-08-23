@@ -29,15 +29,26 @@ v1 plan also passed once on the development unit: all 22 ordinary
 command-boundary postimages were accepted, final new-process reconciliation
 cleared the journal at the exact baseline, and a separate verifier entry point
 reproduced the same 32-MiB image before operator-reported normal keyboard
-operation. The current v2 plan adds a mandatory active intent after
+operation. The historical v2 plan added a mandatory active intent after
 `program-09` completes and WIP reports ready, then closes without postread; only
 a fresh process with a mutation-incapable backend may reconcile. V2 has now
 completed once: two exact postimage reads were accepted without retry, the
 remaining fixed plan restored the baseline, final reconciliation cleared state,
 a separate verifier passed every region CRC, and the owner confirmed normal
-operation. This is fixed scratch work only; it does not authorize firmware-
-region execution. See the
-[v2 test plan](USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md),
+operation. The current v3 plan is hardware-unrun. It self-terminates with
+signal 9/status 137 after validated `program-09` CSW and durable/read-back
+`checkpoint_command_complete`, but before WIP polling, postread or explicit USB
+close. Preflight publishes `preflight_started`, and every step publishes raw
+intent, before backend construction or USB; either surviving marker is terminal
+SPI. Only exact checkpoint-command-complete and final-complete are reconcilable.
+Each read-only pass consumes a one-shot reconciliation-started state before USB,
+then classifies exactly and closes strictly before final publication. Atomic
+ambiguity permits only fresh local `inspect`, never USB. Status 137 is operator-
+observed rather than journal-bound; status 126 or ready-publication error permits
+cleanup only and cannot validate continuation. This is fixed scratch work only;
+it does not authorize firmware-region execution. See the
+[v3 host-termination plan](USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md),
+historical [v2 test plan](USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md),
 [v2 validation record](USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md) and
 [historical validation record](USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md).
 
@@ -162,11 +173,14 @@ implements restart classification and a durable-intent model with fake
 transports, but live firmware mutation remains unavailable. The separate
 scratch executor wires the same principles only to its immutable, non-firmware
 22-operation command set. Its v1 plan completed once on the tested physical
-loader; its v2 mandatory active-intent plan has now also completed once on that
-unit. The historical run exercised ordinary exact command boundaries, and the
-v2 checkpoint ended after command completion and WIP ready, before postread; a
-fresh verifier-only process accepted two exact postimage reads. Neither is a
-physical mid-command or power-loss event. None of these components claims
+loader; its historical v2 mandatory active-intent plan also completed once on
+that unit. V1 exercised ordinary exact command boundaries, and the v2
+checkpoint ended after command completion and WIP ready, before postread; a
+fresh verifier-only process accepted two exact postimage reads. The current v3
+plan moves abrupt userspace termination to after validated program CSW and
+durable command-complete publication but before WIP polling, and is hardware-
+unrun. None is a physical mid-command or power-loss event. None of these
+components claims
 power-loss atomicity. They
 cannot prove behavior for an interrupted NOR erase pulse, program disturb,
 misaddressed device-side handler, unstable cell, loader defect or electrical
@@ -218,12 +232,14 @@ image or an early-valid mixed state.
    new processes and restored the exact baseline. A new separate harness now
    expresses that geometry as 22 one-operation, state-derived invocations. Its
    v1 plan passed once on hardware, including final new-process reconciliation
-   and exact baseline restoration. Its current v2 plan also passed once: its
+   and exact baseline restoration. Its historical v2 plan also passed once: its
    mandatory boundary-9 active-intent checkpoint was followed by fresh-process,
    read-only exact-postimage reconciliation and fixed baseline restoration. Both
    the executor and separate verifier read through the same USB loader/SoC
-   controller. Physical mid-command, power-loss and
-   arbitrary torn-NOR reconciliation remain separate gates before reviewing
+   controller. The current v3 durable-command-complete/pre-WIP self-termination
+   plan is implemented and tested offline but has not run on hardware. Physical
+   mid-command, power-loss and arbitrary torn-NOR reconciliation remain
+   separate gates before reviewing
    any source change that could enable firmware-region execution.
 4. Prove entry back to `5037` after a checksum-valid but nonfunctional custom
    core0, or continue to require an attached and independently tested SPI

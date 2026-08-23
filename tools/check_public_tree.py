@@ -36,6 +36,7 @@ DENIED_NAMES = {
     "updater-journal.json",
     ".kb7-usb-updater-scratch-journal-v1.json",
     ".kb7-usb-updater-scratch-journal-v2.json",
+    ".kb7-usb-updater-scratch-journal-v3.json",
     "updater-scratch-journal.json",
     ".kb7-isp-scratch-restart-state.json",
     "scratch-restart-state.json",
@@ -48,6 +49,7 @@ DENIED_JSON_SCHEMAS = {
     "kb7-usb-updater-journal-v1",
     "kb7-usb-updater-scratch-journal-v1",
     "kb7-usb-updater-scratch-journal-v2",
+    "kb7-usb-updater-scratch-journal-v3",
 }
 DENIED_TEXT = (
     "Ghidra " + "decompiler output",

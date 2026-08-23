@@ -207,11 +207,14 @@ offline planner described below cannot touch a device, and the paired-firmware
 executor scaffold can only preflight and reconcile through read-only full-chip
 captures. A separate dry-run-default scratch executor can replay only 22 fixed
 non-firmware operations. Its preceding v1 plan completed once on the development
-unit and restored the byte-exact baseline. The current v2 plan adds a mandatory
-command-complete/no-postread active-intent checkpoint; that exact plan has now
-also completed once on the development unit, reconciled its exact postimage in
-a fresh read-only process, restored the baseline and returned to normal
-operation. This remains bounded laboratory evidence, not a general update path.
+unit and restored the byte-exact baseline. The historical v2 plan's mandatory
+WIP-ready/no-postread active-intent checkpoint also passed once, reconciled its
+exact postimage in a fresh read-only process, restored the baseline and returned
+to normal operation. The current v3 plan is hardware-unrun: after validated
+program CSW it locally abandons USB, durably publishes and reads back
+`checkpoint_command_complete`, then self-terminates with signal 9/status 137
+before WIP polling, postread or explicit USB close. This remains bounded
+laboratory evidence, not a general update path.
 Treat anything here that writes over USB as experimental and capable of
 destroying your bootloader.
 
@@ -284,8 +287,9 @@ default after writing; add `-N` to verify only the written region.
 | `kb7-isp-scratch-restart.py` | Fixed two-sector experiment with two deliberate no-readback/reconciliation checkpoints | **destructive; dry-run by default; passed once at the fixed plan** |
 | `kb7-updater-plan.py` | V1.22-only paired-region planner and interruption-model checker | **offline only; no device I/O; not an executor** |
 | `kb7-updater-executor.py` | Two-read live preflight, durable journal binding and image-derived reconciliation | **read-only CLI; mutation hard-disabled; not an installer** |
-| `kb7-updater-scratch-executor.py` | One-operation-per-process replay of the fixed 22-command V1.22 scratch plan, with a mandatory boundary-9 active-intent checkpoint | **destructive; dry-run by default; current v2 passed once on the development unit** |
-| `../../docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md` | Exact v2 checkpoint sequence, stop rules and proof boundary | documentation only |
+| `kb7-updater-scratch-executor.py` | One-operation-per-process replay of the fixed 22-command V1.22 scratch plan, mandatory boundary-9 host termination, and local-only state inspection | **destructive; dry-run by default; current v3 is hardware-unrun** |
+| `../../docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md` | Exact v3 durable-command-complete/pre-WIP self-termination sequence and stop rules | documentation only |
+| `../../docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md` | Historical exact v2 checkpoint sequence, stop rules and proof boundary | documentation only |
 | `../../docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md` | Observed v2 checkpoint, completion evidence and limits | documentation only |
 | `WRITE-TEST-PLAN.md` | Exact experimental sequence, remaining failure modes and SPI recovery procedure | documentation only |
 | `ERASE-GRANULARITY-TEST-PLAN.md` | Fixed target, exact four-stage sequence, proof limits and SPI recovery procedure | documentation only |
@@ -350,31 +354,77 @@ one-block `F6 06` programs followed by four `F6 15` sector erases, all inside
 `[0x000c0000,0x00100000)`. It derives exactly one next operation from a distinct
 scratch journal and sends `F6 18` immediately before that operation.
 
-Every committed preflight or step obtains two stable exact 32-MiB reads before
-state is accepted. A step persists intent before its one mutation, polls WIP,
-and normally requires two exact post-reads before advancing. The current v2
-plan makes operation index 9 (`program-09` at `0x000c6000`) a mandatory
-exception: after command completion and WIP-ready polling, it performs no
-postread, leaves intent active and exits 4. This policy is part of the
-hash-pinned plan rather than a runtime option. Only a fresh-process, read-only
-`reconcile` may classify the exact preimage or postimage, and it never retries
-automatically. At the mandatory checkpoint, an exact preimage consumes the
-single attempt, records `checkpoint_no_effect`, exits 5 and blocks every later
-step; the image is exact rather than corrupt, but cleanup requires a separate
-review. After the final erase, the complete journal remains until a final
-read-only reconciliation verifies the restored baseline twice and clears it.
+Every committed preflight first publishes `preflight_started` before backend
+construction or USB, then obtains two stable exact 32-MiB reads, closes strictly
+and publishes boundary 0. Every step similarly publishes raw intent before
+backend construction or USB; it normally verifies two exact pre-reads, mutates,
+polls WIP, verifies two exact post-reads, closes strictly and publishes the next
+boundary. The current v3 plan makes operation index 9 (`program-09` at
+`0x000c6000`) a mandatory
+exception: after exact CBW/data-OUT and strict program-CSW validation, it marks
+the handle abandoned, atomically publishes and reads back
+`checkpoint_command_complete`, and self-sends `SIGKILL` before WIP polling,
+postread, boundary advance or explicit USB close. Shell status 137 is expected.
+The intervening journal `fsync` means this tests durable command completion
+followed by host death, not immediate post-CSW death or known WIP activity.
 
-Preflight and reconciliation now instantiate the verifier-only transport, whose
+Visible `preflight_started` or raw intent at every operation index is terminal
+external SPI. The sole
+checkpoint-ready state authorizes one fresh-process, read-only no-recovery
+`reconcile`; final `complete` similarly authorizes one finalization pass, while
+intermediate verified boundaries are not reconcilable. Ordinary exact postread
+is followed by strict USB close and only then boundary publication; a reported
+publication error succeeds only when the exact target is visible. Before a
+read-only pass opens USB, it atomically consumes its source into
+`checkpoint_reconcile_started` or `final_reconcile_started`. A start-publication
+error with the exact source retained permits exit 4 and a fresh-process retry
+because no USB opened. Once a started state is visible, every backend/open,
+transport, verification or close failure is terminal external SPI. A final-
+publication error accepts only the exact target; an unclassifiable atomic
+result permits local-only inspection, never another USB probe.
+
+Checkpoint reconciliation performs the omitted WIP poll and accepts only the
+exact preimage or postimage from two stable reads. Exact postimage advances to
+boundary 10 without replay. Exact preimage consumes the attempt, records
+`checkpoint_no_effect`, exits 5 and requires external-SPI baseline restoration.
+Exact classification and strict USB close precede final publication. A reported
+atomic publication error is accepted only if its exact target is visible; a
+reported final-clear error is accepted only if the journal is exactly absent.
+
+An atomic publication/readback that cannot be classified in-process reports
+`STATE INSPECTION REQUIRED` / exit 4. The only authorized next command is a
+fresh local `inspect`; it has no `--commit`, never opens USB, and reports a
+permitted dry run or external-SPI action from the exact journal state. It does
+not itself authorize USB.
+
+Status 137 is required for experiment-valid continuation. If ready publication
+reports an error with exact ready visible, no signal is sent and exit 4 permits
+one cleanup reconciliation. If self-`SIGKILL` fails, status 126 is used. Exact
+ready permits cleanup in either invalid case, but even an observed boundary 10
+must be followed by SPI restoration rather than `program-10`; the journal
+cannot encode the shell outcome.
+
+Eligible clean closes check interface-release and kernel-driver-reattach return
+codes, never reattach after a failed release, and always perform local handle
+close and context exit. Any failure in that sequence is an exit-3 external-SPI
+stop.
+
+Preflight and reconciliation instantiate the verifier-only transport, whose
 whitelist cannot issue `F6 06`, `F6 15`, `F6 18` or a data-OUT program phase.
-An active intent also binds a process-instance nonce; the process that wrote it
-cannot reconcile it. This is a software/process boundary, not a physical cable
-disconnect or power cut.
+V3 additionally disables endpoint-recovery traffic in that transport. The
+checkpoint-ready state binds a process-instance nonce; the process that wrote
+it cannot reconcile it. This is abrupt userspace termination after a validated
+BOT command and durable journal publication, not a physical cable disconnect,
+device-power cut or proven NOR-pulse interruption.
 Committed commands also hold one persistent, private per-journal lock from the
 authoritative state read through USB close and publication; a concurrent
 invocation refuses before opening USB.
 
-The current harness and its fake-transport/journal tests pass offline. Its v2
-mandatory-checkpoint plan has now also completed once on the development unit:
+The current v3 harness and its fake-transport/journal tests pass offline, but
+its plan SHA-256
+`c1aa9348e74d6d4590b0e9666a9daf83e5544c3b23292b3df217c34038d5b653`
+has not run on hardware. Its historical v2 mandatory-checkpoint plan completed
+once on the development unit:
 the fixed command and WIP poll completed without postread, a fresh process using
 the verifier-only backend classified two reads as the exact boundary-10
 postimage without retry, and the remaining plan restored the exact baseline.
@@ -391,9 +441,10 @@ the same loader and SoC `F6 05` flash-controller path. Neither run physically
 interrupted a command, tested power loss or touched firmware regions. Read the
 [fixed scratch executor status and test plan](../../docs/USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md)
 for its exact sequence and stop rules, the
-[mandatory active-intent test plan](../../docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md)
+[v3 host-termination test plan](../../docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md),
+historical [mandatory active-intent test plan](../../docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md)
 and [v2 validation record](../../docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md)
-for the completed current campaign, and the
+for the completed historical v2 campaign, and the
 [completed validation record](../../docs/USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md)
 for the historical v1 evidence and proof boundary.
 

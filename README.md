@@ -19,7 +19,7 @@ image generation is disabled.
 ## Current status — 2026-08-23
 
 - The offline/software implementation is complete to the evidence currently
-  available. `make check` passes 171 Python/C integration tests, browser
+  available. `make check` passes 201 Python tests, browser
   validation, three ARM build profiles, hardware-fact checks and the public-tree
   safety audit.
 - Two independent reads of the installed 32-MiB Macronix SPI NOR are
@@ -68,16 +68,35 @@ image generation is disabled.
   cleared the journal at the byte-exact stock baseline, and a separate verifier
   entry point reproduced SHA-256
   `2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f`;
-  the owner then reported normal keyboard operation. The current v2 plan has
-  now also completed one hardware run. At its mandatory `program-09` durable-
+  the owner then reported normal keyboard operation. The historical v2 plan
+  also completed one hardware run. At its mandatory `program-09` durable-
   intent checkpoint, the command and WIP-ready poll completed, then the process
   closed without postread or boundary advance and exited 4. A fresh process
   using the mutation-incapable verifier backend classified two full-chip reads
   as the exact boundary-10 postimage without retry. The remaining fixed plan
   restored the exact baseline, final reconciliation cleared state, a separate
   verifier reproduced the same 32-MiB hash with all three region CRCs valid,
-  and the owner confirmed normal boot. Both executor and verifier reads use the
-  same loader/SoC `F6 05` flash-controller path. This is not a physical command
+  and the owner confirmed normal boot. The current v3 plan is hardware-unrun.
+  It moves the same mandatory checkpoint earlier: after the complete program
+  CBW/data exchange and validated CSW, the process locally abandons USB,
+  durably publishes and reads back `checkpoint_command_complete`, then self-
+  terminates with signal 9/status 137 before WIP polling, postread, boundary
+  publication or explicit USB close. The journal `fsync` means this tests
+  durable command completion followed by host death, not immediate post-CSW
+  death or known WIP activity. Preflight publishes `preflight_started`, and
+  every step publishes raw intent, before constructing a backend or opening
+  USB; either visible marker is terminal SPI. Only exact checkpoint-command-
+  complete and final-complete states are reconcilable, and intermediate
+  boundaries are not. Each read-only pass consumes a one-shot
+  `*_reconcile_started` state before USB; transport, verification or close
+  failure is terminal. Exact classification and strict close precede final
+  publication; an exact target is accepted, while an unclassifiable atomic
+  state change permits only fresh local `inspect`, never USB. Status 137
+  is operator-observed—not journal-bound—and status 126 or ready-publication
+  error permits cleanup only, invalidating the experiment even if boundary 10
+  is observed.
+  Both executor and verifier reads use the same loader/SoC `F6 05`
+  flash-controller path. This is not a physical command
   interruption or power cut, and no firmware region is touched. The
   harness cannot accept a firmware bundle or caller-selected mutation; the
   paired-firmware executor remains mutation-locked. None of these paths makes
@@ -86,7 +105,8 @@ image generation is disabled.
   [executor scaffold status](docs/USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md),
   plus the separate
   [fixed scratch executor status](docs/USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md),
-  [mandatory-checkpoint test plan](docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md),
+  [v3 host-termination test plan](docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md),
+  historical [v2 mandatory-checkpoint test plan](docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md),
   and [v2 validation record](docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md).
 - No custom firmware has been installed. USB, display, touch, RGB, MCU2/Hall,
   pinmux, cold-start memory setup and a legitimate USB identity still require
@@ -113,7 +133,11 @@ record the current control harness and the exact limits of its historical v1
 development-unit run. The
 [mandatory active-intent test plan](docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md)
 and [v2 validation record](docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md)
-record the checkpoint sequence, observed result and its narrower proof boundary.
+record the historical checkpoint sequence, observed result and its narrower
+proof boundary. The current hardware-unrun
+[v3 host-termination plan](docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md)
+records the new durable-command-complete/pre-WIP sequence and stricter stop
+rules.
 
 ## Repository contents
 

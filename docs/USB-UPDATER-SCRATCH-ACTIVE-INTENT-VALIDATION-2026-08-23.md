@@ -1,8 +1,13 @@
 # Mandatory active-intent checkpoint hardware validation — 2026-08-23
 
+> **Historical v2 hardware result.** It validates plan
+> `f0a8acf...ca0e`; it is not a hardware result for the current v3 source. The
+> hardware-unrun v3 self-`SIGKILL` checkpoint is specified in the
+> [host-termination test plan](USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md).
+
 ## Result
 
-The owner completed one end-to-end hardware run of the current v2
+The owner completed one end-to-end hardware run of the then-current v2
 `kb7-updater-scratch-executor.py` plan on the development KB7. The exact
 hash-bound plan was:
 

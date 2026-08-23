@@ -38,11 +38,19 @@ that the contributor does not possess.
   clean-room summaries of the F6 interoperability findings. The scratch
   executor can derive only its 22 reviewed non-firmware operations. Its v1 plan
   completed once on the development unit, restored the exact 32-MiB baseline,
-  and returned to operator-reported normal keyboard operation. Its current v2
-  plan has also completed once: its mandatory command-complete/no-postread
+  and returned to operator-reported normal keyboard operation. Its historical
+  v2 plan also completed once: its mandatory command-complete/no-postread
   active-intent checkpoint reconciled the exact postimage in a fresh process
   over a mutation-incapable backend, then the fixed cleanup restored the exact
-  baseline and the keyboard returned to normal operation. The public tree
+  baseline and the keyboard returned to normal operation. Its current v3 plan
+  is hardware-unrun; it fixes an abrupt self-`SIGKILL` after validated program
+  CSW and durable/read-back command-complete state, before WIP polling, postread
+  or explicit USB close. Preflight-started and raw-intent markers are published
+  before backend construction or USB and are terminal if left visible. Only
+  exact command-complete and final-complete states are reconcilable; each
+  consumes a one-shot started state before USB and closes strictly before final
+  publication. Atomic ambiguity permits only local inspection, never USB.
+  Status 137 is operator-observed and not journal-bound. The public tree
   records only independently authored source, hashes, classifications and
   summarized results from those runs. No vendor DLL, disassembly listing, general USB
   firmware flasher, raw transcript, capture, journal or stock byte payload is
@@ -72,8 +80,9 @@ No external scripts, fonts, images, packages, or vendored libraries are bundled.
   scaffold exposes only read-only preflight/reconciliation; its live mutation
   adapter is hard-disabled and no execute command exists. The distinct scratch
   executor accepts no firmware bundle or caller-selected address, CDB, payload
-  or operation. Its v2 checkpoint is fixed in the hash-bound plan rather than
-  exposed as a runtime selector. It does not change the paired executor's lock.
+  or operation. Its current v3 checkpoint is fixed in the hash-bound plan
+  rather than exposed as a runtime selector. The completed v2 plan remains a
+  historical validation record. Neither changes the paired executor's lock.
 
 ## Excluded and retained only outside the public repository
 

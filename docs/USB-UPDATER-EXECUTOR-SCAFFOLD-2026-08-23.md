@@ -23,14 +23,20 @@ A second tool now exists with a deliberately different domain:
 `kb7-updater-scratch-executor.py`. It can replay only the fixed 22-operation
 V1.22 scratch experiment, is dry-run by default, and has no firmware-bundle or
 caller-selected mutation interface. Its preceding v1 plan completed once on the
-development unit. The current v2 plan has also completed once: its fixed
+development unit. The historical v2 plan also completed once: its fixed
 boundary-9 command-complete/no-postread checkpoint exited 4, a fresh process
 over a mutation-incapable transport accepted two exact postimage reads without
 retry, and the fixed continuation restored the baseline and normal operation.
-Neither revision unlocks this paired-firmware executor; the two tools use distinct plans
-and journal schemas. See the
+The current v3 scratch plan is hardware-unrun. It self-terminates with signal
+9/status 137 after validated program CSW and durable/read-back
+`checkpoint_command_complete`, but before WIP polling, postread or explicit USB
+close; fresh-process read-only reconciliation supplies the omitted poll. No
+revision unlocks this paired-firmware executor; the two tools use
+distinct plans and journal schemas. See the
 [fixed scratch executor plan](USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md) and
-[mandatory checkpoint plan](USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md),
+[v3 host-termination plan](USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md),
+the historical
+[v2 mandatory checkpoint plan](USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md),
 the [v2 validation record](USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md),
 and the [historical v1 validation record](USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md).
 
@@ -184,14 +190,36 @@ or physical interruption recovery.
 
 The scratch harness turns the already reviewed scratch command list into 22
 one-operation process boundaries: 18 fixed 512-byte programs and four fixed
-4-KiB erases inside `[0x000c0000,0x00100000)`. It requires two exact full-chip
-reads before every operation, persists durable intent before mutation, and
-normally requires two exact postreads before advancing. Its current v2 policy
-instead stops obligatorily after `program-09` and WIP-ready polling, with no
-postread and intent still active. A process-instance nonce requires a fresh
-process for reconciliation, whose USB backend cannot represent a program or
-erase. The last mutation leaves a complete journal until final read-only
-reconciliation verifies the exact baseline twice.
+4-KiB erases inside `[0x000c0000,0x00100000)`. Preflight publishes
+`preflight_started`, and each step publishes raw intent, before constructing a
+backend or opening USB. Each step then requires two exact full-chip pre-reads
+and normally two exact postreads before strict close and boundary publication.
+Its current v3 policy
+instead locally abandons USB after `program-09` CSW validation, atomically
+publishes and reads back `checkpoint_command_complete`, then self-terminates
+before WIP polling or postread. The intervening `fsync` means this is durable
+command completion followed by host death, not immediate post-CSW death.
+
+Visible `preflight_started` or raw intent at every index is terminal external
+SPI. Only exact
+checkpoint-command-complete and final-complete states are reconcilable;
+intermediate boundaries are not. Before opening its mutation-incapable backend,
+each pass atomically consumes a one-shot `checkpoint_reconcile_started` or
+`final_reconcile_started` state. A start-publication error with the exact source
+retained permits a fresh-process retry because USB was never opened. Once
+started is visible, any backend/open, transport, exact-classification or close
+failure is terminal. Exact classification and strict USB close precede final
+publication or clear. A final-publication error is accepted only when the exact
+target is visible (or the final journal is exactly absent); an unclassifiable
+atomic result permits local-only inspection, never another USB probe.
+An in-process atomic ambiguity permits only the local `inspect` command; it has
+no commit mode, opens no USB and reports a permitted dry run or SPI action.
+
+Status 137 is required for experiment-valid continuation. Exact ready after
+status 126 or a ready-publication error permits one cleanup reconciliation only,
+then SPI restoration even if boundary 10 is observed. The journal cannot encode
+the shell outcome. The last mutation leaves `complete` until its one-shot final
+read-only pass verifies the baseline twice, closes cleanly and clears state.
 
 The caller cannot provide an address, CDB, payload, length, bundle, device,
 force, retry or skip choice. All operations are re-derived from a source-bound
@@ -199,8 +227,10 @@ plan and separate scratch journal. This provides an offline-testable bridge
 between the earlier one-off scratch script and a state-derived executor without
 placing any mutation code in the paired-firmware executor.
 
-The current v2 source and fake-transport/state tests pass offline, and its exact
-plan has now completed one hardware cycle on the development unit. The fixed
+The current v3 source and fake-transport/state tests pass offline, but plan
+`c1aa9348e74d6d4590b0e9666a9daf83e5544c3b23292b3df217c34038d5b653`
+has not run on hardware. The historical v2 plan completed one hardware cycle
+on the development unit. The fixed
 `program-09` command and WIP-ready poll completed without a postread; the
 process exited 4 with intent active; and a fresh process using the verifier-only
 backend classified two exact 32-MiB postimage reads without retry. The remaining
@@ -217,9 +247,11 @@ before the owner reported normal keyboard operation. Both live readers use the
 same USB loader and SoC `F6 05` controller path. This remains destructive
 laboratory tooling rather than an updater qualification. V1 never left an
 intent unresolved or entered active-intent reconciliation; the completed v2
-checkpoint ended only after its command and WIP poll completed. Neither
-physically interrupts a command,
-tests power loss or touches firmware regions.
+checkpoint ended only after its command and WIP poll completed. V3 moves abrupt
+host termination to after validated CSW and durable command-complete
+publication but before WIP polling; it has not run on hardware. None physically
+interrupts a command or flash pulse, tests device power loss or touches firmware
+regions.
 
 ## Remaining gates
 
@@ -230,15 +262,17 @@ are separately completed and reviewed:
    both command-complete no-readback operations reconciled to their exact
    postimages in new processes, the complete baseline was restored, and normal
    `5038` operation returned. This closed only the host-session restart gate.
-2. Exercise reconciliation after deliberately modeled physical disconnect,
-   power-loss and partial-operation outcomes at safe scratch addresses. The
-   completed experiment did not interrupt CBW/data/CSW, WIP, erase or program.
+2. Run and review the current v3 fixed durable-command-complete/pre-WIP host-
+   termination plan. It is narrower than physical disconnect or power loss and
+   must not be represented as either. Later work still needs deliberately
+   modeled physical disconnect, power-loss and partial-operation outcomes at
+   safe scratch addresses.
 3. Re-review the exact operation transport, intent/restart behavior and source
    freeze. The separate scratch harness has no raw mutation interface; its v1
-   plan passed once on hardware, and its v2 mandatory active-intent plan has now
-   also passed once at a command-complete/no-postread boundary. Physical
-   mid-command and power-loss behavior remain untested. Any future
-   paired-firmware executor
+   plan passed once on hardware, and its v2 mandatory active-intent plan also
+   passed once at a WIP-ready/no-postread boundary. Its v3 plan has not run on
+   hardware. Physical mid-command and power-loss behavior remain untested. Any
+   future paired-firmware executor
    must remain independently locked until its own review and must likewise
    expose no raw mutation interface.
 4. Add release authenticity: the present owner-local bundle is content-hashed

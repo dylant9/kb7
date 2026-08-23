@@ -219,17 +219,28 @@ These are not honest candidates for further offline coding:
    complete-image
    SHA-256
    `2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f`,
-   after which the owner reported normal `5038` operation. The current v2
-   executor has also completed once. Its mandatory
+   after which the owner reported normal `5038` operation. The historical v2
+   executor also completed once. Its mandatory
    command-complete/no-postread active intent exited 4 after `program-09` and
    WIP ready; a fresh verifier-only process accepted two exact boundary-10
    postimage reads without retry; the remaining plan restored the exact
    baseline and cleared state; a separate verifier passed all three region CRCs;
-   and the owner confirmed normal operation. Both verifier and executor use the
-   same loader/SoC `F6 05` read path. Neither run tests physical mid-command
-   interruption or power loss, and neither touches firmware regions.
+   and the owner confirmed normal operation. The current v3 executor is
+   hardware-unrun. Its fixed checkpoint instead self-terminates with signal
+   9/status 137 after validated program CSW and durable/read-back command-
+   complete state, before WIP polling, postread or explicit USB close.
+   Preflight-started and raw-intent markers are published before backend
+   construction or USB and are terminal if left visible. Only exact command-
+   complete and final-complete states are reconcilable; each consumes a one-shot
+   started state before USB and closes strictly before final publication. Atomic
+   ambiguity permits only local inspection, never USB. Status 137 is operator-
+   observed, not journal-bound; status 126 permits cleanup only and does not
+   validate continuation. Both verifier and executor use the same loader/SoC
+   `F6 05` read path. None of these runs tests physical mid-command interruption
+   or power loss, and none touches firmware regions.
    See `USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md` and
-   `USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md`.
+   `USB-UPDATER-SCRATCH-ACTIVE-INTENT-VALIDATION-2026-08-23.md`; the v3 plan is
+   in `USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md`.
 
 ## Build and test profiles
 

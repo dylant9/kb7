@@ -1,8 +1,14 @@
 # Mandatory active-intent checkpoint test plan — 2026-08-23
 
+> **Historical v2 plan.** This exact plan completed successfully and remains
+> the evidence record for the command-complete/WIP-ready/no-postread
+> checkpoint. The current source uses the hardware-unrun v3 self-`SIGKILL`
+> checkpoint documented in the
+> [host-termination test plan](USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md).
+
 ## Status
 
-**Completed successfully on the development KB7.** The current
+**Completed successfully on the development KB7.** The historical
 `kb7-updater-scratch-executor.py` source retains the same 18 fixed programs and
 four fixed erases as the earlier executor, but its v2 plan makes one
 active-intent checkpoint a mandatory part of execution. That safety policy is
@@ -15,10 +21,10 @@ The preceding v1 executor plan, SHA-256
 `491b06c1beb66fa606639e1d420109dcf856c91b50ad02d5fbd0e6bafe1cc797`,
 completed one hardware cycle and restored the exact baseline. That result is
 historical evidence for the unchanged command set and geometry. It is not a
-hardware result for the current v2 source or its mandatory-checkpoint state
-machine.
+hardware result for the current v3 source or its post-CSW host-termination
+state machine.
 
-The current v2 plan descriptor, including the mandatory checkpoint,
+That v2 plan descriptor, including the mandatory checkpoint,
 single-attempt rule and exact-preimage stop policy, has SHA-256
 `f0a8acfcdc7ab5fb7a7dc2753ed8bdca0e381a9433f64fe311348442a8bbdb32`.
 
