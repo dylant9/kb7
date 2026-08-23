@@ -19,7 +19,7 @@ image generation is disabled.
 ## Current status — 2026-08-23
 
 - The offline/software implementation is complete to the evidence currently
-  available. `make check` passes 107 Python/C integration tests, browser
+  available. `make check` passes 118 Python/C integration tests, browser
   validation, three ARM build profiles, hardware-fact checks and the public-tree
   safety audit.
 - Two independent reads of the installed 32-MiB Macronix SPI NOR are
@@ -33,13 +33,15 @@ image generation is disabled.
   retained matching post-repair captures. External SPI is the demonstrated
   rollback path for this development unit.
 - The flash-access tooling adds proven external SPI recovery workflows,
-  read-only USB-ISP diagnostics and a dry-run-default two-stage USB mutation
-  experiment. On 2026-08-23 one guarded V1.22 cycle at offset `0x0008e000`
+  read-only USB-ISP diagnostics and fixed, dry-run-default USB mutation
+  experiments. On 2026-08-23 one guarded V1.22 cycle at offset `0x0008e000`
   confirmed the sub-16-MiB `F6 18` + `F6 06` marker program and normal-NOR
   `F6 18` + `F6 15` erase sequence, with exact 32-MiB postflight comparisons
-  and final restoration to the baseline. `F6 19` remains static-only. This is
-  not a supported general flasher; use SPI for owner-authorized ordinary,
-  recovery and production writes.
+  and final restoration to the baseline. A separate four-stage guarded test is
+  prepared, but has not yet run, to measure the observable erase footprint at
+  `0x000c6000`. Exact 4-KiB granularity and `F6 19` therefore remain unproven.
+  This is not a supported general flasher; use SPI for owner-authorized
+  ordinary, recovery and production writes.
 - No custom firmware has been installed. USB, display, touch, RGB, MCU2/Hall,
   pinmux, cold-start memory setup and a legitimate USB identity still require
   board validation. `flash_approved` remains false.
@@ -51,7 +53,9 @@ boundaries. The
 [bounded USB-ISP validation record](docs/USB-ISP-WRITE-VALIDATION-2026-08-23.md),
 [flash-access guide](tools/flash-access/README.md), and
 [F6 erase analysis](tools/flash-access/F6-ERASE-ENCODING.md) record the separate
-stock-recovery investigation.
+stock-recovery investigation. The
+[erase-footprint test plan](tools/flash-access/ERASE-GRANULARITY-TEST-PLAN.md)
+defines the pending fixed hardware experiment and its recovery boundary.
 
 ## Repository contents
 
@@ -68,8 +72,8 @@ stock-recovery investigation.
 - `tools/inspect_stock_flash.py` — read-only inspection of an owner-supplied
   32-MiB dump; raw images and reports remain outside the repository.
 - `tools/flash-access/` — ESP32/`flashrom` recovery notes, read-only USB-ISP
-  verification tools, F6 command analysis and a guarded two-stage USB write-path
-  experiment. It contains no stock bytes and no supported USB flasher.
+  verification tools, F6 command analysis and fixed guarded USB write-path
+  experiments. It contains no stock bytes and no supported USB flasher.
 - `tools/check_public_tree.py` — rejects compiled/vendor artifacts, archive and
   executable formats, symlinks, build directories, and prohibited artifact
   filenames.
