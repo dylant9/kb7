@@ -1,11 +1,12 @@
 #ifndef KB7_RUNTIME_H
 #define KB7_RUNTIME_H
 
+#include "kb7/build_pair.h"
 #include "kb7/platform.h"
 #include "kb7/regs.h"
 
 #define KB7_RUNTIME_MAGIC UINT32_C(0x4b423741)
-#define KB7_RUNTIME_ABI_VERSION 1U
+#define KB7_RUNTIME_ABI_VERSION 2U
 
 enum kb7_boot_flags {
     KB7_BOOT_CLOCK_READY = KB7_BIT(0),
@@ -19,6 +20,7 @@ struct kb7_runtime_api {
     uint16_t abi_version;
     uint16_t size;
     uint32_t boot_flags;
+    uint8_t build_pair_id[KB7_BUILD_PAIR_ID_BYTES];
     uint32_t (*milliseconds)(void);
     void (*usb_poll)(void);
     int32_t (*usb_send)(uint8_t endpoint, const void *data, uint16_t length);

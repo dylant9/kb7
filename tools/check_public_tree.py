@@ -29,6 +29,8 @@ DENIED_NAMES = {
     "KB7_V1.24-core1.bin",
     "KB7_V1.24-loader.bin",
     "kb7-isp-write.py",
+    "bundle.json",
+    "simulation.json",
 }
 DENIED_TEXT = (
     "Ghidra " + "decompiler output",

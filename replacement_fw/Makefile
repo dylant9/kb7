@@ -82,8 +82,9 @@ integration-check:
 	test $$((0x$$usb_size)) -gt 128
 
 bundle:
-	@echo "Flash-image generation is intentionally unavailable in the public source tree." >&2
-	@echo "See ../docs/SECURITY-AUDIT-2026-08-17.md." >&2
+	@echo "Installable-bundle generation is intentionally unavailable through this Makefile." >&2
+	@echo "The separate offline planner is non-executing and remains flash_approved=false." >&2
+	@echo "See ../docs/USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md." >&2
 	@exit 2
 
 clean:

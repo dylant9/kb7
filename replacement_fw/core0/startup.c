@@ -9,6 +9,16 @@ extern uint32_t __bss_start__, __bss_end__;
 void core0_main(void) KB7_NORETURN;
 void kb7_usb_irq_handler(void);
 
+__attribute__((section(".kb7_pair"), used))
+const struct kb7_build_pair_marker kb7_core0_build_pair = {
+    .magic = KB7_BUILD_PAIR_MAGIC,
+    .format_version = KB7_BUILD_PAIR_FORMAT_VERSION,
+    .size = sizeof(struct kb7_build_pair_marker),
+    .role = KB7_BUILD_PAIR_ROLE_CORE0,
+    .runtime_abi_version = KB7_RUNTIME_ABI_VERSION,
+    .pair_id = {[0 ... KB7_BUILD_PAIR_ID_BYTES - 1U] = UINT8_C(0xff)},
+};
+
 static void default_handler(void) {
     uint32_t exception;
     __asm__ volatile("mrs %0, ipsr" : "=r"(exception));

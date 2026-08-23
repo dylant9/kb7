@@ -19,7 +19,7 @@ image generation is disabled.
 ## Current status — 2026-08-23
 
 - The offline/software implementation is complete to the evidence currently
-  available. `make check` passes 118 Python/C integration tests, browser
+  available. `make check` passes 131 Python/C integration tests, browser
   validation, three ARM build profiles, hardware-fact checks and the public-tree
   safety audit.
 - Two independent reads of the installed 32-MiB Macronix SPI NOR are
@@ -45,6 +45,14 @@ image generation is disabled.
   observable footprint result; `F6 19` and general update safety remain unproven.
   This is not a supported general flasher; use SPI for owner-authorized
   ordinary, recovery and production writes.
+- A new V1.22-only updater planner builds and checks an owner-local,
+  manifest-preserving paired-region plan. It CRC-balances both replacement
+  regions against the unchanged stock manifest, inserts a symmetric build-pair
+  guard, invalidates both regions before dense staging, and commits core0 last.
+  The CLI has only offline `build` and `simulate` operations: it contains no USB
+  executor, reports `flash_approved=false`, and does not make a custom-firmware
+  hardware trial safe. See the
+  [offline updater design](docs/USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md).
 - No custom firmware has been installed. USB, display, touch, RGB, MCU2/Hall,
   pinmux, cold-start memory setup and a legitimate USB identity still require
   board validation. `flash_approved` remains false.
@@ -77,7 +85,8 @@ records the completed fixed hardware experiment and its recovery boundary.
   32-MiB dump; raw images and reports remain outside the repository.
 - `tools/flash-access/` — ESP32/`flashrom` recovery notes, read-only USB-ISP
   verification tools, F6 command analysis and fixed guarded USB write-path
-  experiments. It contains no stock bytes and no supported USB flasher.
+  experiments, plus a non-executing V1.22 updater planner/checker. It contains
+  no stock bytes and no supported USB flasher.
 - `tools/check_public_tree.py` — rejects compiled/vendor artifacts, archive and
   executable formats, symlinks, build directories, and prohibited artifact
   filenames.
@@ -117,7 +126,9 @@ make -C replacement_fw integration-check
 The default, guarded audit, and all-branches integration profiles create ignored
 ELF/disassembly files for local inspection. `integration-check` compiles board-
 verified branches but is not evidence that a board passed those gates. `make
-bundle` deliberately fails: no flash image can be produced by that target.
+bundle` deliberately fails: no installable package can be produced by that
+target. The separate planner emits only owner-local, non-executing sector
+payloads and model metadata.
 
 ## Public-repository boundary
 

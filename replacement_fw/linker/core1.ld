@@ -9,6 +9,7 @@ MEMORY
 SECTIONS
 {
     .entry : ALIGN(2) { KEEP(*(.entry)) } > IMAGE
+    .kb7_pair ORIGIN(IMAGE) + 0x100 : { KEEP(*(.kb7_pair)) } > IMAGE
     .text : ALIGN(4)
     {
         KEEP(*(.text.kb7_host_server_process))
@@ -37,3 +38,7 @@ SECTIONS
 ASSERT(LOADADDR(.data) + SIZEOF(.data) <= ORIGIN(IMAGE) + LENGTH(IMAGE), "core1 image overflow")
 ASSERT(__bss_end__ <= ORIGIN(SRAM) + LENGTH(SRAM), "core1 SRAM overflow")
 ASSERT(__bss_end__ + 0x4000 <= 0x1803f5c0, "less than 16 KiB runtime stack headroom")
+ASSERT(ADDR(.kb7_pair) == ORIGIN(IMAGE) + 0x100, "core1 build-pair marker moved")
+ASSERT(SIZEOF(.kb7_pair) == 32, "core1 build-pair marker size changed")
+ASSERT(LOADADDR(.data) + SIZEOF(.data) <= ORIGIN(IMAGE) + 0x0006ac00,
+       "core1 image overlaps updater fixup reserve")

@@ -37,6 +37,13 @@ unavailable; see `FULL-FLASH-ACQUISITION-2026-08-22.md` and
 recorded separately in `USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md`;
 it validates one stock-loader erase boundary, not replacement firmware.
 
+A later offline-only V1.22 planner addresses the single-manifest power-loss
+hazard by leaving that manifest byte-exact, CRC-balancing paired replacement
+regions and checking an invalidate/stage/sparse-gate transaction model. It also
+adds a symmetric runtime pair-ID/ABI guard. This is a software design result,
+not a USB executor or board validation; see
+`USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md`.
+
 The full SNC7320 datasheet review on 2026-08-18 added a critical correction:
 AIRCR/software reset restarts PRAM, not mask ROM. The former mailbox-marker plus
 software-reset helper therefore did not prove entry to the preserved loader.

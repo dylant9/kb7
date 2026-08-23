@@ -44,6 +44,30 @@ def main() -> int:
             failures.append("core0 no longer defines all 79 vectors with USB IRQ6")
     if "SIZEOF(.isr_vector) == 79 * 4" not in linker:
         failures.append("linker no longer enforces the vector-table size")
+    runtime = source("include/kb7/runtime.h")
+    pair_header = source("include/kb7/build_pair.h")
+    core0_main = source("core0/main.c")
+    core1_startup = source("core1/startup.c")
+    core1_linker = source("linker/core1.ld")
+    if "#define KB7_RUNTIME_ABI_VERSION 2U" not in runtime or \
+            "build_pair_id[KB7_BUILD_PAIR_ID_BYTES]" not in runtime:
+        failures.append("paired-region runtime ABI guard is missing")
+    for marker in ("KB7_CORE0_BUILD_PAIR_ADDRESS UINT32_C(0x00000140)",
+                   "KB7_CORE1_BUILD_PAIR_ADDRESS UINT32_C(0x10000100)"):
+        if marker not in pair_header:
+            failures.append(f"fixed build-pair marker is missing: {marker}")
+    if "kb7_build_pair_marker_valid" not in core0_main or \
+            core0_main.find("kb7_build_pair_marker_valid") > core0_main.find("kb7_usb_init"):
+        failures.append("Core 0 does not reject a mismatched region pair before USB")
+    if "kb7_build_pair_ids_equal" not in core1_startup or \
+            core1_startup.find("kb7_build_pair_ids_equal") > \
+            core1_startup.find("uint32_t *source = &__data_load_start__"):
+        failures.append("region-1 entry does not reject a mismatched pair before data init")
+    if "core0 build-pair marker moved" not in linker or \
+            "core0 image overlaps updater fixup reserve" not in linker or \
+            "core1 build-pair marker moved" not in core1_linker or \
+            "core1 image overlaps updater fixup reserve" not in core1_linker:
+        failures.append("linkers no longer reserve the paired updater metadata")
 
     usb = source("core0/usb.c")
     usb_profile = source("include/kb7/usb_device.h")
@@ -76,7 +100,7 @@ def main() -> int:
 
     makefile = source("Makefile")
     if "OBJCOPY" in makefile or "exit 2" not in makefile:
-        failures.append("public build can emit a flashable binary/bundle")
+        failures.append("ordinary firmware Makefile can emit an installable bundle")
     if "-mcpu=cortex-m3" not in makefile or "-mcpu=cortex-m4" in makefile:
         failures.append("firmware compiler target is not Cortex-M3")
 

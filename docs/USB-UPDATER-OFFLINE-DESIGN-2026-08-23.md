@@ -1,0 +1,187 @@
+# Offline USB updater design — 2026-08-23
+
+## Status
+
+The repository now contains an **offline-only** V1.22 update planner and
+interruption-model checker:
+
+```text
+tools/flash-access/kb7-updater-plan.py
+```
+
+It cannot open a USB device and has no execute, commit, force, address, length
+or raw-CDB option. It emits owner-local replacement sector images, a
+full-image-bound plan and a model report. It is not a flasher, its bundles are
+unsigned, and every result records `execution_authorized=false` and
+`flash_approved=false`.
+
+The planner was exercised offline against two matching V1.22 full-chip inputs
+and the current locally built ELFs. An independent `simulate` pass reproduced
+the same 161-operation plan, preserved every immutable byte, found no early
+checksum-valid mixed pair and reached the exact predicted final image. No
+hardware write was performed.
+
+## Why this replaces the old manifest-last idea
+
+V1.22 has one active manifest sector. Erasing it creates an unavoidable
+power-loss window in which a partly erased mapping could be neither safely old
+nor safely new. The older audit bundle also described logical region lengths
+that are not multiples of the loader's proven 512-byte program unit.
+
+The new design never erases or programs the header, preserved loader or
+manifest. The two replacement regions are CRC-balanced so their final
+`SN_FWIN` checksums equal the existing V1.22 values:
+
+| Region | Flash range covered by CRC | Preserved checksum |
+|---|---:|---:|
+| core0 | `0x11000..0x2035c` | `0xc3f43a6f` |
+| region-1 application | `0x21000..0x8c168` | `0xc8ed2815` |
+
+Only the aligned sector envelopes `0x11000..0x21000` and
+`0x21000..0x8d000` appear in the plan. Bytes `0x00000..0x10fff` and
+`0x8d000..0x1ffffff` are immutable and hash-bound to two fresh, matching
+32-MiB captures.
+
+CRC balancing is compatibility with the recovered loader, not authenticity.
+CRC-32 is not a signature. The bundle content ID detects accidental or
+unreviewed changes but does not identify a publisher; a future distributable
+updater needs a detached signature verified by a separately pinned project
+public key. The independent `simulate` command binds and reconstructs the
+sector payloads, but it does not receive the original ELF inputs and therefore
+does not independently attest their source provenance.
+
+## Paired-build guard
+
+Both images now contain a fixed 32-byte `KB7P` marker:
+
+- core0 marker: execution address `0x00000140`;
+- region-1 marker: execution address `0x10000100`;
+- runtime ABI: version 2;
+- pair identifier: a deterministic 16-byte value patched into both images by
+  the offline planner.
+
+The standalone ELF contains an all-`0xff` identifier and therefore deliberately
+fails the runtime pair check. The planner derives one identifier from both raw
+ELF images and patches the same value into both targets.
+
+After clock, DRAM and cache preparation, core0 validates both markers **before
+USB attach**, publishes the pair identifier through runtime ABI v2, and only
+then branches to the region-1 application. Region-1 validates both markers,
+the ABI and the published identifier **before data/BSS initialization or board
+I/O**. An old/new, new/old, wrong-ABI or independently built pair parks fail
+closed for external reset.
+
+This guard matters because stock, replacement and a mixed stock/replacement
+pair deliberately share the same weak manifest checksums after CRC balancing.
+
+## Transaction model
+
+The offline plan has this normative order:
+
+1. Require two distinct, byte-identical 32-MiB captures. Pin the V1.22 header,
+   preserved loader, manifest and both stock cores; verify all three manifest
+   region checksums and erased sector-tail padding.
+2. Program one requested `1 -> 0` poison bit in stock core0. A modeled
+   interruption leaves either exact stock or a checksum-invalid core0.
+3. Program one requested `1 -> 0` poison bit in stock core1. Both regions are
+   then checksum-invalid.
+4. Erase, program and read back the region-1 body while core0 is an exact
+   invalid barrier. The four-byte region-1 commit gate remains erased.
+5. Erase, program and read back the core0 body while region-1 remains an exact
+   invalid barrier. The four-byte core0 commit gate remains erased.
+6. Program the sparse region-1 gate, leaving core0 invalid.
+7. Program the sparse core0 gate last. Only the exact paired target now matches
+   both unchanged manifest checksums.
+
+Every program command is one 512-byte block and every erase is one aligned
+4-KiB sector. The plan records the literal `F6 06`/`F6 15` CDB, mandatory
+sub-16-MiB `F6 18` mode command, payload hash, exact sector pre/post hashes and
+whole mutable-state hashes. It contains no manifest operation and no stock
+bytes.
+
+## CRC correction and commit gates
+
+Each linker script reserves post-image padding for a four-byte CRC correction
+word and a separate four-byte gate:
+
+| Region | Maximum linked extent | Correction offset | Gate offset/block |
+|---|---:|---:|---:|
+| core0 | `0xee00` | `0xee00` | `0xf000` / flash `0x20000` |
+| region-1 | `0x6ac00` | `0x6ac00` | `0x6ae00` / flash `0x8be00` |
+
+The target gate is `00 00 00 00`; its staged value is `ff ff ff ff`. The
+planner solves the separate correction word so the target retains the stock
+checksum, then independently recomputes it. It also proves that the 32 gate
+bits have rank 32 in the CRC transform. Under the modeled requested-bit-subset
+program behavior, no proper subset of those 32 clears can produce the target
+checksum. The sparse 512-byte commit block contains only the zero gate word and
+`0xff` elsewhere.
+
+## What the checker proves
+
+For every ordered mutation it checks the no-effect and exact-effect command
+boundaries, boot classification, opposite-core invalid barrier, immutable
+hashes, literal CDB and exact target. It records interruption sites around
+journal intent, address mode, CBW/data/CSW, busy polling, readback and verified
+journal replacement. A symbolic rank proof covers every subset of the final 32
+requested gate clears.
+
+Only exact stock (before the first effective poison) and the exact paired
+target (after the last gate) may satisfy the recovered loader checksum model.
+All known intermediate command-boundary states select ISP.
+
+This is presently a boundary/invariant analysis, not a restart-capable executor
+or an exhaustive emulation of physical torn commands. It deliberately does
+**not** claim power-loss atomicity. It cannot prove behavior for an interrupted
+NOR erase pulse, program disturb, misaddressed device-side handler, unstable
+cell, loader defect or electrical failure. Any mid-command hardware result
+would require two stable full reads and exact image-derived classification; no
+journal may authorize a blind retry. An unclassified result requires external
+SPI recovery.
+
+## Offline use
+
+Build the firmware and run the repository checks first. Keep two fresh
+full-chip captures outside the repository, then create a new output directory
+name:
+
+```sh
+make -C replacement_fw clean all
+
+python3 tools/flash-access/kb7-updater-plan.py build \
+  --baseline-a /path/to/fresh-read-a.bin \
+  --baseline-b /path/to/fresh-read-b.bin \
+  --core0-elf replacement_fw/build/core0.elf \
+  --core1-elf replacement_fw/build/core1.elf \
+  --out /path/to/new-owner-local-plan
+
+python3 tools/flash-access/kb7-updater-plan.py simulate \
+  --baseline-a /path/to/fresh-read-a.bin \
+  --baseline-b /path/to/fresh-read-b.bin \
+  --bundle /path/to/new-owner-local-plan
+```
+
+Do not place the generated binaries or JSON beside project source and do not
+publish them as a release. The planner refuses a non-V1.22 source image, a
+single/aliased capture, differing captures, a shifted ELF, an occupied reserve,
+a stale or tampered payload/report, a manifest change, a checksum-valid staged
+image or an early-valid mixed state.
+
+## Remaining steps before any firmware-region hardware trial
+
+1. Independently review the planner, pair guard and model after every change;
+   freeze and sign a specific source/bundle format.
+2. Implement a separate executor with strict BOT transport, durable intent
+   journal (`fsync` file, atomic rename and directory `fsync`), two-read
+   reconciliation, live loader/topology/session binding and no raw address/CDB
+   interface. The offline baseline hash alone is not a unique physical-device
+   identity; two byte-identical units are indistinguishable to this planner.
+3. Fault-inject that executor at every state transition and add a scratch-only
+   multi-sector/reconciliation hardware experiment.
+4. Prove entry back to `5037` after a checksum-valid but nonfunctional custom
+   core0, or continue to require an attached and independently tested SPI
+   recovery path.
+5. Validate the replacement firmware's remaining cold-start, USB, memory,
+   pinmux and peripheral hardware gates before its first installation.
+
+Until all of those are complete, the new work is planning evidence only.

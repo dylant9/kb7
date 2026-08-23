@@ -9,6 +9,7 @@ MEMORY
 SECTIONS
 {
     .isr_vector : ALIGN(4) { KEEP(*(.isr_vector)) } > IMAGE
+    .kb7_pair ORIGIN(IMAGE) + 0x140 : { KEEP(*(.kb7_pair)) } > IMAGE
     .text : ALIGN(4)
     {
         *(.text .text.*)
@@ -37,3 +38,7 @@ SECTIONS
 ASSERT(LOADADDR(.data) + SIZEOF(.data) <= ORIGIN(IMAGE) + LENGTH(IMAGE), "core0 image overflow")
 ASSERT(__bss_end__ <= ORIGIN(SRAM) + LENGTH(SRAM), "core0 SRAM overflow")
 ASSERT(SIZEOF(.isr_vector) == 79 * 4, "core0 vector table must contain 79 entries")
+ASSERT(ADDR(.kb7_pair) == ORIGIN(IMAGE) + 0x140, "core0 build-pair marker moved")
+ASSERT(SIZEOF(.kb7_pair) == 32, "core0 build-pair marker size changed")
+ASSERT(LOADADDR(.data) + SIZEOF(.data) <= ORIGIN(IMAGE) + 0x0000ee00,
+       "core0 image overlaps updater fixup reserve")

@@ -150,14 +150,14 @@ until the logical 14–17 function-4 pinmux is known.
   independently selectable on the host protocol. Transfers have a 5-second
   inactivity timeout; committed content is applied on the next boot.
 - Python CLI compilation/inspection and device-free transfer plans.
-- A source-only bundle constructor which hash-pins every owner-supplied stock
-  component, derives raw payloads from named ELFs, regenerates only the
-  replacement manifest checksum fields, and emits a bounded non-empty
-  `flash-plan.json`. The plan writes/read-backs both payloads before writing the
-  manifest last, includes explicit bounded 4-KiB sector erases in normative
-  erase/program/readback order, and warns that split updates remain non-atomic. It never emits
-  a whole-flash image and excludes the
-  preserved loader/header and stock asset range from writes.
+- The earlier source-only manifest-changing bundle constructor remains an
+  offline audit artifact and is not an update plan. A newer V1.22-only planner
+  takes two matching owner captures, derives raw payloads from named ELFs,
+  inserts a symmetric build-pair ID, CRC-balances both regions against the
+  unchanged manifest, and checks a poison/stage/sparse-gate transaction model.
+  It emits no full image, contains no device I/O and remains unsigned,
+  execution-unapproved and `flash_approved=false`; see
+  `USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md`.
 
 ## Datasheet correctness cross-check
 

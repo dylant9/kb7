@@ -202,8 +202,9 @@ the transfer **size**; in the erase path it is applied to the aligned
 
 **If you have found this repository and want to flash a KB7: use the SPI path.**
 The narrow marker cycle and fixed erase-footprint cycle have passed under
-laboratory guards; no general USB updater exists. Treat anything here that
-writes over USB as experimental and capable of destroying your bootloader.
+laboratory guards; no USB updater executor exists. The offline planner described
+below cannot touch a device. Treat anything here that writes over USB as
+experimental and capable of destroying your bootloader.
 
 Host-side address validation **cannot** protect against device-side
 misaddressing. An earlier host tool correctly refused intended targets outside
@@ -271,6 +272,7 @@ default after writing; add `-N` to verify only the written region.
 | `kb7-isp-repeat.py` | Re-read one region N times across chunk sizes to measure read repeatability | read-only |
 | `kb7-isp-write2.py` | Two-stage marker-program/sector-erase validation experiment | **destructive; dry-run by default; not a firmware flasher** |
 | `kb7-isp-erase-granularity.py` | Fixed four-stage guarded test of the observable `F6 15` erase footprint | **destructive; dry-run by default; passed once at the fixed target** |
+| `kb7-updater-plan.py` | V1.22-only paired-region planner and interruption-model checker | **offline only; no device I/O; not an executor** |
 | `WRITE-TEST-PLAN.md` | Exact experimental sequence, remaining failure modes and SPI recovery procedure | documentation only |
 | `ERASE-GRANULARITY-TEST-PLAN.md` | Fixed target, exact four-stage sequence, proof limits and SPI recovery procedure | documentation only |
 | `F6-ERASE-ENCODING.md` | Calibrated static proof of the erase address units and CDB layouts | documentation only |
@@ -307,6 +309,31 @@ The four-stage run has now passed once at this exact target. All target and
 guard postimages matched, the complete baseline was restored, and the keyboard
 subsequently cold-booted normally. Do not repeat it merely to reconfirm that
 same bounded fact.
+
+### Offline paired updater planner
+
+`kb7-updater-plan.py` is the first software-only step toward a constrained USB
+updater. It requires two distinct matching 32-MiB V1.22 captures and the two
+locally built replacement ELFs. It preserves the header, loader and manifest
+byte-for-byte, emits only the two clean replacement sector envelopes, balances
+their final checksums to the unchanged manifest values, and checks the
+normative poison/stage/Core1-gate/Core0-gate transaction.
+
+The firmware images contain matching build-pair markers and ABI v2 checks so a
+stock/custom or independently built pair parks before application hardware.
+The final commit gates differ from their staged images by exactly 32 requested
+`1 -> 0` transitions, and their CRC transforms are independently required to
+have rank 32. The saved plan and report are content-hashed and independently
+recomputed by the `simulate` command.
+
+This remains an unsigned, full-image-bound planning artifact. It does not know
+a unique physical-device identity; a future executor must additionally bind the
+live loader, USB topology and session. The tool imports no
+USB library and exposes no execute, commit, force, arbitrary-offset or raw-CDB
+option. It does not prove physical torn-erase behavior, custom-firmware recovery
+or board correctness. See the
+[offline updater design](../../docs/USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md)
+for the exact state machine and evidence boundary.
 
 ---
 
