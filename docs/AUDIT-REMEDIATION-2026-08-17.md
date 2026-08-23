@@ -73,8 +73,11 @@ preflight/reconciliation and durable journal binding; its journal filenames are
 also rejected from the public tree, and its mutation adapter remains
 hard-disabled. A distinct dry-run-default scratch executor can replay only 22
 fixed non-firmware operations in the reviewed V1.22 erased gap. It passes
-offline fake-transport/state tests but has not run on hardware and does not
-unlock firmware mutation. Header dependencies use `-MMD -MP`.
+offline fake-transport/state tests, and its complete fixed plan has now passed
+once on the development unit with exact baseline restoration and a subsequent
+operator-reported normal keyboard operation. This command-boundary run did not
+physically interrupt an operation, test power loss or touch firmware regions;
+it does not unlock firmware mutation. Header dependencies use `-MMD -MP`.
 
 Any future image-producing release pipeline must, before it is enabled:
 
@@ -106,7 +109,7 @@ The latest offline verification pass completed successfully on 2026-08-23:
   4 bytes of data and 19,312 bytes of BSS;
 - neither ELF contains unresolved relocations, and core0's vector table is
   exactly `0x13c` bytes;
-- the public-tree policy check accepted 183 UTF-8 source/documentation files and
+- the public-tree policy check accepted 184 UTF-8 source/documentation files and
   found no firmware blobs, generated binaries, or disallowed material; and
 - independent warning passes using GCC `-fanalyzer` and strict conversion,
   shadowing, and undefined-macro diagnostics completed without findings.

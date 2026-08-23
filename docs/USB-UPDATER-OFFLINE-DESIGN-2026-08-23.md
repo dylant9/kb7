@@ -24,8 +24,13 @@ A further [fixed scratch executor](USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md)
 provides a deliberately separate, dry-run-default harness for 22 immutable
 operations in the V1.22 erased scratch gap. It accepts no firmware bundle or
 caller-selected mutation and does not unlock the paired-firmware executor. Its
-source and fake-transport/state tests have passed offline; the new harness has
-not been run on hardware.
+source and fake-transport/state tests have passed offline. Its complete fixed
+plan has now also passed once on the development unit: all 22 command-boundary
+postimages were accepted, final new-process reconciliation cleared the journal
+at the exact baseline, and a separate verifier entry point reproduced the same
+32-MiB image before operator-reported normal keyboard operation. This is fixed
+scratch evidence only; it does not authorize firmware-region execution. See the
+[validation record](USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md).
 
 The planner was exercised offline against two matching V1.22 full-chip inputs
 and the current locally built ELFs. An independent `simulate` pass reproduced
@@ -147,12 +152,14 @@ emulation of physical torn commands. The paired-firmware executor scaffold now
 implements restart classification and a durable-intent model with fake
 transports, but live firmware mutation remains unavailable. The separate
 scratch executor wires the same principles only to its immutable, non-firmware
-22-operation plan; it has not run on hardware. None of these components claims
-power-loss atomicity. They cannot prove behavior for an interrupted NOR erase
-pulse, program disturb, misaddressed device-side handler, unstable cell, loader
-defect or electrical failure. Any mid-command hardware result requires two
-stable full reads and exact image-derived classification; no journal may
-authorize a blind retry. An unclassified result requires external SPI recovery.
+22-operation plan; that plan has completed once on the tested physical loader.
+The run exercised exact command boundaries, not a physical mid-command or
+power-loss event. None of these components claims power-loss atomicity. They
+cannot prove behavior for an interrupted NOR erase pulse, program disturb,
+misaddressed device-side handler, unstable cell, loader defect or electrical
+failure. Any mid-command hardware result requires two stable full reads and
+exact image-derived classification; no journal may authorize a blind retry. An
+unclassified result requires external SPI recovery.
 
 ## Offline use
 
@@ -197,10 +204,12 @@ image or an early-valid mixed state.
    passed once. It classified two command-complete no-readback outcomes from
    new processes and restored the exact baseline. A new separate harness now
    expresses that geometry as 22 one-operation, state-derived invocations and
-   passes offline tests, but has not run on hardware. Physical mid-command,
-   power-loss and arbitrary torn-NOR reconciliation remain separate gates
-   before reviewing any source change that could enable firmware-region
-   execution.
+   passes offline tests. That harness's complete fixed plan has now also passed
+   once on hardware, including final new-process reconciliation and exact
+   baseline restoration. Both the executor and separate verifier read through
+   the same USB loader/SoC controller. Physical mid-command, power-loss and
+   arbitrary torn-NOR reconciliation remain separate gates before reviewing
+   any source change that could enable firmware-region execution.
 4. Prove entry back to `5037` after a checksum-valid but nonfunctional custom
    core0, or continue to require an attached and independently tested SPI
    recovery path.

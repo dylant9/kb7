@@ -10,10 +10,15 @@ tools/flash-access/kb7-updater-scratch-executor.py
 
 It is **dry-run by default**, is restricted to the reviewed V1.22 loader and
 scratch layout, and can replay only the 22 operations listed below. Its source
-and fake-transport tests have passed offline. **This new harness has not been
-run on hardware.** The earlier successful `kb7-isp-scratch-restart.py` run
-validated the underlying fixed commands and process-restart model on one unit;
-it does not by itself validate this new orchestration implementation.
+and fake-transport tests have passed offline. The owner has now also completed
+one full hardware run of this exact harness and fixed plan on the development
+unit. All 22 journal-derived operations reached their expected complete-image
+boundaries; final new-process reconciliation restored and verified the exact
+baseline and cleared the journal; a separate verifier entry point reproduced
+the same 32-MiB hash; and the owner reported normal keyboard operation after a
+power cycle. See the
+[completed validation record](USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md)
+for the exact evidence and limits.
 
 The canonical fixed-plan descriptor currently has SHA-256
 `491b06c1beb66fa606639e1d420109dcf856c91b50ad02d5fbd0e6bafe1cc797`.
@@ -25,6 +30,7 @@ This is not the paired-firmware updater. The general
 and `reconcile`, its mutation adapter remains hard-disabled, and firmware-region
 mutation remains unavailable. The scratch harness accepts no bundle, operation,
 address, length, CDB, payload, device selector, retry, force or skip option.
+This one fixed scratch run does not change `flash_approved=false`.
 
 ## Fixed operation domain
 
@@ -124,11 +130,12 @@ python3 tools/flash-access/kb7-updater-scratch-executor.py reconcile \
   --journal /path/to/owner-local-scratch-journal.json
 ```
 
-There is intentionally no documented hardware-run approval in this record.
-When a hardware trial is separately reviewed and authorized, `--commit` is the
-only switch that opens USB. `preflight --commit` remains read-only; every
-`step --commit` is destructive and advances exactly one operation; and
-`reconcile --commit` remains read-only. Each command must be a fresh process.
+One owner-authorized hardware run is now documented separately; it is evidence
+for this exact fixed plan, not standing approval to repeat it or to broaden the
+mutation domain. `--commit` is the only switch that opens USB.
+`preflight --commit` remains read-only; every `step --commit` is destructive
+and advances exactly one operation; and `reconcile --commit` remains read-only.
+Each command must be a fresh process.
 
 ## Stop and recovery rules
 
@@ -152,13 +159,16 @@ postimage, stop USB work and restore/verify the complete owner image over SPI.
 Offline tests cover the fixed operation construction, rejection of non-scratch
 and firmware-domain operations, transport ordering, two-read gates, durable
 state binding, one-operation process boundary, reconciliation and journal
-faults. They do not prove the new harness on the physical USB loader.
+faults. The completed hardware run additionally proves that this harness can
+traverse all 22 exact command boundaries and finalize its journal on the tested
+physical USB loader, unit and erased scratch geometry.
 
-Even a successful run would prove only exact command-boundary restart behavior
-for this V1.22 unit and fixed erased scratch geometry. It would not prove an
-actual mid-CBW/data/CSW disconnect, interruption during a NOR program or erase
-pulse, arbitrary torn-state recovery, `F6 17`, `F6 19`, other loader versions,
-firmware-region writes, replacement-firmware correctness or a production
-updater. Two matching reads through the same loader also cannot exclude a
-repeatable defect in that read path. External SPI remains the independent
-recovery and verification route.
+It did not create an uncertain intent or physically interrupt CBW, data, CSW,
+WIP polling, a NOR program pulse or an erase pulse. It therefore does not prove
+arbitrary torn-state recovery, power-loss recovery, `F6 17`, `F6 19`, other
+loader versions, other units, firmware-region writes, replacement-firmware
+correctness or a production updater. The final separate verifier was a
+separate program entry point, but both it and the executor read through the
+same loader and SoC flash controller; matching reads cannot exclude a
+repeatable defect in that path. External SPI remains the independent recovery
+and bit-level verification route.

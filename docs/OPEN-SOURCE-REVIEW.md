@@ -1,8 +1,8 @@
 # Public-source provenance review
 
 Review date: 2026-08-17; remediation additions reviewed 2026-08-18; full-flash
-and public-repository status reviewed 2026-08-22; bounded USB-ISP results
-reviewed 2026-08-23
+and public-repository status reviewed 2026-08-22; bounded USB-ISP and fixed
+scratch-executor results reviewed 2026-08-23
 Scope: this repository directory only
 
 ## Decision
@@ -37,8 +37,12 @@ that the contributor does not possess.
   experiments, a separate fixed dry-run-default scratch executor, and
   clean-room summaries of the F6 interoperability findings. The scratch
   executor can derive only its 22 reviewed non-firmware operations and is
-  offline-tested but not hardware-run. No vendor DLL, disassembly listing,
-  general USB firmware flasher, raw transcript, or stock byte payload is
+  offline-tested; that exact fixed plan has also completed once on the
+  development unit, restored the exact 32-MiB baseline, and returned to
+  operator-reported normal keyboard operation. The public tree records only
+  independently authored source, hashes, classifications and summarized
+  results from that run. No vendor DLL, disassembly listing, general USB
+  firmware flasher, raw transcript, capture, journal or stock byte payload is
   included.
 - Apache-2.0 license and project/trademark notice.
 

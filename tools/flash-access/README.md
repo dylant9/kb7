@@ -206,9 +206,10 @@ laboratory guards; no supported or general USB firmware updater exists. The
 offline planner described below cannot touch a device, and the paired-firmware
 executor scaffold can only preflight and reconcile through read-only full-chip
 captures. A separate dry-run-default scratch executor can replay only 22 fixed
-non-firmware operations; it is offline-tested but has not been run on hardware.
-Treat anything here that writes over USB as experimental and capable of
-destroying your bootloader.
+non-firmware operations; that exact plan has completed once on the development
+unit and restored the byte-exact baseline. This remains bounded laboratory
+evidence, not a general update path. Treat anything here that writes over USB
+as experimental and capable of destroying your bootloader.
 
 Host-side address validation **cannot** protect against device-side
 misaddressing. An earlier host tool correctly refused intended targets outside
@@ -279,7 +280,7 @@ default after writing; add `-N` to verify only the written region.
 | `kb7-isp-scratch-restart.py` | Fixed two-sector experiment with two deliberate no-readback/reconciliation checkpoints | **destructive; dry-run by default; passed once at the fixed plan** |
 | `kb7-updater-plan.py` | V1.22-only paired-region planner and interruption-model checker | **offline only; no device I/O; not an executor** |
 | `kb7-updater-executor.py` | Two-read live preflight, durable journal binding and image-derived reconciliation | **read-only CLI; mutation hard-disabled; not an installer** |
-| `kb7-updater-scratch-executor.py` | One-operation-per-process replay of the fixed 22-command V1.22 scratch plan | **destructive; dry-run by default; offline-tested, not hardware-run** |
+| `kb7-updater-scratch-executor.py` | One-operation-per-process replay of the fixed 22-command V1.22 scratch plan | **destructive; dry-run by default; fixed plan passed once on hardware** |
 | `WRITE-TEST-PLAN.md` | Exact experimental sequence, remaining failure modes and SPI recovery procedure | documentation only |
 | `ERASE-GRANULARITY-TEST-PLAN.md` | Fixed target, exact four-stage sequence, proof limits and SPI recovery procedure | documentation only |
 | `F6-ERASE-ENCODING.md` | Calibrated static proof of the erase address units and CDB layouts | documentation only |
@@ -354,12 +355,19 @@ Committed commands also hold one persistent, private per-journal lock from the
 authoritative state read through USB close and publication; a concurrent
 invocation refuses before opening USB.
 
-The new harness and its fake-transport/journal tests pass offline, but the
-harness itself has **not** been run on hardware. The prior successful
-`kb7-isp-scratch-restart.py` experiment validates the underlying fixed command
-set on one unit, not this new orchestration path. Read the
+The harness and its fake-transport/journal tests pass offline. Its complete
+22-operation plan has also passed once through this orchestration path on the
+development unit: every exact boundary was accepted, final new-process
+reconciliation cleared the journal at SHA-256
+`2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f`,
+and the separate read-only verifier entry point reproduced the same 32-MiB
+image before the owner reported normal keyboard operation. Both live readers use
+the same loader and SoC flash controller. The run did not physically interrupt
+a command, test power loss or touch firmware regions. Read the
 [fixed scratch executor status and test plan](../../docs/USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md)
-for its exact 22-operation sequence, commands, stop rules and proof boundary.
+for its exact sequence and stop rules, and the
+[completed validation record](../../docs/USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md)
+for the observed evidence and proof boundary.
 
 ### Offline paired updater planner
 
