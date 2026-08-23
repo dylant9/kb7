@@ -22,10 +22,12 @@ and does not change `flash_approved=false`.
 A second tool now exists with a deliberately different domain:
 `kb7-updater-scratch-executor.py`. It can replay only the fixed 22-operation
 V1.22 scratch experiment, is dry-run by default, and has no firmware-bundle or
-caller-selected mutation interface. It has passed offline tests but has not
-been run on hardware. Its existence does not unlock this paired-firmware
-executor; the two tools use distinct plans and journal schemas. See the
-[fixed scratch executor record](USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md).
+caller-selected mutation interface. It has passed offline tests and its exact
+22-operation plan has now completed once on the development unit. That result
+does not unlock this paired-firmware executor; the two tools use distinct plans
+and journal schemas. See the
+[fixed scratch executor plan](USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md) and
+[completed validation record](USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md).
 
 ## Transaction reconstruction
 
@@ -189,11 +191,16 @@ plan and separate scratch journal. This provides an offline-testable bridge
 between the earlier one-off scratch script and a state-derived executor without
 placing any mutation code in the paired-firmware executor.
 
-As of this record, only its source and fake-transport/state tests have run. A
-successful earlier run of `kb7-isp-scratch-restart.py` proved the underlying
-fixed commands and command-complete session restart behavior on one unit, not
-this new harness. It remains destructive laboratory tooling rather than an
-updater qualification.
+The source and fake-transport/state tests have passed, and the fixed harness has
+now completed one full hardware cycle on the development unit. All 22 exact
+operation boundaries passed; a final new-process read-only reconciliation
+verified the restored complete baseline twice and cleared the journal; and a
+separate verifier entry point reproduced complete-image SHA-256
+`2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f`
+before the owner reported normal keyboard operation. Both live readers use the
+same USB loader and SoC controller. This remains destructive laboratory tooling
+rather than an updater qualification: it did not physically interrupt a
+command, test power loss or touch firmware regions.
 
 ## Remaining gates
 
@@ -208,10 +215,11 @@ are separately completed and reviewed:
    power-loss and partial-operation outcomes at safe scratch addresses. The
    completed experiment did not interrupt CBW/data/CSW, WIP, erase or program.
 3. Re-review the exact operation transport, intent/restart behavior and source
-   freeze. The separate scratch harness has no raw mutation interface, but has
-   not yet run on hardware. Any future paired-firmware executor must remain
-   independently locked until its own review and must likewise expose no raw
-   mutation interface.
+   freeze. The separate scratch harness has no raw mutation interface and its
+   fixed plan has passed once on hardware, but physical mid-command and
+   power-loss behavior remain untested. Any future paired-firmware executor
+   must remain independently locked until its own review and must likewise
+   expose no raw mutation interface.
 4. Add release authenticity: the present owner-local bundle is content-hashed
    but unsigned.
 5. Prove a reliable path back to USB ISP after a checksum-valid but

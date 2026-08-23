@@ -63,10 +63,18 @@ image generation is disabled.
   addresses, not physical mid-command or power-loss recovery. A new, separate
   `kb7-updater-scratch-executor.py` now expresses that same fixed scratch plan
   as 22 journal-derived, one-operation invocations. It is dry-run by default,
-  has passed offline fake-transport and state tests, and has **not** been run on
-  hardware. It cannot accept a firmware bundle or caller-selected mutation;
-  the paired-firmware executor remains mutation-locked. None of these paths
-  makes a custom-firmware hardware trial safe. See the
+  has passed offline fake-transport/state tests, and has now completed one
+  fixed-plan hardware run on the development unit. All 18 programs and four
+  erases reached their exact whole-image boundaries, final new-process
+  reconciliation cleared the journal at the byte-exact stock baseline, and a
+  separate verifier entry point reproduced SHA-256
+  `2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f`;
+  the owner then reported normal keyboard operation. Both executor and verifier
+  reads used the same loader/SoC flash-controller path. No command was
+  physically interrupted and no firmware region was touched. The harness
+  cannot accept a firmware bundle or caller-selected mutation; the
+  paired-firmware executor remains mutation-locked. None of these paths makes
+  a custom-firmware hardware trial safe. See the
   [offline updater design](docs/USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md) and
   [executor scaffold status](docs/USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md),
   plus the separate
@@ -90,7 +98,10 @@ records the completed fixed hardware experiment and its recovery boundary; the
 and [test plan](tools/flash-access/SCRATCH-RESTART-TEST-PLAN.md) record the
 completed process/session-restart experiment and its stricter limits. The
 [fixed scratch executor plan](docs/USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md)
-separately records the new offline-tested but hardware-unrun control harness.
+and its
+[completed hardware validation](docs/USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md)
+record the fixed control harness and the exact limits of its one successful
+development-unit run.
 
 ## Repository contents
 
