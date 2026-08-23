@@ -19,7 +19,7 @@ image generation is disabled.
 ## Current status — 2026-08-23
 
 - The offline/software implementation is complete to the evidence currently
-  available. `make check` passes 152 Python/C integration tests, browser
+  available. `make check` passes 167 Python/C integration tests, browser
   validation, three ARM build profiles, hardware-fact checks and the public-tree
   safety audit.
 - Two independent reads of the installed 32-MiB Macronix SPI NOR are
@@ -60,10 +60,17 @@ image generation is disabled.
   exact full-chip reads in a new process without automatic replay; cleanup
   restored the baseline and the keyboard returned to normal `5038` operation.
   This proves command-complete host-session reconciliation at the fixed scratch
-  addresses, not physical mid-command or power-loss recovery. Neither path
+  addresses, not physical mid-command or power-loss recovery. A new, separate
+  `kb7-updater-scratch-executor.py` now expresses that same fixed scratch plan
+  as 22 journal-derived, one-operation invocations. It is dry-run by default,
+  has passed offline fake-transport and state tests, and has **not** been run on
+  hardware. It cannot accept a firmware bundle or caller-selected mutation;
+  the paired-firmware executor remains mutation-locked. None of these paths
   makes a custom-firmware hardware trial safe. See the
   [offline updater design](docs/USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md) and
-  [executor scaffold status](docs/USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md).
+  [executor scaffold status](docs/USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md),
+  plus the separate
+  [fixed scratch executor plan](docs/USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md).
 - No custom firmware has been installed. USB, display, touch, RGB, MCU2/Hall,
   pinmux, cold-start memory setup and a legitimate USB identity still require
   board validation. `flash_approved` remains false.
@@ -81,7 +88,9 @@ stock-recovery investigation. The
 records the completed fixed hardware experiment and its recovery boundary; the
 [scratch restart validation](docs/USB-ISP-SCRATCH-RESTART-VALIDATION-2026-08-23.md)
 and [test plan](tools/flash-access/SCRATCH-RESTART-TEST-PLAN.md) record the
-completed process/session-restart experiment and its stricter limits.
+completed process/session-restart experiment and its stricter limits. The
+[fixed scratch executor plan](docs/USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md)
+separately records the new offline-tested but hardware-unrun control harness.
 
 ## Repository contents
 
@@ -99,8 +108,9 @@ completed process/session-restart experiment and its stricter limits.
   32-MiB dump; raw images and reports remain outside the repository.
 - `tools/flash-access/` — ESP32/`flashrom` recovery notes, read-only USB-ISP
   verification tools, F6 command analysis and fixed guarded USB write-path
-  experiments, plus a V1.22 updater planner/checker and read-only executor
-  scaffold. It contains no stock bytes and no supported USB flasher.
+  experiments, plus a V1.22 updater planner/checker, read-only firmware
+  executor scaffold and separate fixed scratch-only executor. It contains no
+  stock bytes and no supported USB firmware flasher.
 - `tools/check_public_tree.py` — rejects compiled/vendor artifacts, archive and
   executable formats, symlinks, build directories, and prohibited artifact
   filenames.

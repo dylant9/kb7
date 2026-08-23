@@ -20,6 +20,13 @@ now performs live two-read preflight and reconciliation, durable journal
 binding, and offline fault injection. Its public CLI cannot mutate flash and
 its mutation adapter is hard-disabled. It is not a supported updater.
 
+A further [fixed scratch executor](USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md)
+provides a deliberately separate, dry-run-default harness for 22 immutable
+operations in the V1.22 erased scratch gap. It accepts no firmware bundle or
+caller-selected mutation and does not unlock the paired-firmware executor. Its
+source and fake-transport/state tests have passed offline; the new harness has
+not been run on hardware.
+
 The planner was exercised offline against two matching V1.22 full-chip inputs
 and the current locally built ELFs. An independent `simulate` pass reproduced
 the same 161-operation plan, preserved every immutable byte, found no early
@@ -136,9 +143,11 @@ target (after the last gate) may satisfy the recovered loader checksum model.
 All known intermediate command-boundary states select ISP.
 
 The planner report is a boundary/invariant analysis, not an exhaustive
-emulation of physical torn commands. The separate executor scaffold now
+emulation of physical torn commands. The paired-firmware executor scaffold now
 implements restart classification and a durable-intent model with fake
-transports, but live mutation is unavailable. Neither component claims
+transports, but live firmware mutation remains unavailable. The separate
+scratch executor wires the same principles only to its immutable, non-firmware
+22-operation plan; it has not run on hardware. None of these components claims
 power-loss atomicity. They cannot prove behavior for an interrupted NOR erase
 pulse, program disturb, misaddressed device-side handler, unstable cell, loader
 defect or electrical failure. Any mid-command hardware result requires two
@@ -177,7 +186,7 @@ image or an early-valid mixed state.
 
 1. Independently review the planner, pair guard and model after every change;
    freeze and sign a specific source/bundle format.
-2. The separate executor's strict read-only preflight, durable intent journal
+2. The paired-firmware executor's strict read-only preflight, durable intent journal
    (`fsync` file, atomic rename and directory `fsync`), two-read
    reconciliation, live loader/topology/session binding and fake-transport
    fault injection are implemented. Its live mutation adapter remains
@@ -186,7 +195,9 @@ image or an early-valid mixed state.
    units remain indistinguishable.
 3. The reviewed fixed scratch-only multi-sector/reconciliation experiment has
    passed once. It classified two command-complete no-readback outcomes from
-   new processes and restored the exact baseline. Physical mid-command,
+   new processes and restored the exact baseline. A new separate harness now
+   expresses that geometry as 22 one-operation, state-derived invocations and
+   passes offline tests, but has not run on hardware. Physical mid-command,
    power-loss and arbitrary torn-NOR reconciliation remain separate gates
    before reviewing any source change that could enable firmware-region
    execution.
@@ -196,4 +207,6 @@ image or an early-valid mixed state.
 5. Validate the replacement firmware's remaining cold-start, USB, memory,
    pinmux and peripheral hardware gates before its first installation.
 
-Until all of those are complete, the new work is planning evidence only.
+Until all of those are complete, the paired-firmware work is planning and
+read-only diagnostic evidence only. The fixed scratch harness is destructive
+laboratory tooling, not authorization for a firmware-region trial.

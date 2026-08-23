@@ -68,10 +68,13 @@ offline planner now derives paired replacement sector images from named ELFs and
 two matching owner captures, preserves the manifest, and checks a bounded
 transaction model without any device I/O or full image. Generated plans/images
 and vendor artifacts remain rejected by `check_public_tree.py`. A separate
-executor scaffold performs read-only live preflight/reconciliation and durable
-journal binding; its journal filenames are also rejected from the public tree,
-and its mutation adapter remains hard-disabled. Header dependencies use
-`-MMD -MP`.
+paired-firmware executor scaffold performs read-only live
+preflight/reconciliation and durable journal binding; its journal filenames are
+also rejected from the public tree, and its mutation adapter remains
+hard-disabled. A distinct dry-run-default scratch executor can replay only 22
+fixed non-firmware operations in the reviewed V1.22 erased gap. It passes
+offline fake-transport/state tests but has not run on hardware and does not
+unlock firmware mutation. Header dependencies use `-MMD -MP`.
 
 Any future image-producing release pipeline must, before it is enabled:
 
@@ -95,7 +98,7 @@ required rollback route, but no replacement firmware has run on hardware.
 
 The latest offline verification pass completed successfully on 2026-08-23:
 
-- `make check`: 152 Python/C integration tests passed, browser JavaScript syntax
+- `make check`: 167 Python/C integration tests passed, browser JavaScript syntax
   and executable validator checks passed, and the default, guarded-audit, and
   all-branches integration firmware profiles built and passed ELF verification;
 - the largest all-branches profile used 8,320 bytes of core0 text, 12 bytes of
@@ -103,7 +106,7 @@ The latest offline verification pass completed successfully on 2026-08-23:
   4 bytes of data and 19,312 bytes of BSS;
 - neither ELF contains unresolved relocations, and core0's vector table is
   exactly `0x13c` bytes;
-- the public-tree policy check accepted 180 UTF-8 source/documentation files and
+- the public-tree policy check accepted 183 UTF-8 source/documentation files and
   found no firmware blobs, generated binaries, or disallowed material; and
 - independent warning passes using GCC `-fanalyzer` and strict conversion,
   shadowing, and undefined-macro diagnostics completed without findings.

@@ -41,11 +41,16 @@ A later offline-only V1.22 planner addresses the single-manifest power-loss
 hazard by leaving that manifest byte-exact, CRC-balancing paired replacement
 regions and checking an invalidate/stage/sparse-gate transaction model. It also
 adds a symmetric runtime pair-ID/ABI guard. This is a software design result,
-not board validation or a live mutation path. A later executor scaffold adds
-only read-only live preflight/reconciliation and fake-transport fault injection;
-its mutation adapter remains hard-disabled. See
+not board validation or a live firmware-mutation path. A later paired-firmware
+executor scaffold adds only read-only live preflight/reconciliation and
+fake-transport fault injection; its mutation adapter remains hard-disabled. A
+distinct dry-run-default scratch executor wires only the fixed 22-operation
+V1.22 scratch plan, has passed offline tests, and has not run on hardware. It
+accepts no firmware bundle or caller-selected operation and does not unlock the
+paired executor. See
 `USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md` and
-`USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md`.
+`USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md`, plus
+`USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md`.
 
 The full SNC7320 datasheet review on 2026-08-18 added a critical correction:
 AIRCR/software reset restarts PRAM, not mask ROM. The former mailbox-marker plus
