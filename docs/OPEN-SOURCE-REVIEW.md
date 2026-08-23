@@ -34,9 +34,12 @@ that the contributor does not possess.
   included.
 - Independently authored external-SPI recovery helpers, read-only USB-ISP
   diagnostics, two guarded dry-run-default USB write-path validation
-  experiments, and clean-room summaries of the F6 interoperability findings.
-  No vendor DLL, disassembly listing, general USB flasher, raw transcript, or
-  stock byte payload is included.
+  experiments, a separate fixed dry-run-default scratch executor, and
+  clean-room summaries of the F6 interoperability findings. The scratch
+  executor can derive only its 22 reviewed non-firmware operations and is
+  offline-tested but not hardware-run. No vendor DLL, disassembly listing,
+  general USB firmware flasher, raw transcript, or stock byte payload is
+  included.
 - Apache-2.0 license and project/trademark notice.
 
 No external scripts, fonts, images, packages, or vendored libraries are bundled.
@@ -58,9 +61,11 @@ No external scripts, fonts, images, packages, or vendored libraries are bundled.
   V1.22-only paired planner accepts two owner-supplied full captures and emits
   only clean replacement sector images plus offline metadata. It preserves the
   manifest, contains no device I/O, never emits a full stock image and remains
-  execution-unapproved. A separate source-only executor scaffold exposes only
-  read-only preflight/reconciliation; its live mutation adapter is hard-disabled
-  and no execute command exists.
+  execution-unapproved. A separate source-only paired-firmware executor
+  scaffold exposes only read-only preflight/reconciliation; its live mutation
+  adapter is hard-disabled and no execute command exists. The distinct scratch
+  executor accepts no firmware bundle or caller-selected address, CDB, payload
+  or operation and does not change that lock.
 
 ## Excluded and retained only outside the public repository
 
@@ -73,8 +78,9 @@ No external scripts, fonts, images, packages, or vendored libraries are bundled.
 - USB/SPI/I2C captures, screenshots or assets extracted from vendor software,
   raw pin-map evidence, ROM traces, and decompiler-level reports.
 - The stock-core patch experiments and their exact vendor function addresses.
-- Generated manifests, full-image-bound plans, sector images, executor journals,
-  scratch-restart state, prefixes and any package containing stock bytes.
+- Generated manifests, full-image-bound plans, sector images, paired-executor
+  or scratch-executor journals, scratch-restart state, prefixes and any package
+  containing stock bytes.
   Independently authored
   planner/checker/executor source is included; its generated state stays
   owner-local.

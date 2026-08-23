@@ -11,6 +11,7 @@ build/
 bundle.json
 simulation.json
 *updater-journal*.json
+*updater-scratch-journal*
 *scratch-restart-state*.json
 
 # Firmware/reference material must never enter the public repository

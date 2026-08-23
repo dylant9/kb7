@@ -8,6 +8,7 @@ concealment. Human provenance review remains mandatory.
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import re
 from pathlib import Path
@@ -33,12 +34,18 @@ DENIED_NAMES = {
     "simulation.json",
     ".kb7-usb-updater-journal-v1.json",
     "updater-journal.json",
+    ".kb7-usb-updater-scratch-journal-v1.json",
+    "updater-scratch-journal.json",
     ".kb7-isp-scratch-restart-state.json",
     "scratch-restart-state.json",
+}
+DENIED_NAME_PATTERNS = {
+    "*updater-scratch-journal*",
 }
 DENIED_JSON_SCHEMAS = {
     "kb7-isp-scratch-restart-state-v1",
     "kb7-usb-updater-journal-v1",
+    "kb7-usb-updater-scratch-journal-v1",
 }
 DENIED_TEXT = (
     "Ghidra " + "decompiler output",
@@ -79,7 +86,9 @@ def inspect(root: Path) -> dict[str, object]:
         if not path.is_file():
             continue
         checked += 1
-        if path.name in DENIED_NAMES:
+        if (path.name in DENIED_NAMES or
+                any(fnmatch.fnmatchcase(path.name.lower(), pattern)
+                    for pattern in DENIED_NAME_PATTERNS)):
             failures.append(f"prohibited artifact filename: {relative}")
         if path.suffix.lower() in DENIED_SUFFIXES:
             failures.append(f"denied extension: {relative}")

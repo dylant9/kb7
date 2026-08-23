@@ -54,6 +54,32 @@ class PublicTreeTests(unittest.TestCase):
             self.assertTrue(any("owner-local updater journal" in failure
                                 for failure in result["failures"]))
 
+    def test_scratch_executor_journal_names_and_schema_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / ".kb7-usb-updater-scratch-journal-v1.json").write_text(
+                "{}\n")
+            (root / "kb7-updater-scratch-journal-20260823.json").write_text(
+                "{}\n")
+            (root / ".kb7-updater-scratch-journal.ABC123").write_text(
+                "{}\n")
+            (root / "renamed.json").write_text(
+                '{"schema":"kb7-usb-updater-scratch-journal-v1"}\n')
+
+            result = MODULE.inspect(root)
+
+            self.assertFalse(result["passed"])
+            self.assertEqual(
+                sum("prohibited artifact filename" in failure
+                    for failure in result["failures"]),
+                3,
+            )
+            self.assertEqual(
+                sum("owner-local updater journal" in failure
+                    for failure in result["failures"]),
+                1,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

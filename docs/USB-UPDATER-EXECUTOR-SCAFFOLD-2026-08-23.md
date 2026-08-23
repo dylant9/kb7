@@ -19,6 +19,14 @@ This is the next software step after the offline paired updater planner. It is
 not a firmware installer, does not make the replacement firmware safe to run,
 and does not change `flash_approved=false`.
 
+A second tool now exists with a deliberately different domain:
+`kb7-updater-scratch-executor.py`. It can replay only the fixed 22-operation
+V1.22 scratch experiment, is dry-run by default, and has no firmware-bundle or
+caller-selected mutation interface. It has passed offline tests but has not
+been run on hardware. Its existence does not unlock this paired-firmware
+executor; the two tools use distinct plans and journal schemas. See the
+[fixed scratch executor record](USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md).
+
 ## Transaction reconstruction
 
 Before opening USB, the scaffold independently reloads the owner-local bundle
@@ -165,6 +173,28 @@ live read-only reopen, identity, whole-image and journal-binding path on the
 development unit. It does not validate updater writes, a unique device serial,
 or physical interruption recovery.
 
+## Separate fixed scratch executor
+
+The scratch harness turns the already reviewed scratch command list into 22
+one-operation process boundaries: 18 fixed 512-byte programs and four fixed
+4-KiB erases inside `[0x000c0000,0x00100000)`. It requires two exact full-chip
+reads before and after each operation, persists durable intent before mutation,
+and permits only a new-process read-only reconciliation after an uncertain
+result. The last mutation leaves a complete journal until a final read-only
+reconciliation verifies the exact baseline twice.
+
+The caller cannot provide an address, CDB, payload, length, bundle, device,
+force, retry or skip choice. All operations are re-derived from a source-bound
+plan and separate scratch journal. This provides an offline-testable bridge
+between the earlier one-off scratch script and a state-derived executor without
+placing any mutation code in the paired-firmware executor.
+
+As of this record, only its source and fake-transport/state tests have run. A
+successful earlier run of `kb7-isp-scratch-restart.py` proved the underlying
+fixed commands and command-complete session restart behavior on one unit, not
+this new harness. It remains destructive laboratory tooling rather than an
+updater qualification.
+
 ## Remaining gates
 
 Live firmware-region execution remains unavailable until all of the following
@@ -178,7 +208,10 @@ are separately completed and reviewed:
    power-loss and partial-operation outcomes at safe scratch addresses. The
    completed experiment did not interrupt CBW/data/CSW, WIP, erase or program.
 3. Re-review the exact operation transport, intent/restart behavior and source
-   freeze. A future live executor must still have no raw mutation interface.
+   freeze. The separate scratch harness has no raw mutation interface, but has
+   not yet run on hardware. Any future paired-firmware executor must remain
+   independently locked until its own review and must likewise expose no raw
+   mutation interface.
 4. Add release authenticity: the present owner-local bundle is content-hashed
    but unsigned.
 5. Prove a reliable path back to USB ISP after a checksum-valid but
@@ -187,5 +220,6 @@ are separately completed and reviewed:
 6. Pass the replacement firmware's cold-start, USB, memory, pinmux and
    peripheral hardware gates.
 
-Until then, `preflight` and `reconcile` are diagnostics only. Any actual custom
-firmware write remains outside the supported project workflow.
+Until then, the paired-firmware executor's `preflight` and `reconcile` remain
+diagnostics only. The scratch harness does not change that status. Any actual
+custom-firmware write remains outside the supported project workflow.
