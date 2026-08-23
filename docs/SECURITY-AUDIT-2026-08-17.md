@@ -46,14 +46,18 @@ executor scaffold adds only read-only live preflight/reconciliation and
 fake-transport fault injection; its mutation adapter remains hard-disabled. A
 distinct dry-run-default scratch executor wires only the fixed 22-operation
 V1.22 scratch plan and accepts no firmware bundle or caller-selected operation.
-Its offline tests pass, and that exact plan has now completed once on the
-development unit with exact final baseline restoration and an
-operator-reported return to normal keyboard operation. The run stayed outside all
-firmware regions and did not physically interrupt a command or test power loss;
-it does not unlock the paired executor. See
+Its v1 plan completed once on the development unit with exact final baseline
+restoration and an operator-reported return to normal keyboard operation. The
+current v2 source is offline-tested and hardware-unrun. It makes one fixed
+active-intent checkpoint mandatory after `program-09` and WIP-ready polling,
+before postread, and requires a fresh process with a mutation-incapable backend
+to reconcile. The historical run and proposed checkpoint stay outside all
+firmware regions; neither physically interrupts a command or tests power loss,
+and neither unlocks the paired executor. See
 `USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md` and
 `USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md`, plus
 `USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md` and
+`USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md`; the v1 result is in
 `USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md`.
 
 The full SNC7320 datasheet review on 2026-08-18 added a critical correction:

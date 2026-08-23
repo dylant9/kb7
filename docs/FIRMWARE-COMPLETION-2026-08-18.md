@@ -213,16 +213,20 @@ These are not honest candidates for further offline coding:
    process-restart scratch experiment has now passed once: two
    command-complete/no-readback operations reconciled to exact postimages in
    new processes, cleanup restored the complete baseline, and normal `5038`
-   operation returned. The later fixed scratch executor also completed its
-   distinct 22-operation, one-process-per-boundary plan once; final read-only
-   reconciliation and a separate verifier invocation reproduced complete-image
+   operation returned. The later fixed scratch executor's v1 source also
+   completed its distinct 22-operation, one-process-per-boundary plan once;
+   final read-only reconciliation and a separate verifier invocation reproduced
+   complete-image
    SHA-256
    `2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f`,
-   after which the owner reported normal `5038` operation. Both verifier and
-   executor used the same loader/SoC read path. Neither experiment tested
-   physical mid-command interruption or power loss, and neither touched
-   firmware regions. See
-   `USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md`.
+   after which the owner reported normal `5038` operation. The current v2
+   executor is offline-tested and hardware-unrun; it mandates one
+   command-complete/no-postread active intent and fresh-process read-only
+   reconciliation. Both verifier and executor use the same loader/SoC read path.
+   Neither the historical run nor the planned v2 checkpoint tests physical
+   mid-command interruption or power loss, and neither touches firmware regions.
+   See `USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md` and
+   `USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md`.
 
 ## Build and test profiles
 

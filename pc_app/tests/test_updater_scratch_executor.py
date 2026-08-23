@@ -160,6 +160,10 @@ class UpdaterScratchExecutorTests(unittest.TestCase):
         _descriptor, raw = FIXTURE.accepted_identity()
         return SCRATCH._identity_fields(raw, image)
 
+    def other_process_nonce(self) -> str:
+        candidate = "00" * 32
+        return candidate if candidate != SCRATCH.PROCESS_NONCE else "11" * 32
+
     def write_boundary(self, path: Path, boundary: int) -> None:
         image = SCRATCH.expected_boundary_image(self.transaction, boundary)
         SCRATCH.write_journal_atomic(
@@ -194,6 +198,22 @@ class UpdaterScratchExecutorTests(unittest.TestCase):
         self.assertEqual(descriptor["address_mode_cdb_hex"], "f618" + "00" * 14)
         self.assertEqual(descriptor["envelope"], [0xC0000, 0x100000])
         self.assertEqual(
+            descriptor["required_active_intent_checkpoint"],
+            {
+                "operation_index": 9,
+                "operation_identifier": "program-09",
+                "operation_offset": 0xC6000,
+                "operation_cdb_hex": "f60600600c6000000100000000000000",
+                "payload_sha256": (
+                    "ed41dcb56145068e569b99ca07c7827889e163f5cccc444b128512da244cf380"),
+                "policy": "after_command_and_wip_poll_before_postread",
+                "fresh_process_reconciliation_required": True,
+                "automatic_retry": False,
+                "single_attempt": True,
+                "exact_preimage_policy": "stop_campaign_checkpoint_consumed",
+            },
+        )
+        self.assertEqual(
             [item["cdb_hex"] for item in descriptor["operations"]],
             [operation.cdb.hex() for operation in operations])
 
@@ -203,7 +223,7 @@ class UpdaterScratchExecutorTests(unittest.TestCase):
             "d784f036e06a972d9688d15c76a41cbd7e90ca806d5ced1aeab5aae16745085b")
         self.assertEqual(
             self.production_plan,
-            "491b06c1beb66fa606639e1d420109dcf856c91b50ad02d5fbd0e6bafe1cc797")
+            "f0a8acfcdc7ab5fb7a7dc2753ed8bdca0e381a9433f64fe311348442a8bbdb32")
 
         drift = "00" * 32
         with mock.patch.object(SCRATCH._restart, "PLAN_SHA256", drift), \
@@ -363,7 +383,7 @@ class UpdaterScratchExecutorTests(unittest.TestCase):
         self.assertFalse(unstable.exists())
 
     def test_each_selected_step_has_two_pre_and_post_reads_and_one_mutation(self) -> None:
-        for index in (0, 9, 18, 21):
+        for index in (0, 8, 10, 18, 21):
             with self.subTest(index=index):
                 journal = self.journal_path(f"step-{index}.json")
                 self.write_boundary(journal, index)
@@ -397,8 +417,209 @@ class UpdaterScratchExecutorTests(unittest.TestCase):
                     self.assertEqual(
                         SCRATCH.load_journal(journal)["boundary_index"], index + 1)
 
+    def test_mandatory_checkpoint_executes_once_without_postread_and_reconciles_fresh(self) -> None:
+        index = SCRATCH.CHECKPOINT_OPERATION_INDEX
+        self.assertEqual(index, 9)
+        operation = self.transaction.operations[index]
+        self.assertEqual(
+            (operation.identifier, operation.action, operation.offset,
+             operation.cdb.hex(), SCRATCH._writer.sha256_bytes(operation.payload)),
+            (
+                "program-09", "program", 0xC6000,
+                "f60600600c6000000100000000000000",
+                "ed41dcb56145068e569b99ca07c7827889e163f5cccc444b128512da244cf380",
+            ),
+        )
+
+        journal = self.journal_path("checkpoint-postimage.json")
+        self.write_boundary(journal, index)
+        preimage = SCRATCH.expected_boundary_image(self.transaction, index)
+        postimage = SCRATCH.expected_boundary_image(self.transaction, index + 1)
+        image = bytearray(preimage)
+        mutation_session = FakeSession(self.transaction, index, image)
+
+        result = SCRATCH.live_step(
+            self.transaction, journal,
+            backend_factory=lambda _transaction, _index: mutation_session,
+            progress=False)
+
+        self.assertEqual(mutation_session.capture_count, 2)
+        self.assertEqual(mutation_session.execute_count, 1)
+        self.assertTrue(mutation_session.closed)
+        self.assertEqual(bytes(image), postimage)
+        self.assertEqual(result["classification"],
+                         "planned_active_intent_checkpoint")
+        self.assertEqual(result["command_completed_operation"], "program-09")
+        self.assertTrue(result["reconciliation_required"])
+        self.assertFalse(result["postread_performed"])
+        self.assertFalse(result["automatic_retry"])
+        self.assertEqual(result["boundary_index"], index)
+        self.assertEqual(result["expected_post_boundary_index"], index + 1)
+        pending = SCRATCH.load_journal(journal)
+        self.assertEqual(pending["status"], "intent")
+        self.assertEqual(pending["boundary_index"], index)
+        self.assertEqual(pending["active_operation_id"], "program-09")
+        self.assertEqual(pending["intent_process_nonce"], SCRATCH.PROCESS_NONCE)
+
+        opened = False
+
+        def same_process_factory(_transaction, _index):
+            nonlocal opened
+            opened = True
+            return FakeSession(self.transaction, index, image)
+
+        with self.assertRaisesRegex(
+                SCRATCH.ScratchExecutorError, "fresh process"):
+            SCRATCH.live_reconcile(
+                self.transaction, journal,
+                backend_factory=same_process_factory, progress=False)
+        self.assertFalse(opened)
+
+        next_nonce = self.other_process_nonce()
+        reconcile_session = FakeSession(self.transaction, index, image)
+        self.assertNotEqual(mutation_session.handle, reconcile_session.handle)
+        with mock.patch.object(SCRATCH, "PROCESS_NONCE", next_nonce):
+            reconciled = SCRATCH.live_reconcile(
+                self.transaction, journal,
+                backend_factory=lambda _transaction, _index: reconcile_session,
+                progress=False)
+
+        self.assertEqual(reconcile_session.capture_count, 2)
+        self.assertEqual(reconcile_session.execute_count, 0)
+        self.assertTrue(reconcile_session.closed)
+        self.assertEqual(reconciled["classification"], "exact_postimage_completed")
+        self.assertEqual(reconciled["boundary_index"], index + 1)
+        self.assertEqual(reconciled["next_operation"], "program-10")
+        self.assertFalse(reconciled["automatic_retry"])
+        verified = SCRATCH.load_journal(journal)
+        self.assertEqual(verified["status"], "boundary_verified")
+        self.assertEqual(verified["boundary_index"], index + 1)
+        self.assertIsNone(verified["intent_process_nonce"])
+
+    def test_checkpoint_exact_preimage_is_terminal_and_is_never_retried(self) -> None:
+        index = SCRATCH.CHECKPOINT_OPERATION_INDEX
+        journal = self.journal_path("checkpoint-preimage.json")
+        self.write_boundary(journal, index)
+        preimage = SCRATCH.expected_boundary_image(self.transaction, index)
+        failed_mutation = FakeSession(
+            self.transaction, index, bytearray(preimage), fail_execute=True)
+
+        with self.assertRaises(SCRATCH.ReconciliationRequired):
+            SCRATCH.live_step(
+                self.transaction, journal,
+                backend_factory=lambda _transaction, _index: failed_mutation,
+                progress=False)
+        self.assertEqual(failed_mutation.capture_count, 2)
+        self.assertEqual(failed_mutation.execute_count, 1)
+        self.assertEqual(SCRATCH.load_journal(journal)["status"], "intent")
+
+        read_only = FakeSession(
+            self.transaction, index, bytearray(preimage))
+        with mock.patch.object(
+                SCRATCH, "PROCESS_NONCE", self.other_process_nonce()):
+            stopped = SCRATCH.live_reconcile(
+                self.transaction, journal,
+                backend_factory=lambda _transaction, _index: read_only,
+                progress=False)
+
+        self.assertEqual(read_only.capture_count, 2)
+        self.assertEqual(read_only.execute_count, 0)
+        self.assertTrue(read_only.closed)
+        self.assertEqual(
+            stopped["classification"],
+            "exact_preimage_checkpoint_consumed_no_effect")
+        self.assertEqual(stopped["boundary_index"], index)
+        self.assertIsNone(stopped["next_operation"])
+        self.assertFalse(stopped["automatic_retry"])
+        self.assertTrue(stopped["campaign_stopped"])
+        self.assertFalse(stopped["state_cleared"])
+        self.assertEqual(
+            SCRATCH.load_journal(journal)["status"], "checkpoint_no_effect")
+
+        argv = [
+            str(TOOL_PATH), "reconcile",
+            "--baseline-a", str(self.baseline_a),
+            "--baseline-b", str(self.baseline_b),
+            "--journal", str(journal),
+            "--commit",
+        ]
+        stderr = io.StringIO()
+        with mock.patch.object(sys, "argv", argv), \
+                mock.patch.object(
+                    SCRATCH, "live_reconcile", return_value=stopped) as reconcile, \
+                redirect_stdout(io.StringIO()), redirect_stderr(stderr):
+            result = SCRATCH.main()
+        self.assertEqual(result, 5)
+        reconcile.assert_called_once()
+        self.assertIn("CAMPAIGN STOPPED", stderr.getvalue())
+        self.assertIn("Do not retry or run step", stderr.getvalue())
+
+        dry_step_argv = [
+            str(TOOL_PATH), "step",
+            "--baseline-a", str(self.baseline_a),
+            "--baseline-b", str(self.baseline_b),
+            "--journal", str(journal),
+        ]
+        stderr = io.StringIO()
+        with mock.patch.object(sys, "argv", dry_step_argv), \
+                mock.patch.object(SCRATCH, "live_step") as live, \
+                mock.patch.object(
+                    SCRATCH._writer._verify, "_load_libusb") as load_libusb, \
+                redirect_stdout(io.StringIO()), redirect_stderr(stderr):
+            result = SCRATCH.main()
+        self.assertEqual(result, 2)
+        live.assert_not_called()
+        load_libusb.assert_not_called()
+        self.assertIn("campaign is consumed", stderr.getvalue())
+
+        opened = False
+
+        def forbidden_retry(_transaction, _index):
+            nonlocal opened
+            opened = True
+            return FakeSession(self.transaction, index, bytearray(preimage))
+
+        with self.assertRaisesRegex(
+                SCRATCH.ScratchExecutorError,
+                "campaign is consumed; USB mutation retry is prohibited"):
+            SCRATCH.live_step(
+                self.transaction, journal,
+                backend_factory=forbidden_retry, progress=False)
+        self.assertFalse(opened)
+
+    def test_checkpoint_binding_and_intent_publication_fail_closed(self) -> None:
+        index = SCRATCH.CHECKPOINT_OPERATION_INDEX
+        operation = self.transaction.operations[index]
+        changed = replace(operation, identifier="program-08")
+        operations = (
+            self.transaction.operations[:index] + (changed,) +
+            self.transaction.operations[index + 1:])
+        with self.assertRaisesRegex(
+                SCRATCH.ScratchExecutorError, "reviewed command"):
+            SCRATCH._validate_checkpoint_operation(operations)
+
+        journal = self.journal_path("checkpoint-publish-failure.json")
+        self.write_boundary(journal, index)
+        preimage = SCRATCH.expected_boundary_image(self.transaction, index)
+        session = FakeSession(self.transaction, index, bytearray(preimage))
+
+        def stop_publication(_site):
+            raise RuntimeError("synthetic checkpoint publication failure")
+
+        with self.assertRaisesRegex(RuntimeError, "checkpoint publication"):
+            SCRATCH.live_step(
+                self.transaction, journal,
+                backend_factory=lambda _transaction, _index: session,
+                progress=False, journal_fault=stop_publication)
+        self.assertEqual(session.capture_count, 2)
+        self.assertEqual(session.execute_count, 0)
+        self.assertEqual(
+            SCRATCH.load_journal(journal)["boundary_index"], index)
+        self.assertEqual(
+            SCRATCH.load_journal(journal)["status"], "boundary_verified")
+
     def test_transport_or_postread_failure_leaves_intent_and_never_retries(self) -> None:
-        index = 9
+        index = 10
         preimage = SCRATCH.expected_boundary_image(self.transaction, index)
         for name, session in (
                 ("transport", FakeSession(
@@ -428,7 +649,7 @@ class UpdaterScratchExecutorTests(unittest.TestCase):
                 self.assertTrue(session.closed)
 
     def test_intent_publication_and_close_failures_never_expand_authority(self) -> None:
-        index = 9
+        index = 10
         preimage = SCRATCH.expected_boundary_image(self.transaction, index)
 
         before_intent = self.journal_path("before-intent-failure.json")
@@ -463,7 +684,7 @@ class UpdaterScratchExecutorTests(unittest.TestCase):
             SCRATCH.load_journal(after_intent)["boundary_index"], index + 1)
 
     def test_reconcile_uses_new_read_only_session_for_exact_pre_or_post(self) -> None:
-        index = 9
+        index = 10
         preimage = SCRATCH.expected_boundary_image(self.transaction, index)
         postimage = SCRATCH.expected_boundary_image(self.transaction, index + 1)
         for label, image, expected_boundary in (
@@ -473,7 +694,8 @@ class UpdaterScratchExecutorTests(unittest.TestCase):
                 SCRATCH.write_journal_atomic(
                     journal,
                     SCRATCH.intent_journal(
-                        self.transaction, self.identity(preimage), index),
+                        self.transaction, self.identity(preimage), index,
+                        process_nonce=self.other_process_nonce()),
                     require_absent=True)
                 session = FakeSession(
                     self.transaction, index, bytearray(image))
@@ -491,7 +713,7 @@ class UpdaterScratchExecutorTests(unittest.TestCase):
                     expected_boundary)
 
     def test_reconcile_rejects_partial_unstable_and_outside_damage(self) -> None:
-        index = 9
+        index = 10
         preimage = SCRATCH.expected_boundary_image(self.transaction, index)
         postimage = SCRATCH.expected_boundary_image(self.transaction, index + 1)
         cases: list[tuple[str, list[bytes]]] = []
@@ -509,7 +731,8 @@ class UpdaterScratchExecutorTests(unittest.TestCase):
                 SCRATCH.write_journal_atomic(
                     journal,
                     SCRATCH.intent_journal(
-                        self.transaction, self.identity(preimage), index),
+                        self.transaction, self.identity(preimage), index,
+                        process_nonce=self.other_process_nonce()),
                     require_absent=True)
                 session = FakeSession(
                     self.transaction, index, bytearray(images[0]),
@@ -528,15 +751,25 @@ class UpdaterScratchExecutorTests(unittest.TestCase):
         journal = self.journal_path("strict.json")
         self.write_boundary(journal, 0)
         value = SCRATCH.load_journal(journal)
+        self.assertEqual(
+            SCRATCH.JOURNAL_SCHEMA, "kb7-usb-updater-scratch-journal-v2")
         for key, changed in (
                 ("plan_sha256", "00" * 32),
                 ("boundary_index", 3),
+                ("schema", "kb7-usb-updater-scratch-journal-v1"),
                 ("schema", FIRMWARE.JOURNAL_SCHEMA)):
             tampered = dict(value)
             tampered[key] = changed
             with self.subTest(key=key), self.assertRaises(
                     SCRATCH.ScratchExecutorError):
                 SCRATCH.validate_journal(self.transaction, tampered)
+
+        intent = SCRATCH.intent_journal(
+            self.transaction, self.identity(self.baseline), 0)
+        intent["intent_process_nonce"] = "not-a-process-nonce"
+        with self.assertRaisesRegex(
+                SCRATCH.ScratchExecutorError, "intent_process_nonce"):
+            SCRATCH.validate_journal(self.transaction, intent)
 
         duplicate = self.journal_path("duplicate.json")
         duplicate.write_text('{"schema":"a","schema":"b"}\n', encoding="utf-8")
@@ -581,6 +814,77 @@ class UpdaterScratchExecutorTests(unittest.TestCase):
         self.assertTrue(lock_path.exists())
         self.assertEqual(lock_path.stat().st_mode & 0o777, 0o600)
         self.assertEqual(lock_path.stat().st_size, 0)
+
+    def test_step_dry_run_validates_state_and_checkpoint_cli_maps_to_exit_four(self) -> None:
+        index = SCRATCH.CHECKPOINT_OPERATION_INDEX
+        preimage = SCRATCH.expected_boundary_image(self.transaction, index)
+
+        unresolved = self.journal_path("dry-run-unresolved.json")
+        SCRATCH.write_journal_atomic(
+            unresolved,
+            SCRATCH.intent_journal(
+                self.transaction, self.identity(preimage), index),
+            require_absent=True)
+        argv = [
+            str(TOOL_PATH), "step",
+            "--baseline-a", str(self.baseline_a),
+            "--baseline-b", str(self.baseline_b),
+            "--journal", str(unresolved),
+        ]
+        stderr = io.StringIO()
+        with mock.patch.object(sys, "argv", argv), \
+                mock.patch.object(SCRATCH, "live_step") as live, \
+                mock.patch.object(
+                    SCRATCH._writer._verify, "_load_libusb") as load_libusb, \
+                redirect_stdout(io.StringIO()), redirect_stderr(stderr):
+            result = SCRATCH.main()
+        self.assertEqual(result, 2)
+        live.assert_not_called()
+        load_libusb.assert_not_called()
+        self.assertIn("unresolved intent requires reconcile", stderr.getvalue())
+
+        checkpoint = self.journal_path("dry-run-checkpoint.json")
+        self.write_boundary(checkpoint, index)
+        argv[-1] = str(checkpoint)
+        stdout = io.StringIO()
+        with mock.patch.object(sys, "argv", argv), \
+                mock.patch.object(SCRATCH, "live_step") as live, \
+                mock.patch.object(
+                    SCRATCH._writer._verify, "_load_libusb") as load_libusb, \
+                redirect_stdout(stdout), redirect_stderr(io.StringIO()):
+            result = SCRATCH.main()
+        self.assertEqual(result, 0)
+        live.assert_not_called()
+        load_libusb.assert_not_called()
+        self.assertIn("checkpoint: mandatory", stdout.getvalue())
+        self.assertIn("no USB device was opened", stdout.getvalue())
+
+        argv.append("--commit")
+        checkpoint_result = {
+            "classification": "planned_active_intent_checkpoint",
+            "command_completed_operation": "program-09",
+            "boundary_index": index,
+            "expected_post_boundary_index": index + 1,
+            "next_operation": None,
+            "observed_sha256": None,
+            "automatic_retry": False,
+            "postread_performed": False,
+            "reconciliation_required": True,
+            "state_cleared": False,
+            "firmware_region_mutation_enabled": False,
+        }
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with mock.patch.object(sys, "argv", argv), \
+                mock.patch.object(
+                    SCRATCH, "live_step", return_value=checkpoint_result) as live, \
+                redirect_stdout(stdout), redirect_stderr(stderr):
+            result = SCRATCH.main()
+        self.assertEqual(result, 4)
+        live.assert_called_once()
+        self.assertIn('"reconciliation_required": true', stdout.getvalue())
+        self.assertIn("planned active-intent checkpoint", stderr.getvalue())
+        self.assertIn("fresh process", stderr.getvalue())
 
     def test_dry_run_cli_opens_no_usb_and_exposes_no_raw_authority(self) -> None:
         journal = self.journal_path("dry-run.json")

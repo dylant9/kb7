@@ -36,10 +36,12 @@ that the contributor does not possess.
   diagnostics, two guarded dry-run-default USB write-path validation
   experiments, a separate fixed dry-run-default scratch executor, and
   clean-room summaries of the F6 interoperability findings. The scratch
-  executor can derive only its 22 reviewed non-firmware operations and is
-  offline-tested; that exact fixed plan has also completed once on the
-  development unit, restored the exact 32-MiB baseline, and returned to
-  operator-reported normal keyboard operation. The public tree records only
+  executor can derive only its 22 reviewed non-firmware operations. Its v1 plan
+  completed once on the development unit, restored the exact 32-MiB baseline,
+  and returned to operator-reported normal keyboard operation. Its current v2
+  plan is offline-tested and hardware-unrun; it adds only a mandatory
+  command-complete/no-postread active-intent checkpoint and fresh-process,
+  mutation-incapable reconciliation. The public tree records only
   independently authored source, hashes, classifications and summarized
   results from that run. No vendor DLL, disassembly listing, general USB
   firmware flasher, raw transcript, capture, journal or stock byte payload is
@@ -69,7 +71,8 @@ No external scripts, fonts, images, packages, or vendored libraries are bundled.
   scaffold exposes only read-only preflight/reconciliation; its live mutation
   adapter is hard-disabled and no execute command exists. The distinct scratch
   executor accepts no firmware bundle or caller-selected address, CDB, payload
-  or operation and does not change that lock.
+  or operation. Its v2 checkpoint is fixed in the hash-bound plan rather than
+  exposed as a runtime selector. It does not change the paired executor's lock.
 
 ## Excluded and retained only outside the public repository
 

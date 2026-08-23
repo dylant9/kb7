@@ -6,6 +6,9 @@ only the already reviewed 18-program/four-erase scratch command set.  The
 caller cannot select an operation, address, CDB, payload, size, device, retry,
 or recovery policy.  Each ``step`` derives exactly one next operation from a
 separate durable scratch journal and is dry-run unless ``--commit`` is given.
+At the fixed ``program-09`` boundary, ``step`` deliberately stops after the
+reviewed program command and WIP-ready poll, without post-read or journal
+advance; only a fresh-process, read-only ``reconcile`` may classify the result.
 
 The general paired-firmware executor remains read-only and mutation-locked.
 This tool never accepts a firmware bundle and cannot construct an operation in
@@ -60,12 +63,21 @@ ENVELOPE_LO = _restart.ENVELOPE_LO
 ENVELOPE_HI = _restart.ENVELOPE_HI
 EXPECTED_LOADER_SHA256 = _restart.EXPECTED_LOADER_SHA256
 
-JOURNAL_SCHEMA = "kb7-usb-updater-scratch-journal-v1"
-PLAN_SCHEMA = "kb7-usb-updater-fixed-scratch-plan-v1"
+JOURNAL_SCHEMA = "kb7-usb-updater-scratch-journal-v2"
+PLAN_SCHEMA = "kb7-usb-updater-fixed-scratch-plan-v2"
 EXPECTED_SOURCE_SCRATCH_PLAN_SHA256 = (
     "d784f036e06a972d9688d15c76a41cbd7e90ca806d5ced1aeab5aae16745085b")
 EXPECTED_PLAN_SHA256 = (
-    "491b06c1beb66fa606639e1d420109dcf856c91b50ad02d5fbd0e6bafe1cc797")
+    "f0a8acfcdc7ab5fb7a7dc2753ed8bdca0e381a9433f64fe311348442a8bbdb32")
+
+CHECKPOINT_OPERATION_INDEX = 9
+CHECKPOINT_OPERATION_ID = "program-09"
+CHECKPOINT_OPERATION_OFFSET = 0x000C6000
+CHECKPOINT_OPERATION_CDB_HEX = "f60600600c6000000100000000000000"
+CHECKPOINT_PAYLOAD_SHA256 = (
+    "ed41dcb56145068e569b99ca07c7827889e163f5cccc444b128512da244cf380")
+CHECKPOINT_POLICY = "after_command_and_wip_poll_before_postread"
+PROCESS_NONCE = os.urandom(32).hex()
 
 
 class ScratchExecutorError(SafetyError):
@@ -168,6 +180,18 @@ def plan_descriptor() -> dict[str, object]:
         "address_mode_cdb_hex": _writer.cdb_simple(
             _writer.SUB_EX4B).hex(),
         "source_scratch_plan_sha256": _restart.PLAN_SHA256,
+        "required_active_intent_checkpoint": {
+            "operation_index": CHECKPOINT_OPERATION_INDEX,
+            "operation_identifier": CHECKPOINT_OPERATION_ID,
+            "operation_offset": CHECKPOINT_OPERATION_OFFSET,
+            "operation_cdb_hex": CHECKPOINT_OPERATION_CDB_HEX,
+            "payload_sha256": CHECKPOINT_PAYLOAD_SHA256,
+            "policy": CHECKPOINT_POLICY,
+            "fresh_process_reconciliation_required": True,
+            "automatic_retry": False,
+            "single_attempt": True,
+            "exact_preimage_policy": "stop_campaign_checkpoint_consumed",
+        },
         "operations": [
             _operation_descriptor(operation) for operation in OPERATIONS],
     }
@@ -226,6 +250,26 @@ def _validate_operation(operation: ScratchOperation, manifest: object) -> None:
         raise ScratchExecutorError("fixed operation CDB is not canonical")
 
 
+def _validate_checkpoint_operation(
+        operations: tuple[ScratchOperation, ...]) -> ScratchOperation:
+    if not 0 <= CHECKPOINT_OPERATION_INDEX < len(operations):
+        raise ScratchExecutorError("active-intent checkpoint index is invalid")
+    operation = operations[CHECKPOINT_OPERATION_INDEX]
+    if (operation.identifier != CHECKPOINT_OPERATION_ID or
+            operation.action != "program" or
+            operation.offset != CHECKPOINT_OPERATION_OFFSET or
+            operation.length != BLOCK or
+            operation.payload is None or
+            not hmac.compare_digest(
+                operation.cdb.hex(), CHECKPOINT_OPERATION_CDB_HEX) or
+            not hmac.compare_digest(
+                _writer.sha256_bytes(operation.payload),
+                CHECKPOINT_PAYLOAD_SHA256)):
+        raise ScratchExecutorError(
+            "active-intent checkpoint operation is not the reviewed command")
+    return operation
+
+
 def _apply_operation(image: bytearray, operation: ScratchOperation) -> None:
     start = operation.offset
     end = start + operation.length
@@ -282,6 +326,7 @@ def load_transaction(baseline_a: Path, baseline_b: Path) -> ScratchTransaction:
         if sector not in checked_sectors:
             _writer.validate_target(manifest, baseline, sector)
             checked_sectors.add(sector)
+    _validate_checkpoint_operation(OPERATIONS)
 
     current = bytearray(baseline)
     boundary_hashes = [_writer.sha256_bytes(current)]
@@ -315,6 +360,7 @@ JOURNAL_KEYS = {
     "verifier_source_sha256", "operation_count", "boundary_index",
     "active_operation_id", "active_operation_sha256",
     "pre_image_sha256", "post_image_sha256", "last_observed_sha256",
+    "intent_process_nonce",
 }
 
 
@@ -375,15 +421,19 @@ def boundary_journal(transaction: ScratchTransaction,
         "pre_image_sha256": None,
         "post_image_sha256": None,
         "last_observed_sha256": transaction.boundary_sha256[boundary_index],
+        "intent_process_nonce": None,
     }
 
 
 def intent_journal(transaction: ScratchTransaction,
                    identity: dict[str, str],
-                   operation_index: int) -> dict[str, object]:
+                   operation_index: int, *,
+                   process_nonce: str | None = None) -> dict[str, object]:
     if not 0 <= operation_index < len(transaction.operations):
         raise ScratchExecutorError("cannot journal an invalid scratch operation")
     operation = transaction.operations[operation_index]
+    nonce = PROCESS_NONCE if process_nonce is None else process_nonce
+    _validate_hex(nonce, 64, "intent_process_nonce")
     return {
         **_journal_common(transaction, identity),
         "status": "intent",
@@ -393,6 +443,7 @@ def intent_journal(transaction: ScratchTransaction,
         "pre_image_sha256": transaction.boundary_sha256[operation_index],
         "post_image_sha256": transaction.boundary_sha256[operation_index + 1],
         "last_observed_sha256": transaction.boundary_sha256[operation_index],
+        "intent_process_nonce": nonce,
     }
 
 
@@ -618,7 +669,7 @@ def validate_journal(transaction: ScratchTransaction,
     if type(boundary) is not int or not 0 <= boundary <= len(transaction.operations):
         raise ScratchExecutorError("journal boundary index is invalid")
     status = journal.get("status")
-    if status == "intent":
+    if status in {"intent", "checkpoint_no_effect"}:
         if boundary >= len(transaction.operations):
             raise ScratchExecutorError("intent cannot follow the final boundary")
         operation = transaction.operations[boundary]
@@ -632,10 +683,18 @@ def validate_journal(transaction: ScratchTransaction,
                 journal.get("last_observed_sha256") !=
                 transaction.boundary_sha256[boundary]):
             raise ScratchExecutorError("journal intent is not canonical")
+        _validate_hex(
+            journal.get("intent_process_nonce"), 64,
+            "intent_process_nonce")
+        if (status == "checkpoint_no_effect" and
+                boundary != CHECKPOINT_OPERATION_INDEX):
+            raise ScratchExecutorError(
+                "consumed checkpoint status is outside the reviewed boundary")
     elif status in {"boundary_verified", "complete"}:
         if any(journal.get(key) is not None for key in (
                 "active_operation_id", "active_operation_sha256",
-                "pre_image_sha256", "post_image_sha256")):
+                "pre_image_sha256", "post_image_sha256",
+                "intent_process_nonce")):
             raise ScratchExecutorError("boundary journal contains an active intent")
         if journal.get("last_observed_sha256") != transaction.boundary_sha256[boundary]:
             raise ScratchExecutorError("boundary journal image hash is stale")
@@ -643,6 +702,32 @@ def validate_journal(transaction: ScratchTransaction,
             raise ScratchExecutorError("complete status does not match the final boundary")
     else:
         raise ScratchExecutorError("journal status is invalid")
+
+
+class FixedScratchReadOnlyBackend:
+    """Identity and full-chip reads through the read-only verifier whitelist."""
+
+    def __init__(self, transaction: ScratchTransaction, operation_index: int,
+                 *, device_factory=_writer._verify.Device) -> None:
+        if not 0 <= operation_index < len(transaction.operations):
+            raise ScratchExecutorError("scratch read index is outside the plan")
+        self._device = device_factory()
+        self._closed = False
+
+    def identity(self) -> dict[str, str]:
+        if self._closed:
+            raise ScratchExecutorError("identity is unavailable after close")
+        return _writer.query_loader_identity(self._device)
+
+    def capture(self, *, progress: bool = True) -> bytes:
+        if self._closed:
+            raise ScratchExecutorError("readback is unavailable after close")
+        return _writer.capture_full_chip(self._device, progress=progress)
+
+    def close(self) -> None:
+        if not self._closed:
+            self._device.close()
+            self._closed = True
 
 
 class FixedScratchUsbMutationBackend:
@@ -744,7 +829,7 @@ def _require_live_image(transaction: ScratchTransaction, expected: bytes,
 
 
 def _live_preflight_locked(transaction: ScratchTransaction, journal_path: Path, *,
-                           backend_factory=FixedScratchUsbMutationBackend,
+                           backend_factory=FixedScratchReadOnlyBackend,
                            progress: bool = True) -> dict[str, object]:
     validate_journal_path(transaction, journal_path)
     if os.path.lexists(journal_path):
@@ -774,12 +859,34 @@ def _live_preflight_locked(transaction: ScratchTransaction, journal_path: Path, 
 
 
 def live_preflight(transaction: ScratchTransaction, journal_path: Path, *,
-                   backend_factory=FixedScratchUsbMutationBackend,
+                   backend_factory=FixedScratchReadOnlyBackend,
                    progress: bool = True) -> dict[str, object]:
     with scratch_journal_lock(transaction, journal_path):
         return _live_preflight_locked(
             transaction, journal_path, backend_factory=backend_factory,
             progress=progress)
+
+
+def _require_step_state(transaction: ScratchTransaction,
+                        journal: dict[str, object]) -> int:
+    validate_journal(transaction, journal)
+    status = journal["status"]
+    if status == "intent":
+        raise ScratchExecutorError("unresolved intent requires reconcile")
+    if status == "checkpoint_no_effect":
+        raise ScratchExecutorError(
+            "checkpoint campaign is consumed; USB mutation retry is prohibited")
+    if status == "complete":
+        raise ScratchExecutorError(
+            "scratch plan is complete; run reconcile to clear state")
+    if status != "boundary_verified":
+        raise ScratchExecutorError("scratch step requires a verified boundary")
+    index = journal["boundary_index"]
+    if type(index) is not int or not 0 <= index < len(transaction.operations):
+        raise ScratchExecutorError("scratch step boundary is invalid")
+    if index == CHECKPOINT_OPERATION_INDEX:
+        _validate_checkpoint_operation(transaction.operations)
+    return index
 
 
 def _live_step_locked(transaction: ScratchTransaction, journal_path: Path, *,
@@ -789,13 +896,9 @@ def _live_step_locked(transaction: ScratchTransaction, journal_path: Path, *,
                       ) -> dict[str, object]:
     validate_journal_path(transaction, journal_path)
     current = load_journal(journal_path)
-    validate_journal(transaction, current)
-    if current["status"] == "intent":
-        raise ScratchExecutorError("unresolved intent requires reconcile")
-    if current["status"] == "complete":
-        raise ScratchExecutorError("scratch plan is complete; run reconcile to clear state")
-    index = current["boundary_index"]
+    index = _require_step_state(transaction, current)
     operation = transaction.operations[index]
+    is_checkpoint = index == CHECKPOINT_OPERATION_INDEX
     preimage = expected_boundary_image(transaction, index)
     postimage = expected_boundary_image(transaction, index + 1)
     backend = backend_factory(transaction, index)
@@ -810,6 +913,20 @@ def _live_step_locked(transaction: ScratchTransaction, journal_path: Path, *,
         write_journal_atomic(journal_path, intent, fault=journal_fault)
         intent_is_durable = True
         backend.execute()
+        if is_checkpoint:
+            return {
+                "classification": "planned_active_intent_checkpoint",
+                "command_completed_operation": operation.identifier,
+                "boundary_index": index,
+                "expected_post_boundary_index": index + 1,
+                "next_operation": None,
+                "observed_sha256": None,
+                "automatic_retry": False,
+                "postread_performed": False,
+                "reconciliation_required": True,
+                "state_cleared": False,
+                "firmware_region_mutation_enabled": False,
+            }
         observed = _two_stable_reads(backend, progress=progress)
         _require_live_image(transaction, postimage, observed, "scratch step postimage")
         verified = boundary_journal(transaction, identity, index + 1)
@@ -859,12 +976,17 @@ def live_step(transaction: ScratchTransaction, journal_path: Path, *,
 
 
 def _live_reconcile_locked(transaction: ScratchTransaction, journal_path: Path, *,
-                           backend_factory=FixedScratchUsbMutationBackend,
+                           backend_factory=FixedScratchReadOnlyBackend,
                            progress: bool = True) -> dict[str, object]:
     validate_journal_path(transaction, journal_path)
     current = load_journal(journal_path)
     validate_journal(transaction, current)
     index = current["boundary_index"]
+    if (current["status"] == "intent" and
+            hmac.compare_digest(
+                current["intent_process_nonce"], PROCESS_NONCE)):
+        raise ScratchExecutorError(
+            "active intent must be reconciled by a fresh process")
     backend_index = min(index, len(transaction.operations) - 1)
     backend = backend_factory(transaction, backend_index)
     try:
@@ -877,6 +999,27 @@ def _live_reconcile_locked(transaction: ScratchTransaction, journal_path: Path, 
             pre_sha = current["pre_image_sha256"]
             post_sha = current["post_image_sha256"]
             if hmac.compare_digest(observed_sha, pre_sha):
+                if index == CHECKPOINT_OPERATION_INDEX:
+                    _require_live_image(
+                        transaction,
+                        expected_boundary_image(transaction, index),
+                        observed,
+                        "consumed checkpoint exact preimage")
+                    consumed = dict(current)
+                    consumed["status"] = "checkpoint_no_effect"
+                    consumed["last_observed_sha256"] = observed_sha
+                    write_journal_atomic(journal_path, consumed)
+                    return {
+                        "classification": (
+                            "exact_preimage_checkpoint_consumed_no_effect"),
+                        "boundary_index": index,
+                        "next_operation": None,
+                        "observed_sha256": observed_sha,
+                        "automatic_retry": False,
+                        "campaign_stopped": True,
+                        "state_cleared": False,
+                        "firmware_region_mutation_enabled": False,
+                    }
                 boundary = index
                 classification = "exact_preimage_no_observable_effect"
             elif hmac.compare_digest(observed_sha, post_sha):
@@ -885,6 +1028,13 @@ def _live_reconcile_locked(transaction: ScratchTransaction, journal_path: Path, 
             else:
                 raise RecoveryRequired(
                     "stable image is neither the exact intent preimage nor postimage")
+        elif current["status"] == "checkpoint_no_effect":
+            boundary = index
+            if not hmac.compare_digest(
+                    observed_sha, transaction.boundary_sha256[boundary]):
+                raise RecoveryRequired(
+                    "consumed checkpoint image changed after classification")
+            classification = "exact_preimage_checkpoint_consumed_no_effect"
         else:
             boundary = index
             if not hmac.compare_digest(
@@ -896,19 +1046,29 @@ def _live_reconcile_locked(transaction: ScratchTransaction, journal_path: Path, 
                 else "exact_boundary_already_verified")
         expected = expected_boundary_image(transaction, boundary)
         _require_live_image(transaction, expected, observed, "scratch reconciliation")
-        verified = boundary_journal(transaction, identity, boundary)
-        write_journal_atomic(journal_path, verified)
-        if boundary == len(transaction.operations):
-            clear_journal(journal_path)
+        if current["status"] == "checkpoint_no_effect":
+            verified = dict(current)
+            verified.update(identity)
+            verified["last_observed_sha256"] = observed_sha
+            write_journal_atomic(journal_path, verified)
+        else:
+            verified = boundary_journal(transaction, identity, boundary)
+            write_journal_atomic(journal_path, verified)
+            if boundary == len(transaction.operations):
+                clear_journal(journal_path)
         return {
             "classification": classification,
             "boundary_index": boundary,
             "next_operation": (
-                None if boundary == len(transaction.operations)
+                None if (boundary == len(transaction.operations) or
+                         current["status"] == "checkpoint_no_effect")
                 else transaction.operations[boundary].identifier),
             "observed_sha256": observed_sha,
             "automatic_retry": False,
-            "state_cleared": boundary == len(transaction.operations),
+            "campaign_stopped": current["status"] == "checkpoint_no_effect",
+            "state_cleared": (
+                boundary == len(transaction.operations) and
+                current["status"] != "checkpoint_no_effect"),
             "firmware_region_mutation_enabled": False,
         }
     finally:
@@ -916,7 +1076,7 @@ def _live_reconcile_locked(transaction: ScratchTransaction, journal_path: Path, 
 
 
 def live_reconcile(transaction: ScratchTransaction, journal_path: Path, *,
-                   backend_factory=FixedScratchUsbMutationBackend,
+                   backend_factory=FixedScratchReadOnlyBackend,
                    progress: bool = True) -> dict[str, object]:
     with scratch_journal_lock(transaction, journal_path):
         return _live_reconcile_locked(
@@ -945,10 +1105,17 @@ def _print_plan(command: str, transaction: ScratchTransaction,
     if journal is not None:
         print(f"status    : {journal['status']}")
         print(f"boundary  : {journal['boundary_index']}")
+        if journal["status"] in {"intent", "checkpoint_no_effect"}:
+            label = "intent" if journal["status"] == "intent" else "consumed"
+            print(f"{label:<10}: {journal['active_operation_id']}")
+            print("next      : reconcile only; mutation retry is prohibited")
+            return
         boundary = journal["boundary_index"]
         if boundary < len(transaction.operations):
             operation = transaction.operations[boundary]
             print(f"next      : {operation.identifier} ({operation.action})")
+            if boundary == CHECKPOINT_OPERATION_INDEX:
+                print(f"checkpoint: mandatory {CHECKPOINT_POLICY}")
 
 
 def main() -> int:
@@ -971,6 +1138,8 @@ def main() -> int:
         else:
             journal = load_journal(arguments.journal)
             validate_journal(transaction, journal)
+            if arguments.command == "step":
+                _require_step_state(transaction, journal)
         _print_plan(arguments.command, transaction, journal)
         if not arguments.commit:
             print("\nDRY RUN -- no USB device was opened and nothing was changed.")
@@ -983,11 +1152,30 @@ def main() -> int:
         else:
             result = live_reconcile(transaction, arguments.journal)
         print(json.dumps(result, indent=2, sort_keys=True))
+        if result.get("reconciliation_required") is True:
+            print(
+                "\nRECONCILIATION REQUIRED: planned active-intent checkpoint "
+                "reached after command completion and WIP-ready polling.",
+                file=sys.stderr)
+            print(
+                "Do not run another step. Start a fresh process with reconcile "
+                "--commit.", file=sys.stderr)
+            return 4
+        if result.get("campaign_stopped") is True:
+            print(
+                "\nCHECKPOINT CAMPAIGN STOPPED: the exact pre-command image "
+                "was observed and this checkpoint attempt is consumed.",
+                file=sys.stderr)
+            print(
+                "Do not retry or run step. Keep the device stable and report "
+                "this result; the observed scratch image is exact, not corrupt.",
+                file=sys.stderr)
+            return 5
         return 0
     except ReconciliationRequired as error:
         print(f"\nRECONCILIATION REQUIRED: {error}", file=sys.stderr)
         print(
-            "Do not run another step. Start a new process with reconcile "
+            "Do not run another step. Start a fresh process with reconcile "
             "--commit.", file=sys.stderr)
         return 4
     except RecoveryRequired as error:

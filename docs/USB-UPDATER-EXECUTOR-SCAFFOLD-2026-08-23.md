@@ -22,12 +22,15 @@ and does not change `flash_approved=false`.
 A second tool now exists with a deliberately different domain:
 `kb7-updater-scratch-executor.py`. It can replay only the fixed 22-operation
 V1.22 scratch experiment, is dry-run by default, and has no firmware-bundle or
-caller-selected mutation interface. It has passed offline tests and its exact
-22-operation plan has now completed once on the development unit. That result
-does not unlock this paired-firmware executor; the two tools use distinct plans
+caller-selected mutation interface. Its preceding v1 plan completed once on the
+development unit. The current v2 plan is offline-tested and hardware-unrun; it
+requires a fixed boundary-9 command-complete/no-postread checkpoint followed by
+fresh-process reconciliation over a mutation-incapable transport. Neither
+revision unlocks this paired-firmware executor; the two tools use distinct plans
 and journal schemas. See the
 [fixed scratch executor plan](USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md) and
-[completed validation record](USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md).
+[mandatory checkpoint plan](USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md),
+plus the [historical v1 validation record](USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md).
 
 ## Transaction reconstruction
 
@@ -180,9 +183,12 @@ or physical interruption recovery.
 The scratch harness turns the already reviewed scratch command list into 22
 one-operation process boundaries: 18 fixed 512-byte programs and four fixed
 4-KiB erases inside `[0x000c0000,0x00100000)`. It requires two exact full-chip
-reads before and after each operation, persists durable intent before mutation,
-and permits only a new-process read-only reconciliation after an uncertain
-result. The last mutation leaves a complete journal until a final read-only
+reads before every operation, persists durable intent before mutation, and
+normally requires two exact postreads before advancing. Its current v2 policy
+instead stops obligatorily after `program-09` and WIP-ready polling, with no
+postread and intent still active. A process-instance nonce requires a fresh
+process for reconciliation, whose USB backend cannot represent a program or
+erase. The last mutation leaves a complete journal until final read-only
 reconciliation verifies the exact baseline twice.
 
 The caller cannot provide an address, CDB, payload, length, bundle, device,
@@ -191,16 +197,19 @@ plan and separate scratch journal. This provides an offline-testable bridge
 between the earlier one-off scratch script and a state-derived executor without
 placing any mutation code in the paired-firmware executor.
 
-The source and fake-transport/state tests have passed, and the fixed harness has
-now completed one full hardware cycle on the development unit. All 22 exact
-operation boundaries passed; a final new-process read-only reconciliation
+The current v2 source and fake-transport/state tests pass offline but have not
+run on hardware. The preceding v1 harness completed one full hardware cycle on
+the development unit. All 22 ordinary exact operation boundaries passed; a
+final new-process read-only reconciliation
 verified the restored complete baseline twice and cleared the journal; and a
 separate verifier entry point reproduced complete-image SHA-256
 `2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f`
 before the owner reported normal keyboard operation. Both live readers use the
 same USB loader and SoC controller. This remains destructive laboratory tooling
-rather than an updater qualification: it did not physically interrupt a
-command, test power loss or touch firmware regions.
+rather than an updater qualification. V1 never left an intent unresolved or
+entered active-intent reconciliation; the planned v2 checkpoint ends only after
+its command and WIP poll complete. Neither physically interrupts a command,
+tests power loss or touches firmware regions.
 
 ## Remaining gates
 
@@ -215,9 +224,10 @@ are separately completed and reviewed:
    power-loss and partial-operation outcomes at safe scratch addresses. The
    completed experiment did not interrupt CBW/data/CSW, WIP, erase or program.
 3. Re-review the exact operation transport, intent/restart behavior and source
-   freeze. The separate scratch harness has no raw mutation interface and its
-   fixed plan has passed once on hardware, but physical mid-command and
-   power-loss behavior remain untested. Any future paired-firmware executor
+   freeze. The separate scratch harness has no raw mutation interface; its v1
+   plan passed once on hardware, while its v2 mandatory active-intent plan is
+   offline-tested and hardware-unrun. Physical mid-command and power-loss
+   behavior remain untested. Any future paired-firmware executor
    must remain independently locked until its own review and must likewise
    expose no raw mutation interface.
 4. Add release authenticity: the present owner-local bundle is content-hashed

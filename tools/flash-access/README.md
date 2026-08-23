@@ -206,10 +206,12 @@ laboratory guards; no supported or general USB firmware updater exists. The
 offline planner described below cannot touch a device, and the paired-firmware
 executor scaffold can only preflight and reconcile through read-only full-chip
 captures. A separate dry-run-default scratch executor can replay only 22 fixed
-non-firmware operations; that exact plan has completed once on the development
-unit and restored the byte-exact baseline. This remains bounded laboratory
-evidence, not a general update path. Treat anything here that writes over USB
-as experimental and capable of destroying your bootloader.
+non-firmware operations. Its preceding v1 plan completed once on the development
+unit and restored the byte-exact baseline. The current v2 plan adds a mandatory
+command-complete/no-postread active-intent checkpoint; it passes offline tests
+but has not run on hardware. This remains bounded laboratory evidence, not a
+general update path. Treat anything here that writes over USB as experimental
+and capable of destroying your bootloader.
 
 Host-side address validation **cannot** protect against device-side
 misaddressing. An earlier host tool correctly refused intended targets outside
@@ -280,7 +282,8 @@ default after writing; add `-N` to verify only the written region.
 | `kb7-isp-scratch-restart.py` | Fixed two-sector experiment with two deliberate no-readback/reconciliation checkpoints | **destructive; dry-run by default; passed once at the fixed plan** |
 | `kb7-updater-plan.py` | V1.22-only paired-region planner and interruption-model checker | **offline only; no device I/O; not an executor** |
 | `kb7-updater-executor.py` | Two-read live preflight, durable journal binding and image-derived reconciliation | **read-only CLI; mutation hard-disabled; not an installer** |
-| `kb7-updater-scratch-executor.py` | One-operation-per-process replay of the fixed 22-command V1.22 scratch plan | **destructive; dry-run by default; fixed plan passed once on hardware** |
+| `kb7-updater-scratch-executor.py` | One-operation-per-process replay of the fixed 22-command V1.22 scratch plan, with a mandatory boundary-9 active-intent checkpoint | **destructive; dry-run by default; current v2 is offline-tested and hardware-unrun** |
+| `../../docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md` | Exact v2 checkpoint sequence, stop rules and proof boundary | documentation only |
 | `WRITE-TEST-PLAN.md` | Exact experimental sequence, remaining failure modes and SPI recovery procedure | documentation only |
 | `ERASE-GRANULARITY-TEST-PLAN.md` | Fixed target, exact four-stage sequence, proof limits and SPI recovery procedure | documentation only |
 | `F6-ERASE-ENCODING.md` | Calibrated static proof of the erase address units and CDB layouts | documentation only |
@@ -346,28 +349,44 @@ scratch journal and sends `F6 18` immediately before that operation.
 
 Every committed preflight or step obtains two stable exact 32-MiB reads before
 state is accepted. A step persists intent before its one mutation, polls WIP,
-and requires two exact post-reads before advancing. An uncertain intent may be
-classified only by a new-process, read-only `reconcile`, which accepts the exact
-preimage or exact postimage and never retries automatically. After the final
-erase, the complete journal remains until a final read-only reconciliation
-verifies the restored baseline twice and clears it.
+and normally requires two exact post-reads before advancing. The current v2
+plan makes operation index 9 (`program-09` at `0x000c6000`) a mandatory
+exception: after command completion and WIP-ready polling, it performs no
+postread, leaves intent active and exits 4. This policy is part of the
+hash-pinned plan rather than a runtime option. Only a fresh-process, read-only
+`reconcile` may classify the exact preimage or postimage, and it never retries
+automatically. At the mandatory checkpoint, an exact preimage consumes the
+single attempt, records `checkpoint_no_effect`, exits 5 and blocks every later
+step; the image is exact rather than corrupt, but cleanup requires a separate
+review. After the final erase, the complete journal remains until a final
+read-only reconciliation verifies the restored baseline twice and clears it.
+
+Preflight and reconciliation now instantiate the verifier-only transport, whose
+whitelist cannot issue `F6 06`, `F6 15`, `F6 18` or a data-OUT program phase.
+An active intent also binds a process-instance nonce; the process that wrote it
+cannot reconcile it. This is a software/process boundary, not a physical cable
+disconnect or power cut.
 Committed commands also hold one persistent, private per-journal lock from the
 authoritative state read through USB close and publication; a concurrent
 invocation refuses before opening USB.
 
-The harness and its fake-transport/journal tests pass offline. Its complete
-22-operation plan has also passed once through this orchestration path on the
-development unit: every exact boundary was accepted, final new-process
+The current harness and its fake-transport/journal tests pass offline, but its
+v2 mandatory-checkpoint plan has not run on hardware. The preceding v1
+22-operation plan passed once through the earlier orchestration path on the
+development unit: every ordinary exact boundary was accepted, final new-process
 reconciliation cleared the journal at SHA-256
 `2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f`,
 and the separate read-only verifier entry point reproduced the same 32-MiB
 image before the owner reported normal keyboard operation. Both live readers use
 the same loader and SoC flash controller. The run did not physically interrupt
-a command, test power loss or touch firmware regions. Read the
+a command, create the v2 active-intent checkpoint, test power loss or touch
+firmware regions. Read the
 [fixed scratch executor status and test plan](../../docs/USB-UPDATER-SCRATCH-EXECUTOR-2026-08-23.md)
-for its exact sequence and stop rules, and the
+for its exact sequence and stop rules, the
+[mandatory active-intent test plan](../../docs/USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md)
+for the current hardware-unrun campaign, and the
 [completed validation record](../../docs/USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md)
-for the observed evidence and proof boundary.
+for the historical v1 evidence and proof boundary.
 
 ### Offline paired updater planner
 

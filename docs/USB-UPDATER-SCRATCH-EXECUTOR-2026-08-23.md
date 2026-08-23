@@ -9,28 +9,37 @@ tools/flash-access/kb7-updater-scratch-executor.py
 ```
 
 It is **dry-run by default**, is restricted to the reviewed V1.22 loader and
-scratch layout, and can replay only the 22 operations listed below. Its source
-and fake-transport tests have passed offline. The owner has now also completed
-one full hardware run of this exact harness and fixed plan on the development
-unit. All 22 journal-derived operations reached their expected complete-image
-boundaries; final new-process reconciliation restored and verified the exact
-baseline and cleared the journal; a separate verifier entry point reproduced
-the same 32-MiB hash; and the owner reported normal keyboard operation after a
-power cycle. See the
-[completed validation record](USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md)
-for the exact evidence and limits.
+scratch layout, and can replay only the 22 operations listed below. The current
+v2 source and fake-transport tests pass offline, but this source and plan have
+**not run on hardware**. V2 adds a mandatory active-intent checkpoint after the
+fixed `program-09` command and WIP-ready poll, before any postread or verified
+boundary publication. Reconciliation must then occur in a fresh process using
+a mutation-incapable transport.
 
-The canonical fixed-plan descriptor currently has SHA-256
-`491b06c1beb66fa606639e1d420109dcf856c91b50ad02d5fbd0e6bafe1cc797`.
-The journal binds that plan plus the scratch-plan, writer, verifier and executor
-source hashes, so implementation drift fails closed between invocations.
+The preceding v1 plan, SHA-256
+`491b06c1beb66fa606639e1d420109dcf856c91b50ad02d5fbd0e6bafe1cc797`,
+completed one hardware cycle, restored the exact baseline and returned to
+operator-reported normal keyboard operation. That result remains historical
+evidence for the unchanged commands and geometry; it is not a hardware result
+for the current v2 state machine. See the
+[historical validation record](USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md)
+and the separate
+[v2 checkpoint test plan](USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md).
+
+The current canonical v2 descriptor has SHA-256
+`f0a8acfcdc7ab5fb7a7dc2753ed8bdca0e381a9433f64fe311348442a8bbdb32`.
+It includes the mandatory checkpoint index, command and stop policy. The v2
+journal binds that plan plus the scratch-plan, writer, verifier and executor
+source hashes, so implementation or policy drift fails closed between
+invocations.
 
 This is not the paired-firmware updater. The general
 `kb7-updater-executor.py` command line still exposes only read-only `preflight`
 and `reconcile`, its mutation adapter remains hard-disabled, and firmware-region
 mutation remains unavailable. The scratch harness accepts no bundle, operation,
 address, length, CDB, payload, device selector, retry, force or skip option.
-This one fixed scratch run does not change `flash_approved=false`.
+Neither the historical run nor the current offline-tested revision changes
+`flash_approved=false`.
 
 ## Fixed operation domain
 
@@ -44,7 +53,7 @@ by the strict WIP poll. The plan is:
 |---:|---|---|---|
 | 0 | program | `0x000c4e00` | deterministic pattern slot 0, lower guard |
 | 1–8 | program | `0x000c5000..0x000c5e00`, step `0x200` | pattern slots 1–8, work sector A |
-| 9 | program | `0x000c6000` | pattern slot 9, first block of work sector B |
+| 9 | program | `0x000c6000` | pattern slot 9; mandatory active-intent checkpoint after WIP ready and before postread |
 | 10–16 | program | `0x000c6200..0x000c6e00`, step `0x200` | pattern slots 10–16, remainder of work sector B |
 | 17 | program | `0x000c7000` | pattern slot 17, upper guard |
 | 18 | erase | `0x000c5000` | work sector A |
@@ -72,10 +81,12 @@ recorded by read-only preflight and must match on every later invocation.
 
 ## Per-operation protocol
 
-`preflight --commit` is read-only. It requires two distinct, byte-identical,
-exactly 32-MiB owner captures; checks the reviewed loader, V1.22 manifest and
-erased scratch envelope; opens the live loader; obtains two stable full-chip
-reads equal to the baseline; and creates a new owner-local scratch journal.
+`preflight --commit` is read-only. It uses the verifier transport whose command
+whitelist cannot represent a flash program or erase. It requires two distinct,
+byte-identical, exactly 32-MiB owner captures; checks the reviewed loader, V1.22
+manifest and erased scratch envelope; opens the live loader; obtains two stable
+full-chip reads equal to the baseline; and creates a new owner-local scratch
+journal.
 
 Each separate `step --commit` invocation then:
 
@@ -86,14 +97,27 @@ Each separate `step --commit` invocation then:
    and directory `fsync`;
 4. emits `F6 18`, exactly one state-derived `F6 06` or `F6 15`, and the WIP
    poll; and
-5. obtains two more stable 32-MiB reads equal to the one exact postimage before
-   durably advancing the journal.
+5. normally obtains two more stable 32-MiB reads equal to the one exact
+   postimage before durably advancing the journal.
+
+Operation index 9 is the mandatory exception to step 5. After the fixed
+`program-09` command and strict WIP poll complete, the process deliberately
+does not read flash or advance the journal. It closes with the canonical intent
+still active and exits 4. This checkpoint cannot be selected, moved or skipped
+through the CLI. It is command-complete/no-readback behavior, not a physical
+USB interruption or power cut.
 
 No invocation can perform a second mutation. If anything fails after intent is
 durable, the tool exits with reconciliation required and does not retry.
-`reconcile --commit`, started as a new process, is read-only: it takes two
-stable full-chip reads and accepts only the exact intent preimage or exact
-postimage. Any other stable image requires external SPI recovery.
+`reconcile --commit`, started as a new process, uses the verifier-only backend:
+it takes two stable full-chip reads and accepts only the exact intent preimage
+or exact postimage. Every intent includes a process-instance nonce and the same
+process is refused before USB opens. At the mandatory checkpoint, the exact
+postimage advances to boundary 10 without replay. The exact preimage is a known,
+non-corrupt image but consumes the single permitted checkpoint attempt: the
+journal enters `checkpoint_no_effect`, exits 5 and refuses every later `step`.
+The campaign must stop for a separately reviewed cleanup decision; it must not
+silently retry. Any other stable image requires external SPI recovery.
 
 The last step leaves a durable `complete` journal rather than deleting state in
 the same mutation process. A final read-only `reconcile --commit` must verify
@@ -130,11 +154,13 @@ python3 tools/flash-access/kb7-updater-scratch-executor.py reconcile \
   --journal /path/to/owner-local-scratch-journal.json
 ```
 
-One owner-authorized hardware run is now documented separately; it is evidence
-for this exact fixed plan, not standing approval to repeat it or to broaden the
-mutation domain. `--commit` is the only switch that opens USB.
+One owner-authorized v1 hardware run is documented separately; it is historical
+evidence for the same fixed operation list, not evidence that v2's mandatory
+active-intent path has run and not standing approval to broaden the mutation
+domain. `--commit` is the only switch that opens USB.
 `preflight --commit` remains read-only; every `step --commit` is destructive
-and advances exactly one operation; and `reconcile --commit` remains read-only.
+and normally advances exactly one operation; the mandatory boundary-9 step
+instead exits 4 with intent active. `reconcile --commit` remains read-only.
 Each command must be a fresh process.
 
 ## Stop and recovery rules
@@ -146,6 +172,11 @@ Each command must be a fresh process.
 - Exit 3 explicitly requires SPI recovery. Do not issue another USB mutation.
 - Exit 4 means a durable intent exists and a new-process
   `reconcile --commit` is required. Do not run `step` again first.
+- Exit 5 means the mandatory checkpoint produced its exact preimage and the
+  single permitted attempt is consumed. The flash is in an exact known scratch
+  state, not a corruption state, but the campaign and all USB mutations must
+  stop pending a separately reviewed cleanup decision. Keep the journal and
+  device state intact; do not power-cycle.
 - An operator interruption before durable intent exits 130. An interruption at
   or after a mutating transport boundary must still be treated as uncertain.
 
@@ -158,13 +189,17 @@ postimage, stop USB work and restore/verify the complete owner image over SPI.
 
 Offline tests cover the fixed operation construction, rejection of non-scratch
 and firmware-domain operations, transport ordering, two-read gates, durable
-state binding, one-operation process boundary, reconciliation and journal
-faults. The completed hardware run additionally proves that this harness can
-traverse all 22 exact command boundaries and finalize its journal on the tested
-physical USB loader, unit and erased scratch geometry.
+state binding, the mandatory no-postread checkpoint, fresh-process nonce,
+mutation-incapable reconciliation backend, one-operation process boundary,
+reconciliation and journal faults. The current v2 plan remains hardware-unrun.
 
-It did not create an uncertain intent or physically interrupt CBW, data, CSW,
-WIP polling, a NOR program pulse or an erase pulse. It therefore does not prove
+The historical v1 hardware run proved traversal of all 22 ordinary exact
+command boundaries and finalization on the tested loader, unit and geometry. It
+never left an intent unresolved or exercised active-intent reconciliation. A
+successful v2 run would add only controlled command-complete/no-postread
+reconciliation and continuation evidence. Neither
+revision physically interrupts CBW, data, CSW, WIP polling, a NOR program pulse
+or an erase pulse. They therefore do not prove
 arbitrary torn-state recovery, power-loss recovery, `F6 17`, `F6 19`, other
 loader versions, other units, firmware-region writes, replacement-firmware
 correctness or a production updater. The final separate verifier was a

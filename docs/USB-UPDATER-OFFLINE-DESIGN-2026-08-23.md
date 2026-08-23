@@ -25,12 +25,17 @@ provides a deliberately separate, dry-run-default harness for 22 immutable
 operations in the V1.22 erased scratch gap. It accepts no firmware bundle or
 caller-selected mutation and does not unlock the paired-firmware executor. Its
 source and fake-transport/state tests have passed offline. Its complete fixed
-plan has now also passed once on the development unit: all 22 command-boundary
-postimages were accepted, final new-process reconciliation cleared the journal
-at the exact baseline, and a separate verifier entry point reproduced the same
-32-MiB image before operator-reported normal keyboard operation. This is fixed
-scratch evidence only; it does not authorize firmware-region execution. See the
-[validation record](USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md).
+v1 plan also passed once on the development unit: all 22 ordinary
+command-boundary postimages were accepted, final new-process reconciliation
+cleared the journal at the exact baseline, and a separate verifier entry point
+reproduced the same 32-MiB image before operator-reported normal keyboard
+operation. The current v2 plan adds a mandatory active intent after
+`program-09` completes and WIP reports ready, then closes without postread; only
+a fresh process with a mutation-incapable backend may reconcile. V2 is
+offline-tested and hardware-unrun. This is fixed scratch work only; it does not
+authorize firmware-region execution. See the
+[v2 test plan](USB-UPDATER-SCRATCH-ACTIVE-INTENT-TEST-PLAN-2026-08-23.md) and
+[historical validation record](USB-UPDATER-SCRATCH-EXECUTOR-VALIDATION-2026-08-23.md).
 
 The planner was exercised offline against two matching V1.22 full-chip inputs
 and the current locally built ELFs. An independent `simulate` pass reproduced
@@ -152,9 +157,12 @@ emulation of physical torn commands. The paired-firmware executor scaffold now
 implements restart classification and a durable-intent model with fake
 transports, but live firmware mutation remains unavailable. The separate
 scratch executor wires the same principles only to its immutable, non-firmware
-22-operation plan; that plan has completed once on the tested physical loader.
-The run exercised exact command boundaries, not a physical mid-command or
-power-loss event. None of these components claims power-loss atomicity. They
+22-operation command set. Its v1 plan completed once on the tested physical
+loader; its v2 mandatory active-intent policy currently has offline evidence
+only. The historical run exercised exact command boundaries, and the planned
+v2 checkpoint ends after command completion and WIP ready. Neither is a
+physical mid-command or power-loss event. None of these components claims
+power-loss atomicity. They
 cannot prove behavior for an interrupted NOR erase pulse, program disturb,
 misaddressed device-side handler, unstable cell, loader defect or electrical
 failure. Any mid-command hardware result requires two stable full reads and
@@ -203,11 +211,13 @@ image or an early-valid mixed state.
 3. The reviewed fixed scratch-only multi-sector/reconciliation experiment has
    passed once. It classified two command-complete no-readback outcomes from
    new processes and restored the exact baseline. A new separate harness now
-   expresses that geometry as 22 one-operation, state-derived invocations and
-   passes offline tests. That harness's complete fixed plan has now also passed
-   once on hardware, including final new-process reconciliation and exact
-   baseline restoration. Both the executor and separate verifier read through
-   the same USB loader/SoC controller. Physical mid-command, power-loss and
+   expresses that geometry as 22 one-operation, state-derived invocations. Its
+   v1 plan passed once on hardware, including final new-process reconciliation
+   and exact baseline restoration. Its current v2 plan passes offline tests and
+   mandates a boundary-9 active-intent checkpoint followed by fresh-process,
+   read-only reconciliation, but that revision has not run on hardware. Both
+   the executor and separate verifier read through the same USB loader/SoC
+   controller. Physical mid-command, power-loss and
    arbitrary torn-NOR reconciliation remain separate gates before reviewing
    any source change that could enable firmware-region execution.
 4. Prove entry back to `5037` after a checksum-valid but nonfunctional custom
