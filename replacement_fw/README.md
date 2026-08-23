@@ -17,7 +17,7 @@ stock patch tooling, assigned USB identity and every generated binary.
 This is public, inspection-oriented source. Do not commit locally built images,
 stock inputs, captures, or proprietary analysis artifacts to this directory.
 
-## Current status — 2026-08-22
+## Current status — 2026-08-23
 
 All substantial software-owned functions supported by the available evidence
 are implemented and host-tested, including five profiles, USB EP0/HID/vendor
@@ -27,10 +27,20 @@ longer overlaps stock configuration or upload partitions.
 
 The default build still parks before the application and leaves every
 unverified peripheral, USB attachment and flash mutation path disabled. An
-external ESP32-C3 repair has restored the stock firmware on the physical unit,
-but the replacement images themselves have never run on the board. Cold-start
-clock/OPI state, alternate-function pinmux, controller electrical behavior and
-the complete rollback procedure remain hardware gates.
+external ESP32-C3 full-stock restore/verification rehearsal has succeeded on the
+physical unit, but the replacement images themselves have never run on the
+board. Cold-start clock/OPI state, alternate-function pinmux and controller
+electrical behavior remain hardware gates.
+
+The two link images now carry fixed `KB7P` build-pair markers and use runtime
+ABI v2. Standalone ELFs deliberately contain an erased all-`0xff` pair ID and
+are not runnable images: the offline V1.22 planner must patch one derived ID
+into both targets. Core0 validates the pair before USB attach, and the region-1
+entry validates it again before data/BSS initialization or board I/O. The
+linkers also reserve the CRC correction and sparse commit-gate blocks used by
+the offline transaction model. This makes a checksum-compatible mixed build
+fail-stop for external reset; it is not a proven transition back to USB ISP and
+does not show that either paired image works on the board.
 
 Requirements: GNU Make, Python 3, and `arm-none-eabi-gcc`/binutils.
 
@@ -50,11 +60,13 @@ profile.
 findings have regression-tested repairs, described in
 `../docs/FIRMWARE-COMPLETION-2026-08-18.md`. USB/MCU2 identities and board
 profiles, generic non-GPIO pinmux, logical-key→LED correlation and hardware
-validation remain unresolved. External stock repair has succeeded once, but a
-repeatable exact rollback procedure is still required. The repository has no
-USB flashing utility. Separate read-only USB diagnostics and the proven
-external-SPI recovery notes live in
-[`../tools/flash-access/`](../tools/flash-access/README.md); neither is an
+validation remain unresolved. External SPI is the demonstrated stock rollback
+route. The repository has no supported USB flashing utility. Separate read-only
+USB diagnostics, two fixed guarded destructive experiments that passed at
+stock-loader scratch targets (including an observable exact 4-KiB footprint at
+one target), a read-only updater preflight/reconciliation scaffold, and the
+proven external-SPI recovery notes live in
+[`../tools/flash-access/`](../tools/flash-access/README.md); none is an
 installation route for these ELFs. Do not install them.
 
 The compatibility function named `kb7_enter_loader()` does not claim an

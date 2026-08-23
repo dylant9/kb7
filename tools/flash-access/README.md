@@ -12,7 +12,7 @@ makes the replacement firmware flash-approved.
 | Path | Transport | Reliability | Can write? |
 |---|---|---|---|
 | **SPI** | ESP32-C3 running `serprog` + `flashrom` | Proven, byte-exact | **Yes — proven** |
-| **USB ISP** | Bootloader mass-storage `F6` commands | Reads proven; program observed; erase encoding static-only | **No — read-only policy** |
+| **USB ISP** | Bootloader mass-storage `F6` commands | Reads proven; one marker cycle and one guarded exact-footprint cycle passed on the V1.22 loader | **Narrow lab primitives validated; not a supported flasher** |
 
 ---
 
@@ -89,14 +89,34 @@ endpoint fails above 4 KB per transfer, so keep reads at ≤ 0x1000.
 
 | Cmd | Function | Encoding |
 |---|---|---|
-| `F6 00` | Identify | returns `01 01 …` |
+| `F6 00` | Identify | 2 bytes, exactly `01 01` |
 | `F6 01` | Read status | 1 byte; bit 0 = WIP |
 | `F6 05` | **NOR read** | `CDB[3:7]` = BE32 **raw byte address** (`0x60000000` + offset); `CDB[7:9]` = BE16 count in **512-byte blocks** |
 | `F6 06` | **NOR program** | `CDB[3:7]` = BE32 **raw byte address** (`0x60000000` + offset in the official path); `CDB[7:9]` = BE16 count in **512-byte blocks** |
-| `F6 17` | Enter 4-byte addressing | no operands; required above 16 MB |
+| `F6 17` | Enter 4-byte addressing | no operands |
+| `F6 18` | Leave 4-byte addressing for a sub-16-MiB operation | no operands |
+| `F6 15` | Normal-NOR erase at the tested target | `CDB[3:5]` = BE16 512-byte-block index; no count |
 | `F6 F1` | Device descriptor | 36 bytes |
 
-### Erase encoding: resolved statically, not validated on hardware
+The V1.22 loader has one confirmed Bulk-Only Transport quirk: for every `F6`
+command it leaves CSW `dCSWDataResidue` equal to the requested CBW data length,
+even after completing an exact data phase. The tools check this exact value per
+command (for example 2 for `F6 00`, 4096 for a 4-KiB `F6 05`, and 0 for a
+no-data command). They do not generally permit nonzero or arbitrary residue.
+
+`F6 F1` transfers 36 bytes, but the V1.22 handler explicitly initializes only
+bytes 0–27 and 32–35; bytes 28–31 are an uninitialized stack tail included by
+its final fixed-size copy. The tools require the exact stable version, device
+and magic fields and exclude only that four-byte tail from state hashes. They
+still require the complete 36-byte USB transfer.
+
+Static tracing of the vendor orchestration additionally establishes that it
+selects `F6 17` when the program or erase range crosses the absolute
+`0x61000000` boundary, and `F6 18` (no operands) when the range remains below
+it. The 2026-08-23 validation cycle exercised `F6 18` immediately before both
+the sub-16-MiB program and erase.
+
+### Erase encoding: static proof plus bounded hardware validation
 
 Calibrated data-flow analysis of the updater proved:
 
@@ -114,9 +134,45 @@ complete proof and [F6-WRITE-ENCODING.md](F6-WRITE-ENCODING.md) for the final
 command summary.
 
 `F6 19` is not the automatic “above 16 MiB” form. A separate internal
-flash-type selector chooses that path. The updater emits `F6 17` independently
-when the NOR address range crosses `0x61000000`, and normal KB7 NOR erase
-remains `F6 15`. A 16-bit index in 512-byte units covers the entire 32-MiB chip.
+flash-type selector chooses that path. For both program and erase, the updater
+emits `F6 17` when the NOR operation range crosses `0x61000000` and `F6 18`
+otherwise. This address-mode choice neither changes the interpretation of the
+`F6 15` block index nor reads or modifies the flash-type selector. Normal KB7
+NOR erase therefore remains `F6 15` in either address mode. A 16-bit index in
+512-byte units covers the entire 32-MiB chip.
+
+On 2026-08-23 the V1.22 preserved loader accepted `F6 15` with block index
+`0x0470` after `F6 18` and removed a previously verified marker at flash offset
+`0x0008e000`. The complete 32-MiB post-image compared byte-for-byte equal to the
+original baseline. That confirms the normal-NOR target interpretation on this
+unit; it does not prove exact erase granularity because the rest of the sector
+and surrounding gap were already `0xff`. `F6 19` remains untested.
+
+The fixed follow-up `kb7-isp-erase-granularity.py` subsequently populated every
+byte of sector `0x000c6000`, placed non-`0xff` guards immediately below and
+above it, and required the whole
+aligned `[0x000c0000,0x00100000)` containment envelope to be erased in the
+baseline. It additionally pins the actual preserved-loader flash window
+`[0x00001000,0x00010000)` to SHA-256
+`9cc33333a88641b633bb5a4c0d55425c757e0fbdbe70eb99e9a9e40b76378a56`
+in the offline baseline, every live full-chip preflight and the saved state; USB
+identify replies alone are not accepted as proof of the executing loader code.
+Its plan hash also binds the literal ten `F6 06` and three `F6 15` CDBs, the
+`F6 18` mode subcode, flash/block/sector sizes, payload hashes, geometry, and
+SHA-256 of the experiment, strict writer and verifier source files. With the
+reviewed source tree that fixed plan hash is
+`a68642a348b18ee27a2f1cfdb6c8137aeff43c0ce14487f9c765c4c76e9be783`;
+source or command drift changes it and invalidates prior stage state. This is a
+fail-closed consistency check, not code signing.
+It is dry-run by default and has four identity- and image-bound stages: prepare,
+erase the target, clean the lower guard, and clean the upper guard back to the
+exact baseline. That fixed cycle passed on the development unit: all 4,096
+target bytes erased, both adjacent guards survived exactly, every 32-MiB
+postimage matched its prediction, cleanup restored the baseline, and the owner
+then confirmed a working cold boot. This proves an observable exact 4-KiB
+footprint only at that target with this unit and loader. See the
+[runbook](ERASE-GRANULARITY-TEST-PLAN.md) and
+[dated result](../../docs/USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md).
 
 ### The disproven Phase-0 program model
 
@@ -142,19 +198,46 @@ the same argument trace to erase. In the program path the `>> 9` is applied to
 the transfer **size**; in the erase path it is applied to the aligned
 **address**.
 
-### USB writing remains disabled
+### ⚠️ Bounded USB mutations validated — not a supported flashing path
+
+**If you have found this repository and want to flash a KB7: use the SPI path.**
+The narrow marker cycle and fixed erase-footprint cycle have passed under
+laboratory guards; no live USB mutation updater exists. The offline planner
+described below cannot touch a device, and the separate executor scaffold can
+only preflight and reconcile through read-only full-chip captures. Treat
+anything here that writes over USB as experimental and capable of destroying
+your bootloader.
 
 Host-side address validation **cannot** protect against device-side
-misaddressing. The experimental host tool correctly refused intended targets
-outside the scratch window—but the device acted on the *encoded* value
-(`0x470`), not the intended offset (`0x8e000`). No USB mutation tool or command
-emitter is included in the public tree.
+misaddressing. An earlier host tool correctly refused intended targets outside
+the scratch window — but the device acted on the *encoded* value (`0x470`), not
+the intended offset (`0x8e000`), and overwrote the header, bootloader, manifest
+and core0. Recovery required a full-chip SPI rewrite.
 
-Even with the encoding statically resolved, there is no erase test that is
-non-destructive under every remaining implementation failure. The loader is an
-early `v0.001 test!` build and the USB bulk path has other observed limitations.
-Use USB ISP only for diagnostics and reads; use the proven SPI path for all
-writes.
+`kb7-isp-write2.py` settled the loader-side `F6 15` question for one V1.22 unit,
+target and command size. Its exact reviewed sequence passed once. It remains
+**dry-run by default**, derives an unused scratch sector from the connected
+manifest, requires exact full-chip pre/post images, and refuses to erase unless
+a separately verified program stage left its bound marker and authorization
+state. It is a restricted validation experiment, not a flashing tool. See
+[WRITE-TEST-PLAN.md](WRITE-TEST-PLAN.md) before considering its explicit
+`--commit` mode.
+
+The separate `kb7-isp-erase-granularity.py` does not broaden that primitive
+into a flasher. Its address, patterns, geometry and commands are fixed solely to
+make an under- or over-erase observable at one guarded target. Its completed
+hardware pass proved that observable exact 4-KiB footprint for the tested V1.22
+loader, unit and target. It did not prove `F6 19`, arbitrary update planning or
+power-loss recovery, and the fixed script remains destructive and unsuitable
+as an updater.
+
+The successful cycle does not make another mutation intrinsically safe:
+transport failure, power loss, an untested offset/version or a future tooling
+defect can still damage the boot chain. The loader is an early `v0.001 test!`
+build and its USB bulk path has other observed limitations.
+
+**Do not attempt a USB write without a working SPI programmer, a byte-exact
+backup of your own device, and a willingness to spend 30 minutes restoring it.**
 
 ---
 
@@ -189,12 +272,113 @@ default after writing; add `-N` to verify only the written region.
 | `kb7-enter-isp.py` | Switch a running keyboard into ISP mode | volatile; asks before sending |
 | `kb7-isp-verify.py` | Read flash **through the SoC's own controller** and verify region CRCs | **read-only** — mutating opcodes are unrepresentable |
 | `kb7-isp-repeat.py` | Re-read one region N times across chunk sizes to measure read repeatability | read-only |
+| `kb7-isp-write2.py` | Two-stage marker-program/sector-erase validation experiment | **destructive; dry-run by default; not a firmware flasher** |
+| `kb7-isp-erase-granularity.py` | Fixed four-stage guarded test of the observable `F6 15` erase footprint | **destructive; dry-run by default; passed once at the fixed target** |
+| `kb7-isp-scratch-restart.py` | Fixed two-sector experiment with two deliberate no-readback/reconciliation checkpoints | **destructive; dry-run by default; passed once at the fixed plan** |
+| `kb7-updater-plan.py` | V1.22-only paired-region planner and interruption-model checker | **offline only; no device I/O; not an executor** |
+| `kb7-updater-executor.py` | Two-read live preflight, durable journal binding and image-derived reconciliation | **read-only CLI; mutation hard-disabled; not an installer** |
+| `WRITE-TEST-PLAN.md` | Exact experimental sequence, remaining failure modes and SPI recovery procedure | documentation only |
+| `ERASE-GRANULARITY-TEST-PLAN.md` | Fixed target, exact four-stage sequence, proof limits and SPI recovery procedure | documentation only |
 | `F6-ERASE-ENCODING.md` | Calibrated static proof of the erase address units and CDB layouts | documentation only |
 | `F6-WRITE-ENCODING.md` | Final program/erase investigation record and safety verdict | documentation only |
 
 `kb7-isp-verify.py` is the useful one: it exercises the same flash read path the
 bootloader uses at boot, so it can distinguish "the chip is bad" from "the SoC's
 read of the chip is bad" — a distinction the SPI programmer cannot make.
+
+`kb7-isp-write2.py` is deliberately not a general writer. It accepts only the
+reviewed marker-program and sector-erase experiment, opens no USB device in its
+default dry run, and requires an explicit `--commit` for either destructive
+stage. That sequence passed once on the V1.22 development unit at `0x8e000`;
+other offsets, lengths, loader revisions, interruption behavior and `F6 19`
+remain outside its evidence. Its guards bound host-side mistakes; they cannot
+make an incorrect or faulty loader handler safe. For ordinary or production
+writes, continue to use the proven external-SPI procedure. This project remains
+`flash_approved=false`.
+
+`kb7-isp-erase-granularity.py` is similarly fixed and fail-closed. It uses
+sector `0x000c6000`, programs all eight of its 512-byte blocks, and brackets the
+sector with adjacent 512-byte guards. The required erased containment envelope
+is `[0x000c0000,0x00100000)`, wholly inside the reviewed V1.22 scratch gap; this
+bounds plausible 64/128/256-KiB over-erase while making it detectable. Each
+stage checks the reviewed 60-KiB preserved-loader flash hash before mutation.
+The state-bound fixed plan covers that hash plus every mutation CDB, geometry
+and source-file hash, so changing the implementation between stages fails
+closed. Each stage opens a fresh USB session without requiring a physical power
+cycle, requires an exact full-chip preimage, persists a started state before
+mutation, and accepts only its exact full-chip postimage. Read the dedicated
+plan before even running its offline dry mode.
+
+The four-stage run has now passed once at this exact target. All target and
+guard postimages matched, the complete baseline was restored, and the keyboard
+subsequently cold-booted normally. Do not repeat it merely to reconfirm that
+same bounded fact.
+
+`kb7-isp-scratch-restart.py` is a separately scoped fixed experiment. It uses
+only fixed sectors `0x000c4000..0x000c7fff` inside the same required erased
+256-KiB containment envelope. It fully patterns two work sectors and places
+non-`0xff` guards immediately outside them. One fixed program and one fixed
+erase deliberately stop after WIP clears but before readback. Only a new
+process running its read-only `reconcile` stage may classify the result, using
+two matching full-chip reads and accepting only the exact intent preimage or
+postimage. It never retries automatically. The script is dry-run by default and
+has no caller-selected address/CDB/payload/force options. The complete sequence
+passed once on the development unit: both no-readback operations reconciled to
+exact postimages from two full-chip reads in new processes, cleanup restored
+the exact baseline, and normal `5038` operation returned. This validates
+command-complete process/libusb-session reconciliation only; it did not
+interrupt an operation or remove device power while markers remained. Read the
+[dated result](../../docs/USB-ISP-SCRATCH-RESTART-VALIDATION-2026-08-23.md) and
+[test plan](SCRATCH-RESTART-TEST-PLAN.md) for the exact proof boundary.
+
+### Offline paired updater planner
+
+`kb7-updater-plan.py` is the first software-only step toward a constrained USB
+updater. It requires two distinct matching 32-MiB V1.22 captures and the two
+locally built replacement ELFs. It preserves the header, loader and manifest
+byte-for-byte, emits only the two clean replacement sector envelopes, balances
+their final checksums to the unchanged manifest values, and checks the
+normative poison/stage/Core1-gate/Core0-gate transaction.
+
+The firmware images contain matching build-pair markers and ABI v2 checks so a
+stock/custom or independently built pair parks before application hardware.
+The final commit gates differ from their staged images by exactly 32 requested
+`1 -> 0` transitions, and their CRC transforms are independently required to
+have rank 32. The saved plan and report are content-hashed and independently
+recomputed by the `simulate` command.
+
+This remains an unsigned, full-image-bound planning artifact. It does not know
+a unique physical-device identity. The separate read-only executor scaffold
+adds live loader, USB topology and session binding, but byte-identical units at
+the same topology are still indistinguishable. The planner imports no
+USB library and exposes no execute, commit, force, arbitrary-offset or raw-CDB
+option. It does not prove physical torn-erase behavior, custom-firmware recovery
+or board correctness. See the
+[offline updater design](../../docs/USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md)
+for the exact state machine and evidence boundary.
+
+### Read-only updater executor scaffold
+
+`kb7-updater-executor.py` reloads and independently verifies the complete
+owner-local plan before opening USB. `preflight` requires two identical 32-MiB
+live reads that exactly equal the planned V1.22 baseline, then binds a durable
+journal to the live loader, topology, flash anchors, bundle and tool-source
+hashes. `reconcile` again requires two identical full reads and classifies only
+exact modeled boundaries or a transition confined to the journal's active
+operation unit. It never treats the journal as flash-state authority and never
+authorizes an automatic retry.
+
+The internal one-operation state engine is fault-injected with fake transports
+at intent, mode, transport, polling, readback and journal boundaries. The public
+CLI offers only `preflight` and `reconcile`; the live mutation adapter is
+hard-disabled. This is diagnostic/restart architecture, not a firmware flasher.
+See the
+[executor scaffold record](../../docs/USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md).
+
+The live read-only executor path has now also been exercised on the development
+unit in two separate processes: preflight and reconcile both classified the
+same exact stock 32-MiB image at boundary 0 while mutation remained disabled.
+That is a diagnostic/reopen result, not evidence for firmware-region writes.
 
 ---
 

@@ -1,7 +1,8 @@
 # Public-source provenance review
 
-Review date: 2026-08-17; remediation additions reviewed 2026-08-18; full-flash,
-flash-access, and public-repository status reviewed 2026-08-22
+Review date: 2026-08-17; remediation additions reviewed 2026-08-18; full-flash
+and public-repository status reviewed 2026-08-22; bounded USB-ISP results
+reviewed 2026-08-23
 Scope: this repository directory only
 
 ## Decision
@@ -32,8 +33,10 @@ that the contributor does not possess.
   recovery measurements. No raw dump, programmer log or repair image is
   included.
 - Independently authored external-SPI recovery helpers, read-only USB-ISP
-  diagnostics, and a clean-room summary of the F6 interoperability findings.
-  No vendor DLL, disassembly listing, or USB mutation utility is included.
+  diagnostics, two guarded dry-run-default USB write-path validation
+  experiments, and clean-room summaries of the F6 interoperability findings.
+  No vendor DLL, disassembly listing, general USB flasher, raw transcript, or
+  stock byte payload is included.
 - Apache-2.0 license and project/trademark notice.
 
 No external scripts, fonts, images, packages, or vendored libraries are bundled.
@@ -50,9 +53,14 @@ No external scripts, fonts, images, packages, or vendored libraries are bundled.
   packet framing are present until physical correlation is measured.
 - Flash mutation defaults off and is allow-listed to project-owned A/B stores.
   The ordinary `make bundle` target deliberately fails.
-- A source-only bounded bundle constructor may be run only with owner-supplied,
-  hash-matching stock recovery inputs. It emits replacement payloads and a
-  flash plan, never redistributes those inputs or emits a full stock image.
+- The older source-only manifest-changing constructor is retained as an audit
+  artifact and must not be treated as an executable update plan. The newer
+  V1.22-only paired planner accepts two owner-supplied full captures and emits
+  only clean replacement sector images plus offline metadata. It preserves the
+  manifest, contains no device I/O, never emits a full stock image and remains
+  execution-unapproved. A separate source-only executor scaffold exposes only
+  read-only preflight/reconciliation; its live mutation adapter is hard-disabled
+  and no execute command exists.
 
 ## Excluded and retained only outside the public repository
 
@@ -65,8 +73,11 @@ No external scripts, fonts, images, packages, or vendored libraries are bundled.
 - USB/SPI/I2C captures, screenshots or assets extracted from vendor software,
   raw pin-map evidence, ROM traces, and decompiler-level reports.
 - The stock-core patch experiments and their exact vendor function addresses.
-- Generated manifests, flash plans, prefixes and any package containing stock
-  bytes. The independently authored constructor source is included.
+- Generated manifests, full-image-bound plans, sector images, executor journals,
+  scratch-restart state, prefixes and any package containing stock bytes.
+  Independently authored
+  planner/checker/executor source is included; its generated state stays
+  owner-local.
 
 ## Engineering checks
 

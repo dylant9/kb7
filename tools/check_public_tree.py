@@ -29,6 +29,16 @@ DENIED_NAMES = {
     "KB7_V1.24-core1.bin",
     "KB7_V1.24-loader.bin",
     "kb7-isp-write.py",
+    "bundle.json",
+    "simulation.json",
+    ".kb7-usb-updater-journal-v1.json",
+    "updater-journal.json",
+    ".kb7-isp-scratch-restart-state.json",
+    "scratch-restart-state.json",
+}
+DENIED_JSON_SCHEMAS = {
+    "kb7-isp-scratch-restart-state-v1",
+    "kb7-usb-updater-journal-v1",
 }
 DENIED_TEXT = (
     "Ghidra " + "decompiler output",
@@ -85,6 +95,14 @@ def inspect(root: Path) -> dict[str, object]:
             failures.append(f"non-UTF-8/binary file: {relative}")
             continue
         text_bytes += len(data)
+        if path.suffix.lower() == ".json":
+            try:
+                structured = json.loads(text)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                structured = None
+            if (isinstance(structured, dict) and
+                    structured.get("schema") in DENIED_JSON_SCHEMAS):
+                failures.append(f"owner-local updater journal: {relative}")
         for marker in DENIED_TEXT:
             if marker in text:
                 failures.append(f"prohibited content marker {marker!r}: {relative}")

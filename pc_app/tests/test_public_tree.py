@@ -34,6 +34,26 @@ class PublicTreeTests(unittest.TestCase):
             self.assertFalse(result["passed"])
             self.assertTrue(any("base64-like" in failure for failure in result["failures"]))
 
+    def test_owner_local_updater_metadata_names_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "bundle.json").write_text("{}\n")
+            (root / "simulation.json").write_text("{}\n")
+            (root / ".kb7-usb-updater-journal-v1.json").write_text("{}\n")
+            (root / "updater-journal.json").write_text("{}\n")
+            (root / ".kb7-isp-scratch-restart-state.json").write_text("{}\n")
+            (root / "scratch-restart-state.json").write_text("{}\n")
+            (root / "innocent-name.json").write_text(
+                '{"schema":"kb7-usb-updater-journal-v1"}\n')
+            (root / "other-innocent-name.json").write_text(
+                '{"schema":"kb7-isp-scratch-restart-state-v1"}\n')
+            result = MODULE.inspect(root)
+            self.assertFalse(result["passed"])
+            self.assertEqual(sum("prohibited artifact filename" in failure
+                                 for failure in result["failures"]), 6)
+            self.assertTrue(any("owner-local updater journal" in failure
+                                for failure in result["failures"]))
+
 
 if __name__ == "__main__":
     unittest.main()

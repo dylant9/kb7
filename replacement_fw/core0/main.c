@@ -1,4 +1,5 @@
 #include "kb7/config.h"
+#include "kb7/build_pair.h"
 #include "kb7/drivers.h"
 #include "kb7/platform_boot.h"
 #include "kb7/regs.h"
@@ -59,16 +60,27 @@ void core0_main(void) {
         state->last_error = UINT32_C(0x1cac0001);
         kb7_enter_loader();
     }
+    volatile const struct kb7_build_pair_marker *const core0_pair =
+        kb7_build_pair_at(KB7_CORE0_BUILD_PAIR_ADDRESS);
+    volatile const struct kb7_build_pair_marker *const core1_pair =
+        kb7_build_pair_at(KB7_CORE1_BUILD_PAIR_ADDRESS);
+    if (!kb7_build_pair_marker_valid(core0_pair, KB7_BUILD_PAIR_ROLE_CORE0,
+                                     KB7_RUNTIME_ABI_VERSION) ||
+        !kb7_build_pair_marker_valid(core1_pair, KB7_BUILD_PAIR_ROLE_CORE1,
+                                     KB7_RUNTIME_ABI_VERSION) ||
+        !kb7_build_pair_ids_equal(core0_pair->pair_id, core1_pair->pair_id)) {
+        state->last_error = UINT32_C(0xb0170002);
+        kb7_enter_loader();
+    }
     /* Stock establishes the default peripheral pad routes before board I/O. */
     KB7_MMIO32(SNC_SYS0_BASE + SNC_SYS0_PINCTRL) = 0U;
-    if (kb7_usb_init()) {
-        state->boot_flags |= KB7_BOOT_USB_READY;
-    }
 
-    api->magic = KB7_RUNTIME_MAGIC;
+    api->magic = 0U;
     api->abi_version = KB7_RUNTIME_ABI_VERSION;
     api->size = sizeof(*api);
-    api->boot_flags = state->boot_flags;
+    for (size_t index = 0U; index < KB7_BUILD_PAIR_ID_BYTES; ++index) {
+        api->build_pair_id[index] = core0_pair->pair_id[index];
+    }
     api->milliseconds = milliseconds;
     api->usb_poll = kb7_usb_poll;
     api->usb_send = kb7_usb_send;
@@ -76,6 +88,12 @@ void core0_main(void) {
     api->flash_erase_4k = kb7_flash_erase_4k;
     api->flash_program = kb7_flash_program;
     api->enter_loader = kb7_enter_loader;
+    if (kb7_usb_init()) {
+        state->boot_flags |= KB7_BOOT_USB_READY;
+    }
+    api->boot_flags = state->boot_flags;
+    kb7_dmb();
+    api->magic = KB7_RUNTIME_MAGIC;
     kb7_dsb();
 
     const uint32_t systick_reload = kb7_systick_reload(kb7_system_clock_hz());

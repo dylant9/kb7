@@ -7,6 +7,11 @@ build/
 *.d
 *.map
 *.dis
+# Owner-local updater-plan metadata (payloads are already covered by *.bin)
+bundle.json
+simulation.json
+*updater-journal*.json
+*scratch-restart-state*.json
 
 # Firmware/reference material must never enter the public repository
 firmware/

@@ -1,6 +1,6 @@
 # SNC7320 boot and KB7 recovery model
 
-Review date: 2026-08-22
+Review date: 2026-08-23
 Source: Sonix *SNC7320 Series Data Sheet*, revision 2.1, 1 June 2022
 Source SHA-256: `d360aca16c2695f12edf91d263b2994b36edf5ad6faf130547a9220dfaca94b4`
 
@@ -19,8 +19,16 @@ not safe for further direct use with this 3.3-V flash without level translation.
 
 An ESP32-C3 SPI repair subsequently restored normal stock boot. Boot was
 unreliable while the unpowered programmer remained connected and recovered when
-it was physically disconnected. This proves one external write/recovery event,
-not a repeatable byte-identical full-chip restore procedure.
+it was physically disconnected. The owner subsequently confirmed a complete
+full-chip SPI restore/verification rehearsal, and two later full-chip USB reads
+of the restored image were byte-identical. External SPI is therefore the
+demonstrated rollback path for this development unit.
+
+On 2026-08-23 the preserved V1.22 flash loader also completed one guarded
+512-byte marker program and normal-NOR erase cycle at offset `0x0008e000`. Both
+32-MiB postflight images matched their exact expectations and the final image
+returned byte-for-byte to the baseline. This validates one narrow command
+sequence, not a supported USB flasher or recovery substitute.
 
 The board pad labeled `MCU_RST` is a strong candidate for active-low `RSTN`,
 which is package lead 88 on the presumed SNC73200 LQFP128. It measured about
@@ -59,10 +67,10 @@ an external reset; it no longer issues the misleading software reset.
 
 | Layer | What the datasheet establishes | KB7 status |
 |---|---|---|
-| External SPI-NOR programmer | External XIP window, SFC controller, 1/2/4-bit reads, 1/4-bit writes, and common command families (pp. 37–39) | Two identical full reads and one successful ESP32-C3 stock repair/boot; repeatable bit-identical full restore remains unproved |
+| External SPI-NOR programmer | External XIP window, SFC controller, 1/2/4-bit reads, 1/4-bit writes, and common command families (pp. 37–39) | Two identical original reads, a successful ESP32-C3 full-stock restore/verification rehearsal and normal boot; demonstrated rollback route for the development unit |
 | External `RSTN` | Release restarts through ROM; SNC73200 lead 88 (pp. 21 and 43) | `MCU_RST` voltage behavior and read isolation are demonstrated; physical continuity/waveform remain unverified |
 | ROM USB-ISP | ROM enters it when no boot identifying mark is found (p. 44) | Identity/protocol and behavior with a corrupt-but-present identifying mark remain unknown |
-| Preserved flash loader | Recovered loader is separate from mask ROM | Observed over USB as `10f5:5037` mass-storage/SCSI mode; no open-source writer is currently included |
+| Preserved flash loader | Recovered loader is separate from mask ROM | Observed over USB as `10f5:5037`; exact full-chip reads, a marker cycle, and a guarded exact-footprint cycle at one target passed. It remains an experimental path, not a supported flasher or recovery substitute |
 | SWD | One SWD port; SNC73200 SWO/SWCLK/SWDIO are leads 11/12/13 (pp. 1, 11 and 19) | Connect-under-reset and core visibility are untested; no erase operation is authorized |
 | Watchdog reset | Underflow can reset through ROM; WDT uses the 32-kHz ILRC (pp. 43 and 57–58) | Potential autonomous ROM route, but usable register fields are absent from this data sheet |
 | Software reset | Restarts PRAM (p. 43) | Explicitly not a loader recovery route |
@@ -122,11 +130,12 @@ VDDIO33 exceed 1.8 V before RSTN reaches 1.8 V (p. 81). Holding reset low while
 board rails rise is consistent with that requirement, but it does not validate
 the KB7's regulator or supervisor circuitry.
 
-### Read-only programmer proof
+### Programmer and restore proof
 
-Steps 1–3 below have now been substantially completed for the 32-MiB main array;
+Steps 1–4 below have now been substantially completed for the 32-MiB main array;
 the canonical evidence is in `FULL-FLASH-ACQUISITION-2026-08-22.md`. Flashrom
-warns that the chip's OTP area is not included in a normal read.
+warns that the chip's OTP area is not included in a normal read. Step 5 remains
+the policy for any future non-test write.
 
 1. Read and record JEDEC ID, status/configuration registers, block protection,
    quad-enable state, and 3-byte/4-byte address mode.
@@ -136,8 +145,9 @@ warns that the chip's OTP area is not included in a normal read.
    retain the identifying mark, load table, loader, application regions,
    configuration/calibration, vendor assets, and erased padding—not merely the
    extracted PRAM/I-cache payloads.
-4. Demonstrate a complete restore and byte-for-byte readback on a spare or
-   otherwise safely recoverable setup before any custom image experiment.
+4. Demonstrate a complete restore and byte-for-byte verification/readback on a
+   spare or otherwise safely recoverable setup before any custom image
+   experiment. This has been completed on the development unit.
 5. Use bounded sector-aware read-modify-write operations; never use whole-chip
    erase for initial work.
 
@@ -154,9 +164,10 @@ software reset path. It does not solve:
 - a bad backup or incomplete boot container; or
 - releasing reset into an image whose early execution damages hardware.
 
-The successful ESP32-C3 repair is now a real recovery result. A release-quality
-recovery gate still requires that result to be repeatable: restore a stock image,
-read it back identically, disconnect every programmer signal, and boot normally.
+The successful ESP32-C3 full-chip restore/verification rehearsal is a real
+recovery result. A release-quality runbook should retain the exact tooling,
+wiring, reset isolation, hashes and disconnect-before-boot procedure, and it
+must be rehearsed again if any of those conditions change.
 
 ## Missing information to collect
 
@@ -164,10 +175,12 @@ read it back identically, disconnect every programmer signal, and boot normally.
 - `MCU_RST` to lead-88 continuity and reset/SFC-idle waveform;
 - exact flash rail, configuration/security/OTP state, 4-byte address behavior,
   and SFC wiring width;
-- a documented repeatable full stock restore plus exact post-restore hash;
+- preservation of the demonstrated full-stock restore procedure and exact
+  post-restore hashes in owner-controlled records;
 - passive SFC capture during stock boot and update;
 - SWD accessibility/core routing under reset;
-- USB-ISP identity and protocol;
+- mask-ROM USB-ISP identity and protocol; the exercised preserved-loader subset
+  is recorded separately;
 - ROM-entering watchdog/remap register semantics from `SNC7320_reg_vx.xx` or
   independently validated stock-code recovery; and
 - whether the mailbox request marker survives each ROM-entering reset and is

@@ -11,14 +11,15 @@ other material that the project cannot redistribute.
 
 **It is not yet board-validated firmware. Do not install it on hardware.** The
 software-owned drivers and protocols are now implemented, but several
-electrical/pinmux/controller assumptions and a repeatable full rollback
-procedure still need physical proof. Public defaults remain fail-closed and
-flash-image generation is disabled.
+electrical/pinmux/controller assumptions still need physical proof. A stock
+full-chip external-SPI restore has been rehearsed; that recovery result does not
+validate the replacement image. Public defaults remain fail-closed and flash-
+image generation is disabled.
 
-## Current status — 2026-08-22
+## Current status — 2026-08-23
 
 - The offline/software implementation is complete to the evidence currently
-  available. `make check` passes 90 Python/C integration tests, browser
+  available. `make check` passes 152 Python/C integration tests, browser
   validation, three ARM build profiles, hardware-fact checks and the public-tree
   safety audit.
 - Two independent reads of the installed 32-MiB Macronix SPI NOR are
@@ -28,14 +29,41 @@ flash-image generation is disabled.
 - An external ESP32-C3 SPI repair restored normal stock boot. The intermittent
   boot seen immediately afterward was consistent with the unpowered programmer
   remaining connected to the flash bus and disappeared when it was disconnected.
-  This is a demonstrated emergency-repair path, not yet a repeatable,
-  byte-identical full-chip rollback qualification.
-- The flash-access tooling adds proven external SPI recovery workflows
-  and read-only USB-ISP diagnostics. The loader's `F6 06` program layout was
-  established by a destructive incident; the `F6 15`/`F6 19` erase layouts are
-  resolved by calibrated static analysis but remain untested on hardware. The
-  USB tooling intentionally cannot mutate flash; use SPI for owner-authorized
-  repair writes.
+  The owner has since completed the full-chip restore/verification rehearsal and
+  retained matching post-repair captures. External SPI is the demonstrated
+  rollback path for this development unit.
+- The flash-access tooling adds proven external SPI recovery workflows,
+  read-only USB-ISP diagnostics and fixed, dry-run-default USB mutation
+  experiments. On 2026-08-23 one guarded V1.22 cycle at offset `0x0008e000`
+  confirmed the sub-16-MiB `F6 18` + `F6 06` marker program and normal-NOR
+  `F6 18` + `F6 15` erase sequence, with exact 32-MiB postflight comparisons
+  and final restoration to the baseline. A second guarded test populated all
+  4,096 bytes of sector `0x000c6000` plus immediate lower and upper guards. The
+  target erase removed exactly the populated 4-KiB sector, both guards survived,
+  every complete-array postimage matched, cleanup restored the baseline, and a
+  later cold boot worked normally. That is a one-unit, one-loader, one-target
+  observable footprint result; `F6 19` and general update safety remain unproven.
+  This is not a supported general flasher; use SPI for owner-authorized
+  ordinary, recovery and production writes.
+- A new V1.22-only updater planner builds and checks an owner-local,
+  manifest-preserving paired-region plan. It CRC-balances both replacement
+  regions against the unchanged stock manifest, inserts a symmetric build-pair
+  guard, invalidates both regions before dense staging, and commits core0 last.
+  Its CLI has only offline `build` and `simulate` operations and reports
+  `flash_approved=false`. A separate executor scaffold now provides only
+  read-only live `preflight` and `reconcile`: it binds two exact full-chip reads,
+  loader identity, USB topology and a durable journal, while its mutation path
+  remains hard-disabled and unreachable from the CLI. Both read-only commands
+  have now passed in separate live sessions at exact-stock boundary 0. A
+  separate fixed two-sector scratch/restart experiment has also passed once.
+  Its program and erase no-readback checkpoints were each classified from two
+  exact full-chip reads in a new process without automatic replay; cleanup
+  restored the baseline and the keyboard returned to normal `5038` operation.
+  This proves command-complete host-session reconciliation at the fixed scratch
+  addresses, not physical mid-command or power-loss recovery. Neither path
+  makes a custom-firmware hardware trial safe. See the
+  [offline updater design](docs/USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md) and
+  [executor scaffold status](docs/USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md).
 - No custom firmware has been installed. USB, display, touch, RGB, MCU2/Hall,
   pinmux, cold-start memory setup and a legitimate USB identity still require
   board validation. `flash_approved` remains false.
@@ -43,9 +71,17 @@ flash-image generation is disabled.
 See the [firmware completion status](docs/FIRMWARE-COMPLETION-2026-08-18.md),
 [full-flash acquisition record](docs/FULL-FLASH-ACQUISITION-2026-08-22.md), and
 [boot/recovery model](docs/BOOT-RECOVERY-MODEL.md) for the firmware evidence
-boundaries. The [flash-access guide](tools/flash-access/README.md) and
+boundaries. The
+[bounded USB-ISP validation record](docs/USB-ISP-WRITE-VALIDATION-2026-08-23.md),
+[guarded erase-footprint result](docs/USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md),
+[flash-access guide](tools/flash-access/README.md), and
 [F6 erase analysis](tools/flash-access/F6-ERASE-ENCODING.md) record the separate
-stock-recovery investigation.
+stock-recovery investigation. The
+[erase-footprint test plan](tools/flash-access/ERASE-GRANULARITY-TEST-PLAN.md)
+records the completed fixed hardware experiment and its recovery boundary; the
+[scratch restart validation](docs/USB-ISP-SCRATCH-RESTART-VALIDATION-2026-08-23.md)
+and [test plan](tools/flash-access/SCRATCH-RESTART-TEST-PLAN.md) record the
+completed process/session-restart experiment and its stricter limits.
 
 ## Repository contents
 
@@ -62,8 +98,9 @@ stock-recovery investigation.
 - `tools/inspect_stock_flash.py` — read-only inspection of an owner-supplied
   32-MiB dump; raw images and reports remain outside the repository.
 - `tools/flash-access/` — ESP32/`flashrom` recovery notes, read-only USB-ISP
-  verification tools and the F6 command analysis. It contains no stock bytes
-  and no USB write utility.
+  verification tools, F6 command analysis and fixed guarded USB write-path
+  experiments, plus a V1.22 updater planner/checker and read-only executor
+  scaffold. It contains no stock bytes and no supported USB flasher.
 - `tools/check_public_tree.py` — rejects compiled/vendor artifacts, archive and
   executable formats, symlinks, build directories, and prohibited artifact
   filenames.
@@ -103,7 +140,9 @@ make -C replacement_fw integration-check
 The default, guarded audit, and all-branches integration profiles create ignored
 ELF/disassembly files for local inspection. `integration-check` compiles board-
 verified branches but is not evidence that a board passed those gates. `make
-bundle` deliberately fails: no flash image can be produced by that target.
+bundle` deliberately fails: no installable package can be produced by that
+target. The separate planner emits only owner-local, non-executing sector
+payloads and model metadata.
 
 ## Public-repository boundary
 

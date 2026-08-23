@@ -8,8 +8,19 @@ Two complete 32-MiB reads of the keyboard's external Macronix SPI NOR are
 bit-identical. This is a strong read-only backup and gives us the missing
 physical tail/configuration data. A subsequent ESP32-C3 repair programmed the
 stock repair image and restored normal boot after the programmer was physically
-disconnected. This proves a practical external write/recovery path, but not a
-repeatable byte-identical full-chip restore, so `flash_approved` remains false.
+disconnected. The owner later completed the full-chip restore/verification
+rehearsal and retained matching post-repair captures. This establishes external
+SPI as the development unit's rollback path. It does not validate replacement
+firmware, so `flash_approved` remains false.
+
+On 2026-08-23 a separate bounded USB-ISP experiment also programmed and erased
+one 512-byte marker in the manifest gap and returned the complete main array
+exactly to its preflight baseline. See
+[`USB-ISP-WRITE-VALIDATION-2026-08-23.md`](USB-ISP-WRITE-VALIDATION-2026-08-23.md).
+A later guarded cycle populated an entire 4-KiB sector and immediate guards,
+observed exactly that sector erased with both guards preserved, restored the
+same full-chip baseline, and was followed by a working cold boot. See
+[`USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md`](USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md).
 
 The dump materially changed the clean-room firmware in two ways:
 
@@ -65,10 +76,10 @@ disconnected, which is consistent with an unpowered bus master clamping or
 back-powering the SFC lines. External programmers must be disconnected or
 demonstrably high-impedance before reset is released.
 
-This is meaningful recovery evidence: the external flash accepted a repair and
-the SoC subsequently booted the repaired stock image. It does not yet document a
-repeatable whole-chip erase/program/readback cycle or an exact post-restore
-32-MiB hash, and it says nothing about whether the replacement firmware will run.
+This is meaningful recovery evidence: the external flash accepted a complete
+stock restore, its verification/readback rehearsal passed, and the SoC
+subsequently booted the repaired stock image. It says nothing about whether the
+replacement firmware will run.
 
 ## USB extraction cross-check
 
@@ -111,8 +122,9 @@ The repair restored the zeroed region-2 bytes from the checksum-matching stock
 reference, and the keyboard subsequently returned to normal stock boot once the
 external programmer was removed. That strongly supports treating the zeroed
 page as corruption rather than an intentional persistent state. The initiating
-cause is still not proven, and a canonical post-repair full read/hash should be
-retained before claiming a completely characterized boot-integrity policy.
+cause is still not proven. Two canonical post-repair full USB reads and their
+matching hash are now retained, but they do not completely characterize the
+initiating fault or boot-integrity policy.
 
 ## Tail findings
 
@@ -157,14 +169,17 @@ Raw filenames and artifacts are operator inputs and stay outside the repository.
 
 1. Store the two original binaries in two independent locations and retain the
    canonical log and hashes.
-2. Archive a post-repair complete read and exact hash, and confirm the repaired
-   `0xa02000` sector remains stable across true cold boots.
+2. Preserve the post-repair complete reads and exact hashes, and continue to
+   confirm the repaired `0xa02000` sector across true cold boots.
 3. Read the flash configuration/security registers needed to establish 4-byte
    addressing, quad mode and protection behavior; preserve any OTP identifiers.
 4. Prove `MCU_RST` continuity/waveform and check that the SoC never drives the
    SPI bus while held.
-5. Validate a bounded erase/program/readback cycle on an expendable or known
-   custom-safe sector before contemplating a replacement-firmware region.
-6. Turn the successful ESP32-C3 repair into a documented, repeatable full-stock
-   restore/readback procedure. The repair is a demonstrated recovery event, but
-   not yet a fully qualified rollback process.
+5. The bounded USB-ISP marker program/erase/readback cycle has passed once at
+   `0x0008e000`, and the later guarded `0x000c6000` cycle established an exact
+   observable 4-KiB footprint at that target. Retain their one-unit/loader/
+   target evidence boundaries rather than treating them as a general updater
+   qualification.
+6. Preserve the successful ESP32-C3 full-stock restore/readback procedure as an
+   owner-controlled runbook and repeat it whenever programmer, wiring, reset
+   isolation or baseline assumptions change.

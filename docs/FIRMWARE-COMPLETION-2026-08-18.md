@@ -1,10 +1,10 @@
 # Firmware implementation completion and pre-flash status
 
 Review date: 2026-08-18
-Updated with full-flash evidence: 2026-08-22
+Updated with recovery and USB-ISP validation evidence: 2026-08-23
 Scope: independently authored public source after the missing-function work
 Replacement firmware exercised on hardware: none
-Stock recovery exercised: one successful external ESP32-C3 repair and boot
+Stock recovery exercised: full-chip external ESP32-C3 restore/verification and boot
 
 ## Verdict and primary LCD answer
 
@@ -27,8 +27,17 @@ and `MCU_RST` held low.
 Two bit-identical full stock reads and the later successful ESP32-C3 repair now
 provide a real external recovery result. The initial post-repair boot problem
 was traced to leaving the unpowered programmer connected to the SFC bus. This
-improves the recovery position, but does not validate any replacement-firmware
-hardware path or constitute a repeatable bit-identical full-chip rollback test.
+was followed by an owner-confirmed full-chip restore/verification rehearsal and
+matching post-repair captures. This establishes the development unit's external-
+SPI rollback path, but does not validate any replacement-firmware hardware path.
+
+The preserved V1.22 loader has also completed one guarded USB-ISP marker program
+and erase cycle at offset `0x0008e000`, with exact complete-array postflight
+comparisons and final restoration to the baseline. A second fixed cycle at
+`0x000c6000` populated an entire sector plus immediate guards and observed an
+exact 4-KiB programmed-data footprint at that target; cleanup restored the full
+baseline and the keyboard then cold-booted normally. These remain bounded stock-
+loader results, not an installation route for these replacement images.
 
 ## Completed software-owned work
 
@@ -141,14 +150,14 @@ until the logical 14–17 function-4 pinmux is known.
   independently selectable on the host protocol. Transfers have a 5-second
   inactivity timeout; committed content is applied on the next boot.
 - Python CLI compilation/inspection and device-free transfer plans.
-- A source-only bundle constructor which hash-pins every owner-supplied stock
-  component, derives raw payloads from named ELFs, regenerates only the
-  replacement manifest checksum fields, and emits a bounded non-empty
-  `flash-plan.json`. The plan writes/read-backs both payloads before writing the
-  manifest last, includes explicit bounded 4-KiB sector erases in normative
-  erase/program/readback order, and warns that split updates remain non-atomic. It never emits
-  a whole-flash image and excludes the
-  preserved loader/header and stock asset range from writes.
+- The earlier source-only manifest-changing bundle constructor remains an
+  offline audit artifact and is not an update plan. A newer V1.22-only planner
+  takes two matching owner captures, derives raw payloads from named ELFs,
+  inserts a symmetric build-pair ID, CRC-balances both regions against the
+  unchanged manifest, and checks a poison/stage/sparse-gate transaction model.
+  It emits no full image, contains no device I/O and remains unsigned,
+  execution-unapproved and `flash_approved=false`; see
+  `USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md`.
 
 ## Datasheet correctness cross-check
 
@@ -178,9 +187,8 @@ The implementation now reflects these material SNC7320 facts:
 These are not honest candidates for further offline coding:
 
 1. Confirm the complete SoC marking/package and `MCU_RST`→RSTN lead-88
-   continuity. The Macronix main array has two identical backups and one
-   successful ESP32-C3 repair/boot; archive an exact post-repair read and make
-   the complete stock restore/readback procedure repeatable.
+   continuity. Preserve the demonstrated external-SPI full-stock
+   restore/readback procedure, exact hashes and reset-isolation evidence.
 2. Passively capture post-boot SYS0/SYS1, OPI/DRAM and cache state or validate
    the reconstructed cold-start sequence on an isolated board.
 3. Determine the unpublished generic `SYS0_PINCTRL` encoding, especially LCD
@@ -196,10 +204,17 @@ These are not honest candidates for further offline coding:
    physical key legends before enabling per-key effects.
 8. Verify action-bar GPIO continuity, active-low polarity and safe pulls before
    enabling its board-profile gate.
-9. Turn the successful external repair into a repeatable reset/programmer
-   recovery runbook before any combined image is written. Autonomous software
-   loader entry remains intentionally unavailable, and no open-source USB
-   writer is included.
+9. Maintain the successful external-SPI reset/programmer recovery runbook before
+   any combined image is written. Autonomous software loader entry remains
+   intentionally unavailable. The narrow marker and guarded erase-footprint
+   experiments passed at their fixed stock-loader scratch targets, but are not
+   a supported flasher and do not install these replacement images; external
+   SPI remains the required recovery route. A separate fixed multi-sector and
+   process-restart scratch experiment has now passed once: two
+   command-complete/no-readback operations reconciled to exact postimages in
+   new processes, cleanup restored the complete baseline, and normal `5038`
+   operation returned. It did not test physical mid-command interruption or
+   power loss and did not touch firmware regions.
 
 ## Build and test profiles
 

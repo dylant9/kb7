@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Build and audit a split KB7 engineering bundle from the named ELFs.
+"""Build a legacy split-bundle audit artifact from the named ELFs.
 
 The tool never creates a whole-flash image.  It preserves a hash-pinned stock
 header/loader, changes only the two manifest checksum words, and emits an exact
-sector plan which excludes the recovery and asset regions.
+sector plan which excludes the recovery and asset regions.  That manifest-last
+model is superseded and MUST NOT be executed.  Use the offline-only
+flash-access/kb7-updater-plan.py for the current manifest-preserving design.
 """
 
 from __future__ import annotations
@@ -248,7 +250,9 @@ def build(stock_dir: Path, core0_elf: Path, core1_elf: Path, output: Path,
         plan = {
             "format": "KB7 bounded split-region flash plan v1",
             "complete_flash_image": False,
-            "status": "pending_hardware",
+            "status": "deprecated_offline_audit_only",
+            "execution_authorized": False,
+            "superseded_by": "tools/flash-access/kb7-updater-plan.py",
             "power_loss_warning": (
                 "The split update is not atomic. Program and read back both payloads first, "
                 "then program the manifest last; interruption still requires external recovery."

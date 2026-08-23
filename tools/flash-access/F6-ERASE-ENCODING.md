@@ -1,6 +1,9 @@
 # `F6 15` / `F6 19` erase-command encoding
 
-Status: **resolved by static data-flow analysis** on 2026-08-22.
+Status: **resolved by static data-flow analysis on 2026-08-22; the normal-NOR
+`F6 15` target interpretation and an exact observable 4-KiB footprint at one
+guarded target were confirmed on hardware on 2026-08-23.** `F6 19` remains
+static-only.
 
 ## Result
 
@@ -146,9 +149,15 @@ orchestrator compares `start + length` with `0x61000000`, emitting `F6 17` when
 the range crosses that boundary and `F6 18` otherwise. That logic neither reads
 nor changes the flash-type selector.
 
+This decision is made around both the NOR program and NOR erase operations. A
+program or erase wholly below 16 MiB therefore receives `F6 18`, not `F6 17`,
+before its mutation command. The address-mode command does not rescale or
+reinterpret the 16-bit block index carried by `F6 15`.
+
 Thus:
 
 - entering four-byte NOR mode with `F6 17` does **not** select `F6 19`;
+- leaving four-byte NOR mode with `F6 18` does **not** select `F6 15`;
 - the normal KB7 NOR erase remains `F6 15` above 16 MiB;
 - a 16-bit index in 512-byte units covers exactly 32 MiB. The final 4-KiB
   sector begins at offset `0x01fff000`, whose index is `0xfff8`, so `F6 15`
@@ -164,6 +173,60 @@ pointer is also incorrect. The erase/program routines use that scalar only in
 busy-wait timing calculations. It does not contribute to any CDB address or
 count field.
 
+## Hardware validation at `0x0008e000`
+
+The guarded experiment in [WRITE-TEST-PLAN.md](WRITE-TEST-PLAN.md) completed on
+one owner-controlled KB7 using the recovered V1.22 preserved loader. With the
+full target sector initially erased, it first selected `F6 18` and programmed a
+512-byte marker using:
+
+```text
+F6 06 00 60 08 e0 00 00 01 00 00 00 00 00 00 00
+```
+
+The complete 32-MiB post-image matched the exact expected marker image. The
+erase stage then selected `F6 18` and sent:
+
+```text
+F6 15 00 04 70 00 00 00 00 00 00 00 00 00 00 00
+```
+
+The marker disappeared at offset `0x0008e000`, and the subsequent complete
+32-MiB image compared byte-for-byte equal to the original baseline. No other
+byte difference was observable in either postflight image.
+
+This confirms that this loader's normal-NOR `F6 15` path interprets `0x0470` as
+the 512-byte-block index for the tested target. It does not prove the exact
+erase granularity: the other 3,584 bytes in the sector and the surrounding gap
+were already `0xff`, so erasing a narrower or wider all-erased range would be
+observationally identical. See the
+[dated result](../../docs/USB-ISP-WRITE-VALIDATION-2026-08-23.md) for the hashes,
+transport checks and full evidence boundary.
+
+## Guarded footprint validation at `0x000c6000`
+
+A second fixed experiment populated all eight 512-byte blocks of sector
+`[0x000c6000,0x000c7000)` with non-`0xff` patterns and placed non-`0xff`
+512-byte guards immediately below and above it. After an exact full-chip
+preflight, it selected `F6 18` and sent:
+
+```text
+F6 15 00 06 30 00 00 00 00 00 00 00 00 00 00 00
+```
+
+All 4,096 target bytes read back as erased, both adjacent guards survived
+exactly, and the complete 32-MiB image matched its predicted postimage. Separate
+cleanup stages restored the original baseline exactly, a final new-session USB
+capture matched it, and the owner then confirmed normal operation after a cold
+boot.
+
+This establishes an observable exact 4-KiB programmed-data erase footprint at
+that target on the tested unit, preserved V1.22 loader and normal-NOR path. It
+does not generalize the result to every address, device, loader or flash
+revision, and it does not test `F6 19`, above-16-MiB mutation or interruption
+behavior. See the
+[dated footprint result](../../docs/USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md).
+
 ## Proven facts versus remaining inference
 
 Proven from the updater's register and stack data flow:
@@ -172,7 +235,8 @@ Proven from the updater's register and stack data flow:
 - the two-byte and four-byte field widths and byte order shown above;
 - neither erase CDB carries a count;
 - one command is issued per host-loop erase unit;
-- `F6 17` selection is independent of `F6 15`/`F6 19` selection;
+- `F6 17`/`F6 18` selection is independent of `F6 15`/`F6 19` selection and
+  does not change how the erase index is interpreted;
 - the registered NOR operator defaults the flash-type selector to zero, and a
   separate configuration path can change it;
 - the separately traced state is timing data, not an address-unit table.
@@ -186,29 +250,34 @@ Inferred from the known MX25L25645G target and the zero-selector NOR default:
   setter, but cannot prove which optional flash-type choice an operator would
   make at runtime.
 
-Not proven on hardware:
+Still not proven on hardware:
 
-- that the loader's erase handler implements these statically recovered
-  commands correctly;
-- the exact device-side purpose of the alternate `F6 19`/128-KiB mode.
+- arbitrary targets, other command sizes, repeated/interrupted operation or
+  another loader/flash revision; and
+- the exact device-side purpose and behavior of the alternate
+  `F6 19`/128-KiB mode.
 
 ## Tooling and write-path verdict
 
-An earlier command emitter was based on two disproven `F6 06` fields. No USB
-mutation tool or command emitter is included in this source-only branch.
+An earlier command emitter was based on two disproven `F6 06` fields. This
+branch now includes `kb7-isp-write2.py`, a narrow, dry-run-by-default laboratory
+utility for a coupled marker-program and sector-erase experiment. It is not a
+general USB writer or a supported firmware installation path.
 
-**Keep USB ISP read-only and use the proven SPI/flashrom path for every write.**
+**Use the proven SPI/flashrom path for ordinary, recovery and production
+writes.**
 
-Static analysis now settles the CDB layout, but it does not make an initial
-erase experiment safe. The erase handler itself has never been validated on
-this bootloader; erase is irreversible for a whole unit; the loader identifies
-itself as `v0.001 test!`; its bulk transport is already unreliable above 4 KiB;
-and the prior program experiment destroyed the boot chain despite correct
-host-side range guards. By contrast, the SPI path has been recovered and
-verified on this exact board and can be constrained with flashrom layouts.
+Static analysis settles both CDB layouts, and the normal-NOR `F6 15` target
+interpretation has now passed once at `0x8e000`. That narrow result does not
+make a general erase operation safe: erase is irreversible for a whole unit;
+the loader identifies itself as `v0.001 test!`; its bulk transport is unreliable
+above 4 KiB; and the prior program experiment destroyed the boot chain despite
+correct host-side range guards. By contrast, the SPI path is the demonstrated
+recovery route on this exact board and can be constrained with flashrom layouts.
 
-There is no erase test that is non-destructive under every remaining uncertainty.
-Now that the address-unit ambiguity is resolved, the remaining uncertainty is
-whether the target implements the recovered destructive command as expected;
-any command capable of answering that question necessarily erases a sector or
-block. No hardware erase test is proposed.
+There is no erase test that is non-destructive under every implementation
+failure. [WRITE-TEST-PLAN.md](WRITE-TEST-PLAN.md) documents the explicitly
+destructive two-stage validation experiment whose recovery assumption is a
+working external-SPI path and byte-exact backup. That experiment has now passed
+once for the exact sequence recorded above. It does not validate `F6 19`, create
+a supported updater or change `flash_approved=false`.

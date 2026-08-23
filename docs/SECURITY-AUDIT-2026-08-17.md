@@ -29,10 +29,23 @@ for device installation.
 The actionable source findings have since been incorporated with fail-closed
 hardware boundaries and host-side regression tests. See
 `AUDIT-REMEDIATION-2026-08-17.md` for the finding-by-finding status. This does
-not change the non-flashable verdict. A later external stock repair succeeded,
-but the required replacement-firmware hardware profiles and a repeatable exact
-rollback qualification remain unavailable; see
-`FULL-FLASH-ACQUISITION-2026-08-22.md`.
+not change the non-flashable verdict. A later external-SPI full-stock
+restore/verification rehearsal established the development unit's rollback
+path, but the required replacement-firmware hardware profiles remain
+unavailable; see `FULL-FLASH-ACQUISITION-2026-08-22.md` and
+`USB-ISP-WRITE-VALIDATION-2026-08-23.md`. A subsequent guarded footprint run is
+recorded separately in `USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md`;
+it validates one stock-loader erase boundary, not replacement firmware.
+
+A later offline-only V1.22 planner addresses the single-manifest power-loss
+hazard by leaving that manifest byte-exact, CRC-balancing paired replacement
+regions and checking an invalidate/stage/sparse-gate transaction model. It also
+adds a symmetric runtime pair-ID/ABI guard. This is a software design result,
+not board validation or a live mutation path. A later executor scaffold adds
+only read-only live preflight/reconciliation and fake-transport fault injection;
+its mutation adapter remains hard-disabled. See
+`USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md` and
+`USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md`.
 
 The full SNC7320 datasheet review on 2026-08-18 added a critical correction:
 AIRCR/software reset restarts PRAM, not mask ROM. The former mailbox-marker plus
