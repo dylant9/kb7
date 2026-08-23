@@ -274,7 +274,7 @@ default after writing; add `-N` to verify only the written region.
 | `kb7-isp-repeat.py` | Re-read one region N times across chunk sizes to measure read repeatability | read-only |
 | `kb7-isp-write2.py` | Two-stage marker-program/sector-erase validation experiment | **destructive; dry-run by default; not a firmware flasher** |
 | `kb7-isp-erase-granularity.py` | Fixed four-stage guarded test of the observable `F6 15` erase footprint | **destructive; dry-run by default; passed once at the fixed target** |
-| `kb7-isp-scratch-restart.py` | Fixed two-sector experiment with two deliberate no-readback/reconciliation checkpoints | **destructive; dry-run by default; prepared but not hardware-run** |
+| `kb7-isp-scratch-restart.py` | Fixed two-sector experiment with two deliberate no-readback/reconciliation checkpoints | **destructive; dry-run by default; passed once at the fixed plan** |
 | `kb7-updater-plan.py` | V1.22-only paired-region planner and interruption-model checker | **offline only; no device I/O; not an executor** |
 | `kb7-updater-executor.py` | Two-read live preflight, durable journal binding and image-derived reconciliation | **read-only CLI; mutation hard-disabled; not an installer** |
 | `WRITE-TEST-PLAN.md` | Exact experimental sequence, remaining failure modes and SPI recovery procedure | documentation only |
@@ -314,18 +314,22 @@ guard postimages matched, the complete baseline was restored, and the keyboard
 subsequently cold-booted normally. Do not repeat it merely to reconfirm that
 same bounded fact.
 
-`kb7-isp-scratch-restart.py` is the separately scoped next experiment. It uses
+`kb7-isp-scratch-restart.py` is a separately scoped fixed experiment. It uses
 only fixed sectors `0x000c4000..0x000c7fff` inside the same required erased
 256-KiB containment envelope. It fully patterns two work sectors and places
 non-`0xff` guards immediately outside them. One fixed program and one fixed
 erase deliberately stop after WIP clears but before readback. Only a new
 process running its read-only `reconcile` stage may classify the result, using
 two matching full-chip reads and accepting only the exact intent preimage or
-postimage. It never retries automatically. The script is dry-run by default,
-has no caller-selected address/CDB/payload/force options, and has not yet been
-run on hardware. Read
-[SCRATCH-RESTART-TEST-PLAN.md](SCRATCH-RESTART-TEST-PLAN.md) before considering
-the fixed sequence.
+postimage. It never retries automatically. The script is dry-run by default and
+has no caller-selected address/CDB/payload/force options. The complete sequence
+passed once on the development unit: both no-readback operations reconciled to
+exact postimages from two full-chip reads in new processes, cleanup restored
+the exact baseline, and normal `5038` operation returned. This validates
+command-complete process/libusb-session reconciliation only; it did not
+interrupt an operation or remove device power while markers remained. Read the
+[dated result](../../docs/USB-ISP-SCRATCH-RESTART-VALIDATION-2026-08-23.md) and
+[test plan](SCRATCH-RESTART-TEST-PLAN.md) for the exact proof boundary.
 
 ### Offline paired updater planner
 

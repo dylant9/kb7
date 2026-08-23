@@ -210,7 +210,11 @@ These are not honest candidates for further offline coding:
    experiments passed at their fixed stock-loader scratch targets, but are not
    a supported flasher and do not install these replacement images; external
    SPI remains the required recovery route. A separate fixed multi-sector and
-   process-restart scratch experiment is prepared but has not run on hardware.
+   process-restart scratch experiment has now passed once: two
+   command-complete/no-readback operations reconciled to exact postimages in
+   new processes, cleanup restored the complete baseline, and normal `5038`
+   operation returned. It did not test physical mid-command interruption or
+   power loss and did not touch firmware regions.
 
 ## Build and test profiles
 

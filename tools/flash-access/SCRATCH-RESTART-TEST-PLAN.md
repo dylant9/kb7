@@ -2,9 +2,11 @@
 
 ## Status and purpose
 
-This is the next bounded laboratory experiment after the successful guarded
-4-KiB erase-footprint test. It is prepared in source but has **not yet been run
-on hardware**.
+This bounded laboratory experiment completed successfully on one development
+unit on 2026-08-23. Both deliberate no-readback checkpoints reconciled to their
+exact postimages in new processes, cleanup restored the exact 32-MiB baseline,
+and the owner then confirmed normal `5038` enumeration and operation. See the
+[dated validation record](../../docs/USB-ISP-SCRATCH-RESTART-VALIDATION-2026-08-23.md).
 
 The experiment asks two narrow questions:
 
@@ -116,10 +118,10 @@ effective device binding.
 
 ## Proof boundary
 
-A successful cycle would demonstrate fixed multi-sector sequencing and
+The successful cycle demonstrates fixed multi-sector sequencing and
 image-derived recovery from two intentionally unresolved, command-complete
-host sessions on this one unit, loader, mode and address range. It would also
-show both patterned work sectors and adjacent guards behaved exactly as
+host sessions on this one unit, loader, mode and address range. It also showed
+that both patterned work sectors and adjacent guards behaved exactly as
 predicted and that cleanup restored the complete baseline.
 
 It would **not** prove:

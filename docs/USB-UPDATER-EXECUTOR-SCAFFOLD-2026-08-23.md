@@ -170,10 +170,13 @@ or physical interruption recovery.
 Live firmware-region execution remains unavailable until all of the following
 are separately completed and reviewed:
 
-1. Independently review and run the prepared fixed scratch-only
-   multi-sector/restart experiment while external SPI recovery remains proven.
-2. Exercise reconciliation after controlled disconnects at safe scratch
-   boundaries and after modeled partial scratch operations.
+1. The fixed scratch-only multi-sector/process-restart experiment has passed:
+   both command-complete no-readback operations reconciled to their exact
+   postimages in new processes, the complete baseline was restored, and normal
+   `5038` operation returned. This closed only the host-session restart gate.
+2. Exercise reconciliation after deliberately modeled physical disconnect,
+   power-loss and partial-operation outcomes at safe scratch addresses. The
+   completed experiment did not interrupt CBW/data/CSW, WIP, erase or program.
 3. Re-review the exact operation transport, intent/restart behavior and source
    freeze. A future live executor must still have no raw mutation interface.
 4. Add release authenticity: the present owner-local bundle is content-hashed

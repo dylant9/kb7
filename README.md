@@ -55,9 +55,13 @@ image generation is disabled.
   loader identity, USB topology and a durable journal, while its mutation path
   remains hard-disabled and unreachable from the CLI. Both read-only commands
   have now passed in separate live sessions at exact-stock boundary 0. A
-  separate fixed two-sector scratch/restart experiment is prepared, dry-run by
-  default, but has not yet been run. Neither path makes a custom-firmware
-  hardware trial safe. See the
+  separate fixed two-sector scratch/restart experiment has also passed once.
+  Its program and erase no-readback checkpoints were each classified from two
+  exact full-chip reads in a new process without automatic replay; cleanup
+  restored the baseline and the keyboard returned to normal `5038` operation.
+  This proves command-complete host-session reconciliation at the fixed scratch
+  addresses, not physical mid-command or power-loss recovery. Neither path
+  makes a custom-firmware hardware trial safe. See the
   [offline updater design](docs/USB-UPDATER-OFFLINE-DESIGN-2026-08-23.md) and
   [executor scaffold status](docs/USB-UPDATER-EXECUTOR-SCAFFOLD-2026-08-23.md).
 - No custom firmware has been installed. USB, display, touch, RGB, MCU2/Hall,
@@ -75,8 +79,9 @@ boundaries. The
 stock-recovery investigation. The
 [erase-footprint test plan](tools/flash-access/ERASE-GRANULARITY-TEST-PLAN.md)
 records the completed fixed hardware experiment and its recovery boundary; the
-[scratch restart test plan](tools/flash-access/SCRATCH-RESTART-TEST-PLAN.md)
-records the next bounded experiment and its stricter limits.
+[scratch restart validation](docs/USB-ISP-SCRATCH-RESTART-VALIDATION-2026-08-23.md)
+and [test plan](tools/flash-access/SCRATCH-RESTART-TEST-PLAN.md) record the
+completed process/session-restart experiment and its stricter limits.
 
 ## Repository contents
 
