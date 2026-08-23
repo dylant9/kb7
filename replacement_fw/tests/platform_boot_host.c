@@ -42,15 +42,30 @@ int main(void) {
         kb7_gpio_bank(79U) != SNC_GPIO_E_BASE || kb7_gpio_bank(80U) != 0U ||
         kb7_gpio_mask(31U) != UINT16_C(0x8000)) return 10;
     if (!kb7_gpio_pinmux_known(6U, 7U) || kb7_gpio_pinmux_known(7U, 7U) ||
-        !kb7_gpio_pinmux_known(31U, 0U)) return 11;
+        !kb7_gpio_pinmux_known(31U, 0U) ||
+        !kb7_gpio_pinmux_known(36U, 1U) ||
+        !kb7_gpio_pinmux_known(57U, 1U) || kb7_gpio_pinmux_known(58U, 1U) ||
+        !kb7_gpio_pinmux_known(14U, 4U) ||
+        !kb7_gpio_pinmux_known(17U, 4U) || kb7_gpio_pinmux_known(18U, 4U)) return 11;
 
-    if (!map_register_page(SNC_GPIO_A_BASE) || !map_register_page(SNC_SYS0_BASE)) {
+    if (!map_register_page(SNC_GPIO_A_BASE) || !map_register_page(SNC_GPIO_C_BASE) ||
+        !map_register_page(SNC_SYS0_BASE)) {
         return 77;
     }
+    KB7_MMIO32(SNC_GPIO_A_BASE + SNC_GPIO_PIN_CONFIG) = UINT32_C(0xa5a5a5a5);
     kb7_gpio_configure(6U, KB7_GPIO_OUTPUT, 7U, KB7_GPIO_PULL_UP);
-    if ((KB7_MMIO32(SNC_GPIO_A_BASE + SNC_GPIO_DIRECTION) & KB7_BIT(6)) == 0U ||
-        ((KB7_MMIO32(SNC_GPIO_A_BASE + SNC_GPIO_PIN_CONFIG) >> 12U) & 3U) != 1U ||
-        (KB7_MMIO32(SNC_SYS0_BASE + SNC_SYS0_PINCTRL) & KB7_BIT(17)) == 0U) return 12;
+    if ((KB7_MMIO32(SNC_GPIO_A_BASE + SNC_GPIO_DIRECTION) & KB7_BIT(6)) != 0U ||
+        KB7_MMIO32(SNC_GPIO_A_BASE + SNC_GPIO_PIN_CONFIG) != UINT32_C(0xa5a5a5a5) ||
+        (KB7_MMIO32(SNC_SYS0_BASE + SNC_SYS0_PINCTRL) &
+         SNC_PINCTRL_TIMER6_PWM1_ROUTE) == 0U) return 12;
+
+    KB7_MMIO32(SNC_GPIO_C_BASE + SNC_GPIO_DIRECTION) = UINT32_C(0x00100000);
+    KB7_MMIO32(SNC_GPIO_C_BASE + SNC_GPIO_PIN_CONFIG) = UINT32_C(0x5a5a5a5a);
+    kb7_gpio_configure(36U, KB7_GPIO_OUTPUT, 1U, KB7_GPIO_FLOATING);
+    if (KB7_MMIO32(SNC_GPIO_C_BASE + SNC_GPIO_DIRECTION) != UINT32_C(0x00100000) ||
+        KB7_MMIO32(SNC_GPIO_C_BASE + SNC_GPIO_PIN_CONFIG) != UINT32_C(0x5a5a5a5a) ||
+        (KB7_MMIO32(SNC_SYS0_BASE + SNC_SYS0_PINCTRL) &
+         SNC_PINCTRL_LCD_ALT_GROUP) != 0U) return 12;
 
     if (kb7_pwm_compare(UINT32_C(1980000), 1023U, 0U) != UINT32_C(1980000) ||
         kb7_pwm_compare(UINT32_C(1980000), 1023U, 1023U) != 0U) return 13;

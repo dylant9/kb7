@@ -259,8 +259,9 @@ image or an early-valid mixed state.
 4. Prove entry back to `5037` after a checksum-valid but nonfunctional custom
    core0, or continue to require an attached and independently tested SPI
    recovery path.
-5. Validate the replacement firmware's remaining cold-start, USB, memory,
-   pinmux and peripheral hardware gates before its first installation.
+5. Validate the replacement firmware's remaining cold-start, USB, memory and
+   functional peripheral hardware gates before its first installation. The pin
+   routes are recovered offline.
 
 Until all of those are complete, the paired-firmware work is planning and
 read-only diagnostic evidence only. The fixed scratch harness is destructive

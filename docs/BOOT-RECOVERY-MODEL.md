@@ -68,7 +68,7 @@ an external reset; it no longer issues the misleading software reset.
 | Layer | What the datasheet establishes | KB7 status |
 |---|---|---|
 | External SPI-NOR programmer | External XIP window, SFC controller, 1/2/4-bit reads, 1/4-bit writes, and common command families (pp. 37–39) | Two identical original reads, a successful ESP32-C3 full-stock restore/verification rehearsal and normal boot; demonstrated rollback route for the development unit |
-| External `RSTN` | Release restarts through ROM; SNC73200 lead 88 (pp. 21 and 43) | `MCU_RST` voltage behavior and read isolation are demonstrated; physical continuity/waveform remain unverified |
+| External `RSTN` | Release restarts through ROM; SNC73200 lead 88 (pp. 21 and 43) | `MCU_RST` voltage behavior, repeated read isolation and a full restore are demonstrated; direct continuity/waveform are optional documentation |
 | ROM USB-ISP | ROM enters it when no boot identifying mark is found (p. 44) | Identity/protocol and behavior with a corrupt-but-present identifying mark remain unknown |
 | Preserved flash loader | Recovered loader is separate from mask ROM | Observed over USB as `10f5:5037`; exact full-chip reads, a marker cycle, and a guarded exact-footprint cycle at one target passed. It remains an experimental path, not a supported flasher or recovery substitute |
 | SWD | One SWD port; SNC73200 SWO/SWCLK/SWDIO are leads 11/12/13 (pp. 1, 11 and 19) | Connect-under-reset and core visibility are untested; no erase operation is authorized |
@@ -99,7 +99,8 @@ time multiplexing exists.
 
 1. Photograph the complete SoC and flash markings, pin-1 indicators, board
    revision, and both PCB sides.
-2. Confirm continuity from `MCU_RST` to SNC lead 88 and identify a known ground.
+2. Optionally document continuity from `MCU_RST` to SNC lead 88; identify a
+   known ground before any external connection.
 3. Map all flash pins to the SoC-capable SFC leads and record series resistors,
    buffers, level shifters, test pads, and other bus masters.
 4. Check resistance from the flash supply to the board's candidate 3.3-V and
@@ -172,7 +173,7 @@ must be rehearsed again if any of those conditions change.
 ## Missing information to collect
 
 - complete SoC and flash markings and clear PCB photographs;
-- `MCU_RST` to lead-88 continuity and reset/SFC-idle waveform;
+- optional direct `MCU_RST`-to-lead-88 continuity and reset waveform records;
 - exact flash rail, configuration/security/OTP state, 4-byte address behavior,
   and SFC wiring width;
 - preservation of the demonstrated full-stock restore procedure and exact

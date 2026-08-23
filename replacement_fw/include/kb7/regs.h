@@ -44,6 +44,19 @@
 #define SNC_SYS0_CLOCK_ENABLE UINT32_C(0x50)
 #define SNC_SYS0_PERIPHERAL_CLOCK_CONTROL UINT32_C(0x54)
 
+/*
+ * PINCTRL does not contain a generic three-bit selector for every GPIO.  The
+ * data-sheet mode columns describe peripheral-priority routes.  These bits
+ * select only the exceptional alternate groups called out by the table
+ * footnotes; a cleared register leaves the stock LCD/SPI controller groups on
+ * their default pads.  V1.22/V1.24/V1.33 all clear PINCTRL during Core-0
+ * startup, then set only the recovered timer-6 PWM route below.
+ */
+#define SNC_PINCTRL_NAND_ALT_GROUP KB7_BIT(0)
+#define SNC_PINCTRL_LCD_ALT_GROUP KB7_BIT(1)
+#define SNC_PINCTRL_SPI0DMA_ALT_GROUP KB7_BIT(8)
+#define SNC_PINCTRL_TIMER6_PWM1_ROUTE KB7_BIT(17)
+
 #define SNC_SYS1_PERIPHERAL_CLOCK_ENABLE UINT32_C(0x00)
 #define SNC_SYS1_CLOCK_RESET UINT32_C(0x0c)
 #define SNC_SYS1_USB_CONTROL UINT32_C(0x10)

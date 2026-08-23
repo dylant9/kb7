@@ -78,8 +78,10 @@ The evidence separates hardware from software:
   but names no LCD library (p. 35). That omission is supporting context, not the
   proof—the flash-resident display call graph is the proof.
 
-Reimplementing that driver still requires exact, redistributable pinmux/clock
-fields and a hardware-validated panel profile. A mask-ROM dump is useful for
+Reimplementing that driver still requires exact, redistributable clock fields
+and a hardware-validated panel profile. The default LCD pin route has since
+been closed by the datasheet/stock reconciliation recorded in
+`STOCK-PINMUX-RECOVERY-2026-08-23.md`. A mask-ROM dump is useful for
 boot and clock research, but it is not a prerequisite for reconstructing the
 LCD behavior.
 
@@ -148,26 +150,30 @@ device and IRQ15 is SDIO. It documents external IRQ0 through IRQ56, ending at
 vector index 72. The public 79-word vector table therefore covers every
 documented vector plus the additional entries present in the stock table.
 
-### GPIO and pinmux blocker
+### GPIO and pinmux model
 
 The datasheet separates two concepts (pp. 24–27, 43 and 45):
 
 1. per-port `GPIO_PnCFG` fields select inactive, pull-up, pull-down, or repeater
    electrical behavior; and
-2. `SYS0_PINCTRL` selects peripheral modes 0 through 7.
+2. modes 1 through 7 in the pin table are priority-ordered peripheral
+   functions. The lowest enabled mode number wins.
 
-The current `kb7_gpio_configure()` now treats the two-bit per-port field only as
-electrical pull/repeater configuration. `SYS0_PINCTRL` is handled separately;
-ordinary GPIO and the one proven P0.6 PWM route are supported, while other
-alternate functions are rejected until their encoding is recovered.
+`SYS0_PINCTRL` is not a generic three-bit field for every pad. Its pin-table
+footnotes select exceptional alternate groups: bit 0 for alternate NAND, bit 1
+for the alternate LCD/8080 P1 group and bit 8 for alternate SPI0DMA. Stock
+V1.22, V1.24 and V1.33 each clear the register during Core0 startup and later
+set only the recovered bit-17 P0.6 PWM route.
 
-The backlight correction is implemented: P0.6 uses `CT32B6_PWM1` mode 7. LCD
-parallel mode 1 and SPI0 mode 4 remain fail-closed pinmux blockers.
+The backlight correction is implemented: P0.6 uses `CT32B6_PWM1` mode 7 and
+bit 17. LCD parallel mode 1 uses the default P2.4–P3.9 group, and MCU2 SPI0 mode
+4 uses the default P0.14–P1.1 group. The peer AT32F423 stock image and official
+datasheet independently identify its end as SPI3 on PA15/PC10/PC11/PC12 AF6.
 
-The missing `SNC7320_reg_vx.xx` register reference is still needed for exact
-`SYS0_PINCTRL`, pull, drive-strength, clock/reset, and interrupt bitfields. In
-its absence, the acceptable alternatives are complete stock-code recovery plus
-hardware observation; guessing is not acceptable.
+The current driver leaves GPIO pull/direction registers untouched for these
+alternate pads, matching stock controller ownership. Missing clock/reset and
+interrupt bitfields remain separate work; a passive pinmux capture is no longer
+needed for the three KB7 routes above.
 
 ### Clock and timing blocker
 
@@ -196,7 +202,7 @@ the datasheet proves only the package lead associated with each Pn.m signal
 
 | Function | SoC signal | Lead | Status |
 |---|---|---:|---|
-| Board `MCU_RST` pad candidate | RSTN | 88 | Strong; require powered-off continuity. RSTN is active-low. |
+| Board `MCU_RST` pad candidate | RSTN | 88 | Operationally validated for external-SPI isolation; direct continuity is optional documentation. RSTN is active-low. |
 | Wake input | WKPN | 89 | Datasheet-proven pad; KB7 routing unknown. |
 | Trace output / GPIO logical 69 | SWO / P4.5 | 11 | Datasheet-proven. |
 | SWD clock / GPIO logical 70 | SWCLK / P4.6 | 12 | Datasheet-proven. |
@@ -279,13 +285,13 @@ or tiled 1920×800 descriptor geometry. The stock register profile—not a naive
 linear 480×800 setup—must remain the authority until the mismatch is explained
 on hardware.
 
-### Controller-capable pads requiring board continuity
+### Controller-capable pad groups
 
 | Candidate interface | Signals and leads | Important caveat |
 |---|---|---|
 | SPI-NOR controller | CS P0.8/110; CLK P0.9/42; MISO/IO1 P0.10/119; MOSI/IO0 P0.11/39; IO2/WP P0.12/121; IO3 P0.13/44 | These are SoC-capable pads, not proof that every quad-data lead is routed on the KB7. P0.12 is also the recovered touch IRQ, making continuity especially important. |
 | SPI1 / RGB candidate | CS P3.12/128; CLK P3.13/127; MISO P3.14/126; MOSI P3.15/125 | `0x4000f000` is now identified as SPI1. Correlate these leads with the SNLED27351 and the recovered auxiliary GPIOs. |
-| SPI0 / MCU2 | CS P0.14/2; CLK P0.15/3; MISO P1.0/4; MOSI P1.1/5 in mode 4; ready/status P1.3/111 | V1.22 initializes the A3 protocol object with serial instance 0; the generic serial initializer resolves that instance to `0x4000e000`, and the A3 sender polls `+0x0c` and transfers at `+0x1c`. Continuity and electrical timing remain hardware checks. |
+| SPI0 / MCU2 | CS P0.14/2; CLK P0.15/3; MISO P1.0/4; MOSI P1.1/5 in mode 4; ready/status P1.3/111 | V1.22 initializes the A3 protocol object with serial instance 0; the generic serial initializer resolves that instance to `0x4000e000`, and the A3 sender polls `+0x0c` and transfers at `+0x1c`. Peer AT32 firmware/datasheet identify SPI3 AF6; only end-to-end behavior remains a hardware check. |
 | SDIO / unassigned | CLK P1.14/45; CMD P1.15/43; D0 P2.0/31; D1 P2.1/30; D2 P2.2/27; D3 P2.3/26 | `0x40024000` and IRQ15 are SDIO, but they are not the recovered A3 transport. Several data pads overlap recovered RGB controls. |
 
 The AT32 firmware proves that MCU2 uses its SPI3 pins, and the SNC trace now
@@ -312,8 +318,8 @@ marker and issued AIRCR `SYSRESETREQ`. The datasheet proves that this does not
 by itself reach ROM, and the custom PRAM reset path never consumes the marker.
 The public helper now records the marker, disables interrupts, and parks for an
 external reset instead of falsely claiming recovery. The boot-time recovery
-chord also defaults off because it reaches the unverified GPIO/pinmux
-abstraction. A genuine autonomous loader route still requires one of:
+chord also defaults off because its chosen input and boot-time semantics remain
+unverified. A genuine autonomous loader route still requires one of:
 
 - a proven watchdog configuration that resets through ROM;
 - a documented/remapped ROM reset path;
@@ -357,10 +363,11 @@ datasheet is self-inconsistent.
 
 1. Model the two processors explicitly and prove the second-core reset/release,
    vector, stack, IPC, and peripheral-ownership behavior.
-2. Recover `SYS0_PINCTRL` and GPIO pull/drive fields; test every requested mode
-   against the datasheet table. Do not enable the current GPIO abstraction.
-3. Keep the now-recovered SPI0 MCU2 transport behind a disabled board profile
-   until leads 2–5/111, polarity, clock mode, and ownership are measured.
+2. Preserve the recovered pinmux model and regression-test its exact accepted
+   routes: default LCD mode 1, default SPI0 mode 4 and P0.6 PWM bit 17. Reject
+   any additional alternate group until it has equivalent evidence.
+3. Keep the recovered SNC SPI0/AT32 SPI3 transport behind a disabled board
+   profile until its end-to-end behavior and Hall calibration pass on hardware.
 4. Derive the system, peripheral, USB, display, timer, OPI, and SPI-NOR clocks;
    remove fixed-cycle timing assumptions.
 5. Audit all DMA descriptors for address range, alignment, length, completion,
@@ -378,21 +385,17 @@ datasheet is self-inconsistent.
 
 ### Hardware gates while stock firmware remains installed
 
-1. Photograph the complete SoC marking, pin-1 corner, board revision, and both
-   sides of the PCB.
-2. With power removed, continuity-map RSTN, SWDIO, SWCLK, SWO, SPI-NOR, RGB,
-   SDIO candidates, LCD, touch, and the AT32 SPI3 pins. Prefer nearby vias and
-   series resistors over slipping directly on 0.4-mm package leads.
-3. Power stock firmware with current limiting; record 3.3-V I/O, 1.2-V core,
-   and 1.8-V OPI rails plus idle and maximum current.
-4. Hold `MCU_RST` low and verify that SPI-NOR CS, CLK, and data lines are quiet
-   or high-impedance before attaching an external programmer.
-5. Enumerate SWD access ports and debug components, read Cortex CPUID, halt each
-   core independently if supported, and record VTOR/MSP/PC and Core 1 state.
-6. Capture the stock SPI-NOR, RGB, touch, LCD command, and MCU2 candidate buses
-   passively. Do not inject a command while ownership is unresolved.
-7. Prefer initial custom-code execution from Core 0 PRAM/shared SRAM over SWD.
-   A power cycle then restores stock without changing external flash.
+1. Preserve the already-demonstrated `MCU_RST` external-SPI isolation and exact
+   full-image restore/readback procedure.
+2. Treat direct package continuity, rail measurements and stock bus captures as
+   optional diagnostic evidence, not as a way to rediscover the now-known pin
+   modes. The GPIO domain is `VDDIO33`; 1.8 V is the OPI/DRAM supply.
+3. Functionally validate one gated subsystem at a time with explicit abort and
+   recovery criteria. Dynamic panel, touch, Hall, RGB and USB behavior cannot
+   be established solely by static recovery.
+4. Prefer initial custom-code execution from Core0 PRAM/shared SRAM over SWD
+   when a no-flash route is available. A power cycle then restores stock
+   without changing external flash.
 
 ### External-flash recovery gate
 

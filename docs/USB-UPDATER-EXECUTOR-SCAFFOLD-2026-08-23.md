@@ -288,8 +288,9 @@ are separately completed and reviewed:
 5. Prove a reliable path back to USB ISP after a checksum-valid but
    nonfunctional custom core0, or require independently tested external SPI for
    every trial.
-6. Pass the replacement firmware's cold-start, USB, memory, pinmux and
-   peripheral hardware gates. The staged, no-write-first sequence is in
+6. Pass the replacement firmware's cold-start, USB, memory and functional
+   peripheral hardware gates. The pin routes are recovered offline; the staged
+   validation sequence is in
    `BOARD-VALIDATION-PLAN-2026-08-23.md`.
 
 Until then, the paired-firmware executor's `preflight` and `reconcile` remain

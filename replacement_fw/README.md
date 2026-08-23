@@ -29,8 +29,9 @@ The default build still parks before the application and leaves every
 unverified peripheral, USB attachment and flash mutation path disabled. An
 external ESP32-C3 full-stock restore/verification rehearsal has succeeded on the
 physical unit, but the replacement images themselves have never run on the
-board. Cold-start clock/OPI state, alternate-function pinmux and controller
-electrical behavior remain hardware gates.
+board. Cold-start clock/OPI state and controller electrical/end-to-end behavior
+remain hardware gates. LCD mode 1, MCU2 SPI0 mode 4 and P0.6 PWM pin selection
+are now statically recovered from both datasheets and three stock releases.
 
 The two link images now carry fixed `KB7P` build-pair markers and use runtime
 ABI v2. Standalone ELFs deliberately contain an erased all-`0xff` pair ID and
@@ -59,7 +60,7 @@ profile.
 `make bundle` intentionally exits with an error. The offline-correctable audit
 findings have regression-tested repairs, described in
 `../docs/FIRMWARE-COMPLETION-2026-08-18.md`. USB/MCU2 identities and board
-profiles, generic non-GPIO pinmux, logical-key→LED correlation and hardware
+profiles, logical-key→LED correlation and hardware
 validation remain unresolved. External SPI is the demonstrated stock rollback
 route. The repository has no supported USB flashing utility. Separate read-only
 USB diagnostics, two fixed guarded destructive experiments that passed at
@@ -74,5 +75,5 @@ autonomous loader transition. The datasheet establishes that AIRCR/software
 reset restarts PRAM, so the helper records the recovered request marker, disables
 interrupts, and parks for an external reset. A proven ROM-entering watchdog,
 remap, or external-reset path is still required. The recovery chord also
-defaults off until GPIO pull/pinmux behavior and the chosen physical inputs are
+defaults off until its chosen physical inputs and boot-time semantics are
 validated.

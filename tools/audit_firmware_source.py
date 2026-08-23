@@ -116,6 +116,20 @@ def main() -> int:
         if f"#define {name} UINT32_C({value})" not in regs:
             failures.append(f"datasheet-corroborated base {name} is not {value}")
 
+    gpio = source("drivers/gpio.c")
+    for marker in ("SNC_PINCTRL_LCD_ALT_GROUP KB7_BIT(1)",
+                   "SNC_PINCTRL_SPI0DMA_ALT_GROUP KB7_BIT(8)",
+                   "SNC_PINCTRL_TIMER6_PWM1_ROUTE KB7_BIT(17)"):
+        if marker not in regs:
+            failures.append(f"recovered PINCTRL model is missing: {marker}")
+    for marker in ("function == 1U && logical >= 36U && logical <= 57U",
+                   "function == 4U && logical >= 14U && logical <= 17U"):
+        if marker not in gpio:
+            failures.append(f"stock default peripheral route is missing: {marker}")
+    if "if (function == 0U)" not in gpio or \
+            gpio.find("SNC_GPIO_PIN_CONFIG") < gpio.find("if (function == 0U)"):
+        failures.append("alternate-function pads are rewritten as GPIO")
+
     storage = source("include/kb7/storage.h")
     for marker in ("KB7_STORAGE_PROFILE_A", "KB7_STORAGE_PROFILE_B",
                    "KB7_STORAGE_PROFILE_SLOT_BYTES"):

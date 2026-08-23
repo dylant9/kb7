@@ -2,12 +2,12 @@
 
 ## Outcome sought
 
-The next useful milestone is evidence about the board assumptions that still
-hold the replacement firmware closed. It is **not** another flash-transport
-fault campaign and it is not a firmware installation. The first session below
-uses power-off measurements, stock-powered passive observation, and—only if it
-can be made demonstrably non-erasing—a RAM/debug probe. External flash remains
-byte-exact stock throughout.
+The next useful milestone is functional evidence for the dynamic board behavior
+that still holds the replacement firmware closed. It is **not** another flash-
+transport fault campaign and it is not a firmware installation. The complete
+stock recovery and both MCU datasheets now establish the pin modes offline;
+power-off continuity and stock-powered passive captures are optional diagnostic
+tools, not prerequisites for rediscovering those modes.
 
 No paired-firmware write is authorized by this plan. `flash_approved` remains
 false, the paired executor remains mutation-locked, and `make bundle` continues
@@ -36,12 +36,12 @@ The recovery wiring and electrical cautions in
 
 | Gate | Evidence required before enabling it | Related compile-time boundary | Current state |
 |---|---|---|---|
-| Package/reset | Complete SoC marking/package; powered-off `MCU_RST` continuity to RSTN lead 88; reset and SFC-idle waveform | recovery remains externally asserted; no feature macro substitutes for continuity | closed |
+| Package/reset | The demonstrated `MCU_RST`-held exact reads plus full restore/readback establish the required recovery isolation; direct lead-88 continuity is optional documentation | recovery remains externally asserted | passed for the existing SPI recovery method |
 | Cold-start memory | Passive stock SYS0/SYS1, OPI/DRAM/cache state or an isolated RAM-only cold-start validation with bounds and readback | `KB7_ENABLE_UNVERIFIED_DRAM_INIT=0` | closed |
-| Pinmux | Independently observed generic `SYS0_PINCTRL` encodings, especially LCD mode 1 and SPI0 mode 4, plus PCB continuity | display and MCU2 paths fail before unknown routes | closed |
+| Pinmux | SNC mode-priority table, three stock releases and the peer AT32F423 firmware/datasheet establish LCD mode 1, SPI0 mode 4 and PWM bit 17 | exact accepted routes are source-audited | passed offline |
 | USB | PHY/attach voltage, IRQ6, endpoint/DMA/EP0/halt/suspend/traffic evidence and a legitimately assigned VID/PID | `KB7_USB_BOARD_PROFILE_VERIFIED=0`, VID/PID `0` | closed |
-| MCU2/Hall | SPI0 polarity, timing, ownership, ready line, exact pinmux, Hall idle/full travel/noise | `KB7_ENABLE_MCU2=0`, `KB7_MCU2_BOARD_PROFILE_VERIFIED=0` | closed |
-| LCD/touch | Bus continuity, panel timing/scanout, touch reset/address/coordinates/rate | `KB7_ENABLE_DISPLAY=0`, `KB7_ENABLE_TOUCH=0` | closed |
+| MCU2/Hall | End-to-end recovered SNC SPI0/AT32 SPI3 exchange, ready behavior and Hall idle/full travel/noise | `KB7_ENABLE_MCU2=0`, `KB7_MCU2_BOARD_PROFILE_VERIFIED=0` | closed |
+| LCD/touch | Functional panel timing/scanout and touch reset/address/coordinates/rate | `KB7_ENABLE_DISPLAY=0`, `KB7_ENABLE_TOUCH=0` | closed |
 | RGB | Electrical mode/latch behavior and 101-position physical correlation | `KB7_ENABLE_RGB=0` | closed |
 | Encoder/action bar | Continuity, pull state, polarity, debounce and release behavior | encoder disabled; action bar plus board-profile gates disabled | closed |
 | Persistent flash | Board behavior and recovery proven before any custom storage mutation | `KB7_ENABLE_FLASH_MUTATION=0` | closed |
@@ -51,28 +51,32 @@ The recovery wiring and electrical cautions in
 rot. Their sentinel feature defines and USB identity are not board evidence and
 must never be deployed.
 
-## First board session: no custom execution
+## Optional diagnostic session: no custom execution
+
+None of this section is required to determine the stock pin modes. Use it only
+to document the board or diagnose a discrepancy before a functional campaign.
 
 ### A. Powered off
 
 1. Photograph both PCB sides, board revision, SoC/flash markings, pin-1 marks,
    reset pad, flash pins, and likely SWD pads.
-2. Confirm ground and measure `MCU_RST` continuity to SNC73200 lead 88. Record
-   meter mode, probe points, resistance, and uncertainty; do not infer
-   continuity from the pad voltage already observed.
+2. Optionally document `MCU_RST` continuity to SNC73200 lead 88. Its required
+   operational property is already demonstrated by exact reads and restore
+   while the pad held the SoC away from the flash.
 3. Trace flash CS/CLK/IO0–IO3 and supply to the SoC-capable SFC leads. Record
    series resistors, buffers, other masters, and whether an attached debugger
    could contend with the bus.
 4. Identify candidate SWDIO/SWCLK/SWO pads by powered-off continuity only. Do
    not attach or run a debugger during this phase.
 
-Passing A closes only the package/reset and wiring-identification prerequisites.
-Any ambiguous package or reset result is `HOLD`, not a reason to guess.
+These observations improve documentation. They do not supersede the proven
+recovery procedure or change a feature gate by themselves.
 
 ### B. Stock firmware, passive observation
 
-1. With the programmer completely removed, power through the normal path under
-   current limit and capture 3.3-V I/O, 1.2-V core, 1.8-V OPI, and reset ramps.
+1. With the programmer completely removed, optionally capture power/reset ramps
+   if diagnosing startup. SNC GPIO uses `VDDIO33`; 1.8 V is the OPI/DRAM rail,
+   not a selectable GPIO mode.
 2. Capture `MCU_RST` assertion/release and SFC CS/CLK activity. Confirm reset
    keeps the SoC from driving the flash before any external programmer is ever
    reattached.
@@ -81,8 +85,8 @@ Any ambiguous package or reset result is `HOLD`, not a reason to guess.
 4. Power down before moving probes. Cold-boot again with every probe/programmer
    removed and require normal `10f5:5038` keyboard operation.
 
-Passing B supplies passive electrical facts. It does not authorize custom code,
-enable a board-profile macro, or prove unpublished pinmux values by itself.
+Passing B supplies passive electrical facts. It does not authorize custom code
+or enable a board-profile macro; pinmux is already established independently.
 
 ### C. Optional read-only SWD qualification
 
@@ -116,12 +120,11 @@ known stock/full-flash state between campaigns:
 
 1. bounded clocks plus SRAM fault record;
 2. isolated OPI/DRAM training and complete readback;
-3. recovered pinmux snapshots and non-driving GPIO input checks;
-4. USB only after a legitimate identity and electrical profile exist;
-5. MCU2/Hall input before any output-driven UI subsystem;
-6. LCD, then touch, then RGB;
-7. encoder and action bar; and
-8. project-owned persistent A/B storage last.
+3. USB only after a legitimate identity and electrical profile exist;
+4. MCU2/Hall input before any output-driven UI subsystem;
+5. LCD, then touch, then RGB;
+6. encoder and action bar; and
+7. project-owned persistent A/B storage last.
 
 Each campaign needs an exact source revision, explicit enabled macros, timeout
 and fault behavior, expected measurements, abort criteria, power-down order,

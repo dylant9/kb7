@@ -173,8 +173,9 @@ Raw filenames and artifacts are operator inputs and stay outside the repository.
    confirm the repaired `0xa02000` sector across true cold boots.
 3. Read the flash configuration/security registers needed to establish 4-byte
    addressing, quad mode and protection behavior; preserve any OTP identifiers.
-4. Prove `MCU_RST` continuity/waveform and check that the SoC never drives the
-   SPI bus while held.
+4. Preserve the demonstrated `MCU_RST` isolation procedure. Direct continuity
+   and waveform capture are optional documentation; exact reads and the later
+   full restore establish the required operational behavior.
 5. The bounded USB-ISP marker program/erase/readback cycle has passed once at
    `0x0008e000`, and the later guarded `0x000c6000` cycle established an exact
    observable 4-KiB footprint at that target. Retain their one-unit/loader/

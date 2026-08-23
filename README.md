@@ -10,8 +10,8 @@ DLLs, decompiler output, captures, generated flash images, product artwork, or
 other material that the project cannot redistribute.
 
 **It is not yet board-validated firmware. Do not install it on hardware.** The
-software-owned drivers and protocols are now implemented, but several
-electrical/pinmux/controller assumptions still need physical proof. A stock
+software-owned drivers and protocols are now implemented, but cold-start and
+end-to-end board behavior still need physical validation. A stock
 full-chip external-SPI restore has been rehearsed; that recovery result does not
 validate the replacement image. Public defaults remain fail-closed and flash-
 image generation is disabled.
@@ -123,11 +123,13 @@ image generation is disabled.
   never changes `execution_authorized=false` or `flash_approved=false`. See the
   [offline authentication design](docs/OFFLINE-UPDATER-AUTHENTICATION-2026-08-23.md).
 - No custom firmware has been installed. USB, display, touch, RGB, MCU2/Hall,
-  pinmux, cold-start memory setup and a legitimate USB identity still require
-  board validation. The new
-  [board-validation plan](docs/BOARD-VALIDATION-PLAN-2026-08-23.md) starts with
-  powered-off continuity and stock-powered passive capture, not a firmware
-  write. `flash_approved` remains false.
+  cold-start memory setup and a legitimate USB identity still require board
+  validation. The SNC and AT32 datasheets plus the complete stock static
+  recovery now close the LCD mode-1, SPI0 mode-4 and P0.6 PWM pin-selection
+  questions; see the
+  [stock pinmux recovery](docs/STOCK-PINMUX-RECOVERY-2026-08-23.md). The
+  remaining board plan is functional validation, not a search for a generic
+  per-pad `SYS0_PINCTRL` encoding. `flash_approved` remains false.
 
 See the [firmware completion status](docs/FIRMWARE-COMPLETION-2026-08-18.md),
 [full-flash acquisition record](docs/FULL-FLASH-ACQUISITION-2026-08-22.md), and

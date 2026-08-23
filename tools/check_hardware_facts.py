@@ -76,6 +76,8 @@ def lead_for_pad(gpio_leads: dict[str, list[int]], pad: str) -> int:
 
 
 def validate_pin_map(pinmap: dict[str, object]) -> None:
+    require(pinmap["schema_version"] == 2,
+            "pin-map schema must include the recovered PINCTRL model")
     datasheet = pinmap["source"]["datasheet"]
     require(datasheet["sha256"] == EXPECTED_SOURCE_HASH, "pin-map source hash mismatch")
 
@@ -90,6 +92,51 @@ def validate_pin_map(pinmap: dict[str, object]) -> None:
         flattened.extend(leads)
     require(len(flattened) == 80 and len(set(flattened)) == 80,
             "all 80 GPIO package leads must be unique")
+
+    pinmux = pinmap["pinmux_control_model"]
+    require(pinmux["generic_per_pad_pinctrl_field"] is False,
+            "do not model SYS0_PINCTRL as a generic per-pad field")
+    require([item["version"] for item in pinmux["stock_releases"]] ==
+            ["V1.22", "V1.24", "V1.33"],
+            "pinmux evidence must retain all three stock releases")
+    require([(item["core0_sha256"], item["core1_sha256"])
+             for item in pinmux["stock_releases"]] == [
+                ("d779faf9f591e71602e5f17e966ac366602699a83fb5e612534d694d3dafd153",
+                 "b2869bc657ba896474e760f513e4514fac678a951364efc29cbf9b6bb5e2ba72"),
+                ("79eb92bc73ddccbfff682927df7c951802fd64c9863cdeacd9b230642b5ca695",
+                 "dcb06f976dcaff81d0c5ccd1fdfebcb5b6ca4ec3d7e003ad1e90f896a4139aa7"),
+                ("30f791af363b39f472095152118413421e525a2ed09fef87b236f1a437e32cc6",
+                 "d64df057dbdd125b12f156b57de5ad75a9a0d5804e30a16bb9ef1a56830d101f"),
+            ], "stock pinmux evidence hashes changed")
+    require([item["pinctrl_clear_routine_address"]
+             for item in pinmux["stock_releases"]] ==
+            ["0x00007018", "0x0000738c", "0x00003534"],
+            "stock Core0 PINCTRL-clear addresses changed")
+    require([item["timer6_pwm_route_rmw_address"]
+             for item in pinmux["stock_releases"]] ==
+            ["0x10008af4", "0x10008e64", "0x1000cc6c"],
+            "stock PWM PINCTRL addresses changed")
+    require({item["bit"] for item in pinmux["exceptional_selectors"]} ==
+            {0, 1, 8, 17}, "recovered exceptional PINCTRL selectors changed")
+    routes = {item["name"]: item for item in pinmux["kb7_default_routes"]}
+    require(routes["lcd_rgb18"]["mode"] == 1 and
+            routes["lcd_rgb18"]["required_exceptional_selector_bits_set"] == [],
+            "LCD must remain on the default mode-1 group")
+    require(routes["mcu2_spi0"]["mode"] == 4 and
+            routes["mcu2_spi0"]["required_exceptional_selector_bits_set"] == [],
+            "MCU2 must remain on the default SPI0 mode-4 group")
+    require(routes["backlight_pwm"]["required_exceptional_selector_bits_set"] == [17],
+            "backlight must retain the stock-proven PINCTRL bit 17")
+    peer = pinmux["peer_mcu_spi3"]
+    require(peer["part"] == "AT32F423" and
+            peer["stock_firmware_sha256"] ==
+            "8452e825bc71bda5696ecc8b33d3b31e1f7a8f0d4ed677985d2532768e92aa66",
+            "unexpected MCU2 evidence identity")
+    require([(pin["signal"], pin["pin"], pin["alternate_function"])
+             for pin in peer["pins"]] ==
+            [("CS", "PA15", 6), ("SCK", "PC10", 6),
+             ("MISO", "PC11", 6), ("MOSI", "PC12", 6)],
+            "AT32 SPI3 pin assignment changed")
 
     seen_logical: set[int] = set()
     for entry in pinmap["kb7_signals"]:
@@ -115,9 +162,10 @@ def validate_pin_map(pinmap: dict[str, object]) -> None:
     reset = next(entry for entry in pinmap["kb7_signals"]
                  if entry["function"] == "MCU_RST board pad candidate")
     require(reset["soc_pad"] == "RSTN" and reset["package_lead"] == 88,
-            "MCU_RST must remain an unverified candidate for RSTN lead 88")
-    require(reset["continuity"] == "unverified",
-            "do not mark MCU_RST continuity as verified without a measurement record")
+            "MCU_RST must remain the RSTN lead-88 candidate")
+    require(reset["continuity"] == "not_directly_measured" and
+            reset["operational_status"] == "validated_for_external_spi_isolation",
+            "retain the distinction between optional continuity and proven reset use")
 
 
 def validate_stock_flash(stock: dict[str, object]) -> None:

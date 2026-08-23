@@ -1,6 +1,6 @@
 {
   "schema": "kb7.hardware.pin-map",
-  "schema_version": 1,
+  "schema_version": 2,
   "generated_on": "2026-08-22",
   "source": {
     "datasheet": {
@@ -27,6 +27,82 @@
     "bit": "logical & 15",
     "mmio_base": "0x40018000 + port * 0x1000",
     "evidence": "firmware_recovery"
+  },
+  "pinmux_control_model": {
+    "status": "statically_recovered_from_datasheets_and_stock_firmware",
+    "mode_table_semantics": "Peripheral functions are priority-ordered modes; the lowest enabled mode number wins. SYS0_PINCTRL is not a generic per-pad three-bit selector.",
+    "generic_per_pad_pinctrl_field": false,
+    "stock_releases": [
+      {
+        "version": "V1.22",
+        "core0_sha256": "d779faf9f591e71602e5f17e966ac366602699a83fb5e612534d694d3dafd153",
+        "core1_sha256": "b2869bc657ba896474e760f513e4514fac678a951364efc29cbf9b6bb5e2ba72",
+        "pinctrl_clear_routine_address": "0x00007018",
+        "timer6_pwm_route_rmw_address": "0x10008af4"
+      },
+      {
+        "version": "V1.24",
+        "core0_sha256": "79eb92bc73ddccbfff682927df7c951802fd64c9863cdeacd9b230642b5ca695",
+        "core1_sha256": "dcb06f976dcaff81d0c5ccd1fdfebcb5b6ca4ec3d7e003ad1e90f896a4139aa7",
+        "pinctrl_clear_routine_address": "0x0000738c",
+        "timer6_pwm_route_rmw_address": "0x10008e64"
+      },
+      {
+        "version": "V1.33",
+        "core0_sha256": "30f791af363b39f472095152118413421e525a2ed09fef87b236f1a437e32cc6",
+        "core1_sha256": "d64df057dbdd125b12f156b57de5ad75a9a0d5804e30a16bb9ef1a56830d101f",
+        "pinctrl_clear_routine_address": "0x00003534",
+        "timer6_pwm_route_rmw_address": "0x1000cc6c"
+      }
+    ],
+    "exceptional_selectors": [
+      {"bit": 0, "meaning": "alternate NAND group", "evidence": "SNC7320 datasheet pin-table footnote 11"},
+      {"bit": 1, "meaning": "alternate LCD/8080 P1 group", "evidence": "SNC7320 datasheet pin-table footnote 9"},
+      {"bit": 8, "meaning": "alternate SPI0DMA group", "evidence": "SNC7320 datasheet pin-table footnote 10"},
+      {"bit": 17, "meaning": "P0.6 CT32B6_PWM1 route", "evidence": "SNC7320 PWM footnote and identical stock read-modify-write in V1.22/V1.24/V1.33"}
+    ],
+    "kb7_default_routes": [
+      {
+        "name": "lcd_rgb18",
+        "mode": 1,
+        "pads": "P2.4 through P3.9",
+        "controller": "PPU/TFT at 0x40050000",
+        "required_exceptional_selector_bits_set": [],
+        "stock_result": "Core0 clears SYS0_PINCTRL and the LCD initializer uses this default group without another PINCTRL write."
+      },
+      {
+        "name": "mcu2_spi0",
+        "mode": 4,
+        "pads": ["P0.14", "P0.15", "P1.0", "P1.1"],
+        "controller": "SPI0 at 0x4000e000",
+        "required_exceptional_selector_bits_set": [],
+        "stock_result": "The recovered A3 object selects serial instance 0 and initializes this controller without another PINCTRL write."
+      },
+      {
+        "name": "backlight_pwm",
+        "mode": 7,
+        "pads": ["P0.6"],
+        "controller": "CT32B6 PWM1",
+        "required_exceptional_selector_bits_set": [17],
+        "stock_result": "All three recovered stock releases set PINCTRL bit 17 with the same read-modify-write pattern."
+      }
+    ],
+    "peer_mcu_spi3": {
+      "part": "AT32F423",
+      "datasheet_revision": "2.02",
+      "datasheet_url": "https://www.arterychip.com/download/DS/DS_AT32F423_V2.02_EN.pdf",
+      "stock_firmware_version": "V1.15",
+      "stock_firmware_sha256": "8452e825bc71bda5696ecc8b33d3b31e1f7a8f0d4ed677985d2532768e92aa66",
+      "gpio_setup_address": "0x08006fec",
+      "dma_setup_address": "0x08006e24",
+      "pins": [
+        {"signal": "CS", "pin": "PA15", "alternate_function": 6, "peripheral": "SPI3"},
+        {"signal": "SCK", "pin": "PC10", "alternate_function": 6, "peripheral": "SPI3"},
+        {"signal": "MISO", "pin": "PC11", "alternate_function": 6, "peripheral": "SPI3"},
+        {"signal": "MOSI", "pin": "PC12", "alternate_function": 6, "peripheral": "SPI3"}
+      ],
+      "proof_boundary": "This independently corroborates both endpoints' pin modes; physical PCB continuity remains unmeasured but is not required to recover the software configuration."
+    }
   },
   "gpio_package_leads": {
     "P0": [120, 122, 66, 64, 79, 80, 81, 82, 110, 42, 119, 39, 121, 44, 2, 3],
@@ -59,12 +135,13 @@
       "package_lead": 88,
       "active_level": "low",
       "evidence": ["datasheet", "user_observation", "inference"],
-      "continuity": "unverified",
+      "continuity": "not_directly_measured",
+      "operational_status": "validated_for_external_spi_isolation",
       "released_voltage_v": 3.2,
       "asserted_voltage_v": 0.2,
       "assertion_method": "1 kOhm to ground while board was USB-powered",
       "observed_result": "two bit-identical full SPI-NOR reads while asserted",
-      "required_test": "powered-off continuity from labeled pad to lead 88 and reset/SFC-idle waveform measurement"
+      "required_test": "none for the established external-SPI recovery procedure; direct lead-88 continuity remains optional documentation"
     },
     {
       "function": "ST1633i touch SCL",
@@ -382,6 +459,8 @@
         {"name": "READY_STATUS", "pad": "P1.3", "lead": 111, "logical_gpio": 19}
       ],
       "firmware_evidence": "The V1.22 A3 protocol object selects serial instance 0, whose base is 0x4000e000; its sender polls +0x0c and transfers at +0x1c.",
+      "pinmux_status": "statically recovered: default SPI0 mode-4 group; no exceptional PINCTRL selector required",
+      "peer_mcu_firmware_evidence": "AT32F423 stock V1.15 configures SPI3 on PA15/PC10/PC11/PC12 with AF6.",
       "continuity_to_at32_spi3": "unverified"
     },
     "sdio_unassigned_candidate": {
@@ -410,14 +489,8 @@
     }
   },
   "priority_tests": [
-    "Confirm complete SoC marking and pin-1 orientation.",
-    "Verify MCU_RST continuity to lead 88 and measure released voltage.",
-    "Map external flash and resolve the P0.12 touch-IRQ versus IO2 conflict.",
-    "Map touch controller signals to leads 120, 122, 121, and 117.",
-    "Map the panel connector to the RGB18 group and sideband leads 79, 80, 81, 83, and 84.",
-    "Map the LED controller to SPI1 and candidate auxiliary GPIOs.",
-    "Continuity-map AT32 SPI3 pads to the recovered SNC SPI0 leads 2 through 5 and map the ready/status net to lead 111.",
-    "Measure 3.3-V, 1.22-V, and 1.82-V rails under stock operation.",
-    "Passively capture touch, panel, RGB, SPI-NOR, and secondary-MCU traffic before enabling a custom driver."
+    "Functionally validate cold-start clocks and OPI/DRAM initialization with bounded readback.",
+    "Functionally validate USB enumeration and sustained endpoint traffic with a legitimate identity.",
+    "Functionally validate the recovered display, touch, RGB and MCU2 drivers on hardware before enabling their release board-profile gates."
   ]
 }

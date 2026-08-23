@@ -19,8 +19,8 @@ All substantial functions that can presently be implemented and tested
 offline are now represented in source. That does **not** make the firmware
 flash-ready. Public defaults deliberately park before application startup, USB
 does not attach without an assigned identity and verified board profile, MCU2
-cannot transmit until pinmux/continuity are proven, and several proprietary
-controller assumptions still require physical validation. The first hardware
+remains behind a board-profile gate, and several dynamic controller assumptions
+still require hardware validation. The first hardware
 run must use a complete external-flash backup, a proven programmer wiring plan,
 and `MCU_RST` held low.
 
@@ -110,8 +110,9 @@ so `kb7_usb_init()` returns before any USB MMIO or electrical attach.
   link is SPI0 at `0x4000e000`, not SDIO at `0x40024000`.
 
 MCU2 requires both `KB7_ENABLE_MCU2=1` and
-`KB7_MCU2_BOARD_PROFILE_VERIFIED=1`, and additionally refuses initialization
-until the logical 14–17 function-4 pinmux is known.
+`KB7_MCU2_BOARD_PROFILE_VERIFIED=1`. The SNC logical 14–17 SPI0 mode-4 route is
+now known, as are the peer AT32F423 SPI3 AF6 pins; the remaining gate concerns
+end-to-end behavior and Hall calibration.
 
 ### Display, touch and RGB
 
@@ -119,7 +120,8 @@ until the logical 14–17 function-4 pinmux is known.
   delay/order correction (`100 ms`; `35/62/11`; `120 ms`; `29`; `20 ms`).
 - Bounded PPU/LCDC setup, 480×800 active geometry, 1,920-pixel framebuffer
   stride and line-descriptor generation. LCDC makes no controller MMIO writes
-  unless every required parallel-bus function-1 pinmux route is known.
+  unless every required parallel-bus function-1 route is known; the recovered
+  default P2.4–P3.9 group now satisfies that check.
 - ST1633-style open-drain bit-banged I²C with clock-stretch timeout, nine-clock
   recovery, reset/identity/geometry checks, bulk contact reads, bounds checking
   and lost-frame release handling. Only the proven portrait coordinate geometry
@@ -177,15 +179,17 @@ The implementation now reflects these material SNC7320 facts:
   `0x40022000`/`0x40023000`/`0x40024000` are SFC, SD0/NAND and SDIO.
 - `0x40040000`, `0x40050000` and `0x40100000` are OPI/DRAM, PPU/display and USB.
 - IRQ6 is USB and the documented interrupt range fits the 79-word table.
-- GPIO electrical pulls and `SYS0_PINCTRL` peripheral routing are distinct.
-  The driver implements ordinary GPIO and the proven P0.6 PWM route; unknown
-  alternate-function encodings fail closed.
+- GPIO electrical pulls and `SYS0_PINCTRL` exceptional group routing are
+  distinct. The mode columns are peripheral priorities, not a generic per-pad
+  field. The driver implements ordinary GPIO, the default LCD mode-1 and SPI0
+  mode-4 groups, and the stock-proven P0.6 PWM selector.
 - Backlight is P0.6/`CT32B6_PWM1` mode 7.
 - POR/external/LVD/DPD/watchdog reset enter ROM; software reset restarts PRAM.
 - RSTN is package lead 88 for the expected LQFP128 device. The board's
   `MCU_RST` measured about 3.2 V released and 0.2 V when pulled to ground
-  through 1 kΩ during two successful reads; physical lead-88 continuity and a
-  reset waveform still need measurement.
+  through 1 kΩ during two successful reads and was used for a successful full
+  restore. Direct lead-88 continuity remains unmeasured but is optional for the
+  demonstrated recovery procedure.
 
 ## Remaining hardware-only gates
 
@@ -195,19 +199,21 @@ The stop-gated measurement order and exact macro/evidence mapping are now in
 `BOARD-VALIDATION-PLAN-2026-08-23.md`. Its first session performs no custom
 execution and no firmware-region write.
 
-1. Confirm the complete SoC marking/package and `MCU_RST`→RSTN lead-88
-   continuity. Preserve the demonstrated external-SPI full-stock
-   restore/readback procedure, exact hashes and reset-isolation evidence.
+1. Preserve the demonstrated `MCU_RST` external-SPI full-stock
+   restore/readback procedure and exact hashes. Complete marking and direct
+   lead-88 continuity would improve documentation but are no longer treated as
+   prerequisites for the already-demonstrated isolation method.
 2. Passively capture post-boot SYS0/SYS1, OPI/DRAM and cache state or validate
    the reconstructed cold-start sequence on an isolated board.
-3. Determine the unpublished generic `SYS0_PINCTRL` encoding, especially LCD
-   bus mode 1 and SPI0 mode 4, by a register capture/stock trace and continuity.
+3. Retain the statically recovered pinmux model: LCD uses the default P2.4–P3.9
+   mode-1 group, MCU2 uses the default P0.14–P1.1 SPI0 mode-4 group, and P0.6
+   PWM sets bit 17. No stock-powered pinmux capture is required for these routes.
 4. Verify USB PHY attach, IRQ6, DMA actual-length semantics, EP0 address
    application, halt/toggle, suspend/resume and sustained IN/OUT/mailbox traffic;
    obtain a legally assigned VID/PID.
-5. Capture MCU2 SPI0 polarity/timing/ownership and ready-line behavior, then
-   calibrate Hall idle/full-travel/noise on the physical switches.
-6. Verify LCD bus continuity, display timing and framebuffer scanout; verify
+5. Functionally validate the recovered MCU2 SPI0/AT32 SPI3 exchange and ready
+   line, then calibrate Hall idle/full-travel/noise on the physical switches.
+6. Verify functional display timing and framebuffer scanout; verify
    touch reset/address/coordinates and measure end-to-end touch report rate.
 7. Verify RGB electrical mode/latch behavior and correlate all 101 LEDs with
    physical key legends before enabling per-key effects.

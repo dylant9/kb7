@@ -72,7 +72,11 @@ void core0_main(void) {
         state->last_error = UINT32_C(0xb0170002);
         kb7_enter_loader();
     }
-    /* Stock establishes the default peripheral pad routes before board I/O. */
+    /*
+     * Stock V1.22/V1.24/V1.33 clears the exceptional route selectors here.
+     * LCD mode 1 and SPI0 mode 4 are controller-owned default routes, not
+     * generic per-pad PINCTRL fields.
+     */
     KB7_MMIO32(SNC_SYS0_BASE + SNC_SYS0_PINCTRL) = 0U;
 
     api->magic = 0U;
