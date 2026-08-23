@@ -1,10 +1,10 @@
 # Firmware implementation completion and pre-flash status
 
 Review date: 2026-08-18
-Updated with full-flash evidence: 2026-08-22
+Updated with recovery and USB-ISP validation evidence: 2026-08-23
 Scope: independently authored public source after the missing-function work
 Replacement firmware exercised on hardware: none
-Stock recovery exercised: one successful external ESP32-C3 repair and boot
+Stock recovery exercised: full-chip external ESP32-C3 restore/verification and boot
 
 ## Verdict and primary LCD answer
 
@@ -27,8 +27,15 @@ and `MCU_RST` held low.
 Two bit-identical full stock reads and the later successful ESP32-C3 repair now
 provide a real external recovery result. The initial post-repair boot problem
 was traced to leaving the unpowered programmer connected to the SFC bus. This
-improves the recovery position, but does not validate any replacement-firmware
-hardware path or constitute a repeatable bit-identical full-chip rollback test.
+was followed by an owner-confirmed full-chip restore/verification rehearsal and
+matching post-repair captures. This establishes the development unit's external-
+SPI rollback path, but does not validate any replacement-firmware hardware path.
+
+The preserved V1.22 loader has also completed one guarded USB-ISP marker program
+and erase cycle at offset `0x0008e000`, with exact complete-array postflight
+comparisons and final restoration to the baseline. This validates only that
+narrow stock-loader primitive; it is not an installation route for these
+replacement images.
 
 ## Completed software-owned work
 
@@ -178,9 +185,8 @@ The implementation now reflects these material SNC7320 facts:
 These are not honest candidates for further offline coding:
 
 1. Confirm the complete SoC marking/package and `MCU_RST`→RSTN lead-88
-   continuity. The Macronix main array has two identical backups and one
-   successful ESP32-C3 repair/boot; archive an exact post-repair read and make
-   the complete stock restore/readback procedure repeatable.
+   continuity. Preserve the demonstrated external-SPI full-stock
+   restore/readback procedure, exact hashes and reset-isolation evidence.
 2. Passively capture post-boot SYS0/SYS1, OPI/DRAM and cache state or validate
    the reconstructed cold-start sequence on an isolated board.
 3. Determine the unpublished generic `SYS0_PINCTRL` encoding, especially LCD
@@ -196,11 +202,12 @@ These are not honest candidates for further offline coding:
    physical key legends before enabling per-key effects.
 8. Verify action-bar GPIO continuity, active-low polarity and safe pulls before
    enabling its board-profile gate.
-9. Turn the successful external repair into a repeatable reset/programmer
-   recovery runbook before any combined image is written. Autonomous software
-   loader entry remains intentionally unavailable. The narrow two-stage USB
-   write-path experiment is not a supported flasher and does not install these
-   replacement images; external SPI remains the required recovery route.
+9. Maintain the successful external-SPI reset/programmer recovery runbook before
+   any combined image is written. Autonomous software loader entry remains
+   intentionally unavailable. The narrow two-stage USB write-path experiment
+   passed once against a stock-loader scratch sector, but is not a supported
+   flasher and does not install these replacement images; external SPI remains
+   the required recovery route.
 
 ## Build and test profiles
 

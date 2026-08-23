@@ -1,7 +1,8 @@
 {
   "schema": "kb7.hardware.stock-flash-observations",
-  "schema_version": 2,
+  "schema_version": 3,
   "observed_on": "2026-08-22",
+  "updated_on": "2026-08-23",
   "acquisition": {
     "read_count": 2,
     "bit_identical": true,
@@ -40,9 +41,29 @@
   "recovery_validation": {
     "programmer": "ESP32-C3 SPI programmer",
     "stock_repair_write_and_boot_observed": true,
-    "result": "stock boot restored after programming the repair image and physically disconnecting the programmer",
+    "result": "owner-confirmed full-chip stock restore and verification completed; stock boot restored after physically disconnecting the programmer",
     "unpowered_programmer_bus_effect": "boot was unreliable while the unpowered programmer remained connected to the SPI bus",
-    "full_chip_bit_identical_restore_proven": false,
+    "full_chip_bit_identical_restore_proven": true,
+    "post_restore_usb_read_count": 2,
+    "post_restore_usb_reads_bit_identical": true,
+    "post_restore_usb_read_size_bytes": 33554432,
+    "post_restore_usb_sha256": "2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f",
+    "custom_firmware_booted": false
+  },
+  "usb_isp_write_validation": {
+    "observed_on": "2026-08-23",
+    "scope": "one V1.22 preserved-loader cycle at one manifest-gap target",
+    "target_offset": "0x0008e000",
+    "program_length_bytes": 512,
+    "program_address_mode_command": "f6 18",
+    "program_cdb": "f6 06 00 60 08 e0 00 00 01 00 00 00 00 00 00 00",
+    "marked_image_sha256": "ff04edf228413f97053a408c2eb3d8dc83ecd0a9d6d7c9ef1c6c3bcfe6325154",
+    "erase_address_mode_command": "f6 18",
+    "erase_cdb": "f6 15 00 04 70 00 00 00 00 00 00 00 00 00 00 00",
+    "final_image_sha256": "2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f",
+    "complete_postimages_exact": true,
+    "exact_erase_granularity_proven": false,
+    "f6_19_tested": false,
     "custom_firmware_booted": false
   },
   "boot_configuration": {

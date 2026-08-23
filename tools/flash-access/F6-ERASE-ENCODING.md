@@ -1,6 +1,8 @@
 # `F6 15` / `F6 19` erase-command encoding
 
-Status: **resolved by static data-flow analysis** on 2026-08-22.
+Status: **resolved by static data-flow analysis on 2026-08-22; the normal-NOR
+`F6 15` target interpretation was confirmed in one bounded hardware cycle on
+2026-08-23.** `F6 19` remains static-only.
 
 ## Result
 
@@ -170,6 +172,36 @@ pointer is also incorrect. The erase/program routines use that scalar only in
 busy-wait timing calculations. It does not contribute to any CDB address or
 count field.
 
+## Hardware validation at `0x0008e000`
+
+The guarded experiment in [WRITE-TEST-PLAN.md](WRITE-TEST-PLAN.md) completed on
+one owner-controlled KB7 using the recovered V1.22 preserved loader. With the
+full target sector initially erased, it first selected `F6 18` and programmed a
+512-byte marker using:
+
+```text
+F6 06 00 60 08 e0 00 00 01 00 00 00 00 00 00 00
+```
+
+The complete 32-MiB post-image matched the exact expected marker image. The
+erase stage then selected `F6 18` and sent:
+
+```text
+F6 15 00 04 70 00 00 00 00 00 00 00 00 00 00 00
+```
+
+The marker disappeared at offset `0x0008e000`, and the subsequent complete
+32-MiB image compared byte-for-byte equal to the original baseline. No other
+byte difference was observable in either postflight image.
+
+This confirms that this loader's normal-NOR `F6 15` path interprets `0x0470` as
+the 512-byte-block index for the tested target. It does not prove the exact
+erase granularity: the other 3,584 bytes in the sector and the surrounding gap
+were already `0xff`, so erasing a narrower or wider all-erased range would be
+observationally identical. See the
+[dated result](../../docs/USB-ISP-WRITE-VALIDATION-2026-08-23.md) for the hashes,
+transport checks and full evidence boundary.
+
 ## Proven facts versus remaining inference
 
 Proven from the updater's register and stack data flow:
@@ -193,11 +225,13 @@ Inferred from the known MX25L25645G target and the zero-selector NOR default:
   setter, but cannot prove which optional flash-type choice an operator would
   make at runtime.
 
-Not proven on hardware:
+Still not proven on hardware:
 
-- that the loader's erase handler implements these statically recovered
-  commands correctly;
-- the exact device-side purpose of the alternate `F6 19`/128-KiB mode.
+- exact erase granularity inside the initially erased scratch gap;
+- arbitrary targets, other command sizes, repeated/interrupted operation or
+  another loader/flash revision; and
+- the exact device-side purpose and behavior of the alternate
+  `F6 19`/128-KiB mode.
 
 ## Tooling and write-path verdict
 
@@ -209,19 +243,17 @@ general USB writer or a supported firmware installation path.
 **Use the proven SPI/flashrom path for ordinary, recovery and production
 writes.**
 
-Static analysis now settles the CDB layout, but it does not make an initial
-erase experiment safe. The erase handler itself has never been validated on
-this bootloader; erase is irreversible for a whole unit; the loader identifies
-itself as `v0.001 test!`; its bulk transport is already unreliable above 4 KiB;
-and the prior program experiment destroyed the boot chain despite correct
-host-side range guards. By contrast, the SPI path has been recovered and
-verified on this exact board and can be constrained with flashrom layouts.
+Static analysis settles both CDB layouts, and the normal-NOR `F6 15` target
+interpretation has now passed once at `0x8e000`. That narrow result does not
+make a general erase operation safe: erase is irreversible for a whole unit;
+the loader identifies itself as `v0.001 test!`; its bulk transport is unreliable
+above 4 KiB; and the prior program experiment destroyed the boot chain despite
+correct host-side range guards. By contrast, the SPI path is the demonstrated
+recovery route on this exact board and can be constrained with flashrom layouts.
 
-There is no erase test that is non-destructive under every remaining uncertainty.
-Now that the address-unit ambiguity is resolved, the remaining uncertainty is
-whether the target implements the recovered destructive command as expected;
-any command capable of answering that question necessarily erases a sector or
-block. [WRITE-TEST-PLAN.md](WRITE-TEST-PLAN.md) therefore documents an
-explicitly destructive, two-stage validation experiment whose recovery
-assumption is a working external-SPI path and byte-exact backup. The experiment
-remains unrun and does not change `flash_approved=false`.
+There is no erase test that is non-destructive under every implementation
+failure. [WRITE-TEST-PLAN.md](WRITE-TEST-PLAN.md) documents the explicitly
+destructive two-stage validation experiment whose recovery assumption is a
+working external-SPI path and byte-exact backup. That experiment has now passed
+once for the exact sequence recorded above. It does not validate `F6 19`, create
+a supported updater or change `flash_approved=false`.

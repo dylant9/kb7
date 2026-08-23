@@ -17,7 +17,7 @@ stock patch tooling, assigned USB identity and every generated binary.
 This is public, inspection-oriented source. Do not commit locally built images,
 stock inputs, captures, or proprietary analysis artifacts to this directory.
 
-## Current status — 2026-08-22
+## Current status — 2026-08-23
 
 All substantial software-owned functions supported by the available evidence
 are implemented and host-tested, including five profiles, USB EP0/HID/vendor
@@ -27,10 +27,10 @@ longer overlaps stock configuration or upload partitions.
 
 The default build still parks before the application and leaves every
 unverified peripheral, USB attachment and flash mutation path disabled. An
-external ESP32-C3 repair has restored the stock firmware on the physical unit,
-but the replacement images themselves have never run on the board. Cold-start
-clock/OPI state, alternate-function pinmux, controller electrical behavior and
-the complete rollback procedure remain hardware gates.
+external ESP32-C3 full-stock restore/verification rehearsal has succeeded on the
+physical unit, but the replacement images themselves have never run on the
+board. Cold-start clock/OPI state, alternate-function pinmux and controller
+electrical behavior remain hardware gates.
 
 Requirements: GNU Make, Python 3, and `arm-none-eabi-gcc`/binutils.
 
@@ -50,10 +50,10 @@ profile.
 findings have regression-tested repairs, described in
 `../docs/FIRMWARE-COMPLETION-2026-08-18.md`. USB/MCU2 identities and board
 profiles, generic non-GPIO pinmux, logical-key→LED correlation and hardware
-validation remain unresolved. External stock repair has succeeded once, but a
-repeatable exact rollback procedure is still required. The repository has no
-supported USB flashing utility. Separate read-only USB diagnostics, a guarded
-two-stage destructive validation experiment and the proven external-SPI
+validation remain unresolved. External SPI is the demonstrated stock rollback
+route. The repository has no supported USB flashing utility. Separate read-only
+USB diagnostics, a guarded two-stage destructive validation experiment that
+passed once on a stock-loader scratch sector, and the proven external-SPI
 recovery notes live in
 [`../tools/flash-access/`](../tools/flash-access/README.md); none is an
 installation route for these ELFs. Do not install them.

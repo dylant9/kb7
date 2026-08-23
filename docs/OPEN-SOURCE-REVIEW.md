@@ -1,7 +1,8 @@
 # Public-source provenance review
 
-Review date: 2026-08-17; remediation additions reviewed 2026-08-18; full-flash,
-flash-access, and public-repository status reviewed 2026-08-22
+Review date: 2026-08-17; remediation additions reviewed 2026-08-18; full-flash
+and public-repository status reviewed 2026-08-22; bounded USB-ISP result reviewed
+2026-08-23
 Scope: this repository directory only
 
 ## Decision

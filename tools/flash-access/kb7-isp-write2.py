@@ -10,9 +10,10 @@ This is a two-stage laboratory experiment, not a firmware flasher:
    image match.
 
 Both stages require an exact 32-MiB owner-supplied baseline which is compared
-with a fresh full-chip USB read before any mutation. The program and erase
-encodings are recovered, but the erase handler has not been exercised on this
-loader. If it interprets F6 15 differently, it can erase the boot chain. Keep a
+with a fresh full-chip USB read before any mutation. The reviewed sequence
+passed once on the V1.22 loader at offset 0x8e000. That result does not validate
+other targets, lengths, loader versions, F6 19, interruption recovery or
+production flashing. A future error can still erase the boot chain. Keep a
 tested SPI programmer and two matching full-chip backups available.
 
 Examples (the first invocation is dry-run only):

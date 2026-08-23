@@ -1,11 +1,15 @@
 # KB7 USB-ISP write-path validation plan
 
-Status: **offline-reviewed; destructive stages not run on hardware**.
+Status: **completed successfully once on hardware on 2026-08-23**. The exact
+program post-image and exact restoration to the 32-MiB baseline both passed.
 
 `kb7-isp-write2.py` is a destructive laboratory validator, not a supported
 flasher. It is dry-run by default. Its purpose is to validate the loader's
 `F6 15` erase implementation on one recoverable development keyboard; it is not
 an installation route for end users.
+
+The procedure below is retained as the reviewed experiment and recovery
+runbook, not as an invitation to repeat a now-settled destructive test.
 
 ## Preconditions
 
@@ -137,17 +141,16 @@ not change that selector.
 The guards detect damage after a command; they cannot prevent a defective or
 misunderstood device handler from causing it. The material residual risks are:
 
-- `F6 15` could be unsupported or implemented differently and erase a boot-chain
-  sector before the postflight read detects the mismatch;
 - an ambiguous USB disconnect, short transfer, failed CSW, busy timeout, power
   loss, or reset after mutation can leave the flash state unknown; the strict
   transport aborts, but cannot undo a command already accepted by the loader;
-- the loader's non-standard CSW residue behavior is statically proven and now
-  checked exactly, but is another reason not to treat it as a general-purpose
+- static tracing and the completed hardware cycle agree on the loader's non-
+  standard CSW residue behavior: data-phase commands returned the exact expected
+  requested-length residue and no-data `F6 18`/`F6 15` returned zero. This
+  remains another reason not to treat the loader as a general-purpose,
   standards-compliant mass-storage programming transport;
-- the first absolute-address program at this exact target remains a destructive
-  operation even though its encoding is recovered and the earlier handler
-  behavior is known;
+- any further absolute-address program remains destructive even though this
+  exact target and one-block encoding have now passed;
 - the marker makes the encoded erase target observable but cannot distinguish
   the loader's exact erase granularity inside surrounding bytes that were
   already `0xff`;
@@ -194,14 +197,14 @@ operation. Never leave an unpowered programmer connected to the flash bus.
 
 ## Verdict
 
-**Conditional yes: run this once on the deliberately recoverable development
-unit, but only after the full-chip SPI recovery rehearsal above.** Static
-analysis cannot prove the erase handler without an erase, and a working
-non-invasive USB updater is valuable enough to justify a bounded lab risk. The
-marker makes a no-op distinguishable from success, and the full-chip comparisons
-make unintended persistent changes observable.
+**The authorized one-time experiment passed. Do not repeat it merely to
+reconfirm the same fact.** `F6 18` plus the exact `F6 06`/`F6 15` sequence
+programmed and removed the marker at `0x8e000`; both complete postflight images
+were exact, and the final image returned byte-for-byte to the baseline. The
+dated evidence record is
+[`../../docs/USB-ISP-WRITE-VALIDATION-2026-08-23.md`](../../docs/USB-ISP-WRITE-VALIDATION-2026-08-23.md).
 
-That does not make the experiment safe for general users. If full-chip SPI
-restore has not already been demonstrated end to end, if either backup differs,
-or if losing this board is unacceptable, the verdict is **do not run it**. No
-hardware command was issued while preparing this plan.
+That result justifies further engineering of a non-invasive updater, not use by
+general users. Any new destructive test still requires the full-chip SPI
+recovery rehearsal, matching backups and explicit acceptance of losing the
+board. External SPI remains the rollback path.

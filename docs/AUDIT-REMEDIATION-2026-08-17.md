@@ -49,10 +49,10 @@ hardware measurements:
   the four project-owned screen/profile slots.
 - MCU2 needs both a feature gate and separate board-profile proof; its required
   SPI0 function-4 pinmux is not guessed.
-- Two identical external-programmer backups and one ESP32-C3 stock repair/boot
-  are now demonstrated. A repeatable exact full-chip restore/readback and
-  verified MCU reset/SFC-idle waveform remain mandatory before an independent
-  core0 experiment.
+- Two identical external-programmer backups and an ESP32-C3 full-stock
+  restore/verification rehearsal are now demonstrated. A verified MCU
+  reset/SFC-idle waveform remains mandatory before an independent core0
+  experiment.
 - Autonomous loader entry remains unavailable. The recovered mailbox marker's
   lifetime and consumer are unproven, and software reset is explicitly a PRAM
   restart. See `BOOT-RECOVERY-MODEL.md`.
@@ -82,9 +82,9 @@ Any future image-producing release pipeline must, before it is enabled:
 The audited source defects and the offline-implementable functions are
 incorporated, but the public firmware is still a non-flashable engineering
 implementation. Remaining blockers are physical validation, unpublished
-pinmux encodings, assigned USB identity and a release-quality repeatable
-recovery runbook; none is silently enabled. One external stock repair has
-succeeded, but no replacement firmware has run on hardware.
+pinmux encodings and an assigned USB identity; none is silently enabled. The
+external-SPI stock restore/verification rehearsal is complete and remains the
+required rollback route, but no replacement firmware has run on hardware.
 
 ## Verification record
 
@@ -98,7 +98,7 @@ The latest offline verification pass completed successfully on 2026-08-22:
   4 bytes of data and 19,312 bytes of BSS;
 - neither ELF contains unresolved relocations, and core0's vector table is
   exactly `0x13c` bytes;
-- the public-tree policy check accepted 163 UTF-8 source/documentation files and
+- the public-tree policy check accepted 164 UTF-8 source/documentation files and
   found no firmware blobs, generated binaries, or disallowed material; and
 - independent warning passes using GCC `-fanalyzer` and strict conversion,
   shadowing, and undefined-macro diagnostics completed without findings.

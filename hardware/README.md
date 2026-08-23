@@ -13,7 +13,7 @@ output, PCB captures, or copied vendor tables.
   facts from two bit-identical owner-supplied 32-MiB reads. It contains no dump,
   log, firmware bytes or extracted asset.
 
-## Current physical evidence — 2026-08-22
+## Current physical evidence — 2026-08-23
 
 - The external device identifies as Macronix `MX25L25635F/MX25L25645G`
   (`c2 20 19`), and two complete main-array reads have the same SHA-256.
@@ -23,15 +23,19 @@ output, PCB captures, or copied vendor tables.
 - The CH341B PCB used for acquisition was later measured at approximately 5 V
   on CS. It is not considered electrically safe for further connection to this
   3.3-V flash without proper level translation.
-- An ESP32-C3 SPI repair restored stock boot. Leaving that programmer connected
-  while unpowered interfered with boot, so every external bus master must be
-  physically disconnected or demonstrably high-impedance before releasing
-  reset.
+- An ESP32-C3 full-stock restore/verification rehearsal restored normal boot.
+  Leaving that programmer connected while unpowered interfered with boot, so
+  every external bus master must be physically disconnected or demonstrably
+  high-impedance before releasing reset.
+- The V1.22 preserved loader completed one guarded `F6 18` + `F6 06`/`F6 15`
+  marker cycle at `0x0008e000`; complete postflight reads found no unintended
+  byte difference and the final image exactly matched the baseline.
 
-This proves one external repair path, not a repeatable bit-identical full-chip
-restore and not the safety of installing the replacement firmware. Raw backups,
-programmer logs and repair images are intentionally not published or included
-in this public repository.
+This demonstrates the development unit's external-SPI rollback path and one
+narrow preserved-loader write primitive. It does not prove the safety of
+installing the replacement firmware or provide a general USB flasher. Raw
+backups, programmer logs and repair images are intentionally not published or
+included in this public repository.
 
 Every factual item identifies its evidence class and source page. Page numbers
 refer to Sonix *SNC7320 Series Data Sheet*, revision 2.1 (1 June 2022), whose

@@ -11,11 +11,12 @@ other material that the project cannot redistribute.
 
 **It is not yet board-validated firmware. Do not install it on hardware.** The
 software-owned drivers and protocols are now implemented, but several
-electrical/pinmux/controller assumptions and a repeatable full rollback
-procedure still need physical proof. Public defaults remain fail-closed and
-flash-image generation is disabled.
+electrical/pinmux/controller assumptions still need physical proof. A stock
+full-chip external-SPI restore has been rehearsed; that recovery result does not
+validate the replacement image. Public defaults remain fail-closed and flash-
+image generation is disabled.
 
-## Current status — 2026-08-22
+## Current status — 2026-08-23
 
 - The offline/software implementation is complete to the evidence currently
   available. `make check` passes 107 Python/C integration tests, browser
@@ -28,14 +29,16 @@ flash-image generation is disabled.
 - An external ESP32-C3 SPI repair restored normal stock boot. The intermittent
   boot seen immediately afterward was consistent with the unpowered programmer
   remaining connected to the flash bus and disappeared when it was disconnected.
-  This is a demonstrated emergency-repair path, not yet a repeatable,
-  byte-identical full-chip rollback qualification.
+  The owner has since completed the full-chip restore/verification rehearsal and
+  retained matching post-repair captures. External SPI is the demonstrated
+  rollback path for this development unit.
 - The flash-access tooling adds proven external SPI recovery workflows,
   read-only USB-ISP diagnostics and a dry-run-default two-stage USB mutation
-  experiment. The loader's `F6 06` program layout was
-  established by a destructive incident; the `F6 15`/`F6 19` erase layouts are
-  resolved by calibrated static analysis but remain untested on hardware. The
-  experiment is not a supported flasher; use SPI for owner-authorized ordinary,
+  experiment. On 2026-08-23 one guarded V1.22 cycle at offset `0x0008e000`
+  confirmed the sub-16-MiB `F6 18` + `F6 06` marker program and normal-NOR
+  `F6 18` + `F6 15` erase sequence, with exact 32-MiB postflight comparisons
+  and final restoration to the baseline. `F6 19` remains static-only. This is
+  not a supported general flasher; use SPI for owner-authorized ordinary,
   recovery and production writes.
 - No custom firmware has been installed. USB, display, touch, RGB, MCU2/Hall,
   pinmux, cold-start memory setup and a legitimate USB identity still require
@@ -44,7 +47,9 @@ flash-image generation is disabled.
 See the [firmware completion status](docs/FIRMWARE-COMPLETION-2026-08-18.md),
 [full-flash acquisition record](docs/FULL-FLASH-ACQUISITION-2026-08-22.md), and
 [boot/recovery model](docs/BOOT-RECOVERY-MODEL.md) for the firmware evidence
-boundaries. The [flash-access guide](tools/flash-access/README.md) and
+boundaries. The
+[bounded USB-ISP validation record](docs/USB-ISP-WRITE-VALIDATION-2026-08-23.md),
+[flash-access guide](tools/flash-access/README.md), and
 [F6 erase analysis](tools/flash-access/F6-ERASE-ENCODING.md) record the separate
 stock-recovery investigation.
 

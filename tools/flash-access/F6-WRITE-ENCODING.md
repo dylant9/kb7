@@ -1,8 +1,9 @@
 # `F6` write-command encoding — final investigation record
 
-Status as of 2026-08-22: **`F6 06` program is confirmed on hardware and
-`F6 15`/`F6 19` erase is resolved by calibrated static data-flow analysis.**
-This does not authorize USB writes; see the safety verdict below.
+Status as of 2026-08-23: **`F6 06`, `F6 18`, and the normal-NOR `F6 15`
+sequence are confirmed on the V1.22 loader at offset `0x0008e000`; `F6 19`
+remains resolved only by calibrated static data-flow analysis.** This does not
+authorize general USB writes; see the safety verdict below.
 
 The result was independently summarized from local static analysis of a
 lawfully obtained updater. No vendor binary, recovered symbol table,
@@ -98,19 +99,27 @@ chooses `F6 15` versus `F6 19`. The normal NOR erase can therefore still use
 `F6 15` in either address mode: its 16-bit field is in 512-byte units and covers
 the KB7's complete 32-MiB flash.
 
-## Why USB is still not the supported write path
+## Hardware result and why USB is still not the supported write path
 
 **Use the ESP32/flashrom SPI path for ordinary, recovery and production
 writes.**
 
-The recovered layout is now precise, but the loader's erase implementation has
-not been exercised safely on hardware. No no-op or bounded query can validate
-it: an erase command capable of testing the interpretation necessarily erases
-at least one complete unit. The bootloader calls itself `v0.001 test!`, its bulk
-endpoint fails above 4 KiB, and the first program experiment destroyed the boot
-chain after a host-side guard validated the intended rather than encoded
-address. The SPI path is proven on this board and supports explicit flashrom
-layouts and read-back verification.
+On 2026-08-23 the guarded sequence selected `F6 18`, programmed an exact
+512-byte marker at `0x0008e000` using raw address `0x6008e000`, then selected
+`F6 18` again and removed it with `F6 15` block index `0x0470`. Complete 32-MiB
+postflight comparisons found no other byte difference, and the erase post-image
+returned byte-for-byte to the original baseline. The
+[dated validation record](../../docs/USB-ISP-WRITE-VALIDATION-2026-08-23.md)
+contains the exact hashes and evidence limits.
+
+That confirms one loader, flash configuration, target and command size. It does
+not validate exact erase granularity, arbitrary operations, interruption
+recovery, another loader revision or `F6 19`. The bootloader calls itself
+`v0.001 test!`, its bulk endpoint fails above 4 KiB, and the first program
+experiment destroyed the boot chain after a host-side guard validated the
+intended rather than encoded address. The SPI path remains the supported owner-
+recovery and ordinary-write route and provides explicit flashrom layouts and
+read-back verification.
 
 The branch now contains `kb7-isp-write2.py`, a deliberately narrow,
 dry-run-by-default two-stage validation utility. It can emit only the reviewed
@@ -118,11 +127,11 @@ marker-program and sector-erase experiment after explicit `--commit` and
 fail-closed preconditions. It is not a supported USB flasher and does not make
 replacement firmware flash-approved.
 
-## No non-destructive erase test
+## Why the successful test remains destructive evidence
 
-None exists. Static analysis resolves byte-address versus block-index encoding.
-The remaining question is whether the target performs the destructive operation
-correctly, and testing that necessarily changes flash. The bounded experiment
-in [WRITE-TEST-PLAN.md](WRITE-TEST-PLAN.md) accepts that risk; it does not make
-the test non-destructive under every remaining interpretation or implementation
-failure.
+No non-destructive erase test exists. Static analysis resolved byte-address
+versus block-index encoding; confirming the target behavior necessarily changed
+flash. The bounded experiment in [WRITE-TEST-PLAN.md](WRITE-TEST-PLAN.md)
+accepted that risk and passed once. Its exact final image is strong evidence for
+the tested sequence, not a guarantee for untested targets, failures or future
+tools.

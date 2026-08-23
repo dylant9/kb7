@@ -29,10 +29,11 @@ for device installation.
 The actionable source findings have since been incorporated with fail-closed
 hardware boundaries and host-side regression tests. See
 `AUDIT-REMEDIATION-2026-08-17.md` for the finding-by-finding status. This does
-not change the non-flashable verdict. A later external stock repair succeeded,
-but the required replacement-firmware hardware profiles and a repeatable exact
-rollback qualification remain unavailable; see
-`FULL-FLASH-ACQUISITION-2026-08-22.md`.
+not change the non-flashable verdict. A later external-SPI full-stock
+restore/verification rehearsal established the development unit's rollback
+path, but the required replacement-firmware hardware profiles remain
+unavailable; see `FULL-FLASH-ACQUISITION-2026-08-22.md` and
+`USB-ISP-WRITE-VALIDATION-2026-08-23.md`.
 
 The full SNC7320 datasheet review on 2026-08-18 added a critical correction:
 AIRCR/software reset restarts PRAM, not mask ROM. The former mailbox-marker plus

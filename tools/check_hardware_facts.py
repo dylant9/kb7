@@ -121,8 +121,9 @@ def validate_pin_map(pinmap: dict[str, object]) -> None:
 
 
 def validate_stock_flash(stock: dict[str, object]) -> None:
-    require(stock["schema_version"] == 2,
-            "stock-flash evidence schema must describe the repair result")
+    require(stock["schema_version"] == 3 and
+            stock["updated_on"] == "2026-08-23",
+            "stock-flash evidence schema must describe the recovery and USB-ISP results")
     acquisition = stock["acquisition"]
     require(acquisition["read_count"] == 2 and acquisition["bit_identical"] is True,
             "stock flash must retain the two-read evidence boundary")
@@ -140,9 +141,31 @@ def validate_stock_flash(stock: dict[str, object]) -> None:
     recovery = stock["recovery_validation"]
     require(recovery["stock_repair_write_and_boot_observed"] is True,
             "retain the observed external stock-repair result")
-    require(recovery["full_chip_bit_identical_restore_proven"] is False and
+    require(recovery["full_chip_bit_identical_restore_proven"] is True and
+            recovery["post_restore_usb_read_count"] == 2 and
+            recovery["post_restore_usb_reads_bit_identical"] is True and
+            recovery["post_restore_usb_read_size_bytes"] == 0x02000000 and
+            recovery["post_restore_usb_sha256"] ==
+            "2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f" and
             recovery["custom_firmware_booted"] is False,
-            "do not promote a repair into full rollback or custom-firmware proof")
+            "retain the demonstrated rollback boundary without promoting custom firmware")
+
+    usb_write = stock["usb_isp_write_validation"]
+    require(usb_write["target_offset"] == "0x0008e000" and
+            usb_write["program_length_bytes"] == 512 and
+            usb_write["program_address_mode_command"] == "f6 18" and
+            usb_write["erase_address_mode_command"] == "f6 18",
+            "unexpected bounded USB-ISP target or address-mode sequence")
+    require(usb_write["program_cdb"] ==
+            "f6 06 00 60 08 e0 00 00 01 00 00 00 00 00 00 00" and
+            usb_write["erase_cdb"] ==
+            "f6 15 00 04 70 00 00 00 00 00 00 00 00 00 00 00",
+            "unexpected bounded USB-ISP mutation CDB")
+    require(usb_write["complete_postimages_exact"] is True and
+            usb_write["exact_erase_granularity_proven"] is False and
+            usb_write["f6_19_tested"] is False and
+            usb_write["custom_firmware_booted"] is False,
+            "retain the narrow USB-ISP proof boundary")
 
     regions = stock["manifest"]["regions"]
     require([region["index"] for region in regions] == [0, 1, 2],
