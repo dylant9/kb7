@@ -111,9 +111,10 @@ one internally derived mutation per CLI invocation, requires two exact
 full-chip pre/post reads and strict close-before-publication, and has no USB
 reconciliation for an ordinary intent. The supporting sources/policy are
 pinned, and two exact owner baselines now independently reproduce the pinned
-168-operation campaign ID and both stable targets. The exact fixed campaign is
-now authorized for one bounded hardware proof, which remains unrun. This is not
-a reduction in the hardware
+168-operation campaign ID and both stable targets. Its first read-only
+preflight stopped before boundary zero; independent SPI verified exact stock
+flash. Proof mutation is relocked and only phase-reporting read-only preflight
+is enabled. This is not a reduction in the hardware
 severity of finding 12. See the
 [fixed proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md).
 
@@ -170,9 +171,9 @@ severity of finding 12. See the
     accepted firmware. The recovery chord ran after unsafe clock code, fault
     handlers slept forever, and USB recovery was unavailable. The later static
     loader-reentry result supplies a viable early-stage design, and the later
-    fixed install/restore campaign supplies a fail-closed offline test route,
-    and its custom proof is still hardware-unrun; only that bounded campaign is
-    live-enabled.
+    fixed install/restore campaign supplies a fail-closed offline test route.
+    Its custom proof is still hardware-unrun; after the read-only preflight
+    incident no proof mutation is live-enabled.
 
 13. **Software reset was incorrectly treated as loader entry.** The later
     datasheet review proved that it restarts PRAM. The subsequent stock audit

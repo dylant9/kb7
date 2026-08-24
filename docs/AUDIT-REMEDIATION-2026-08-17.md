@@ -74,11 +74,14 @@ hardware measurements:
   temporary one-sector Core-1 checksum poison protects every dense Core-0
   prefix, and the final Core-0 word is a rank-32 checksum gate. Its separate
   executor is dry-run-default, has terminal pre-USB intent states and no raw
-  flash fields. Supporting source/policy pins and 33 focused campaign/executor
+  flash fields. Supporting source/policy pins and focused campaign/executor
   tests pass. Two exact owner baselines independently reproduce its pinned
-  168-operation identity and exact proof/stock closure. The exact bounded
-  hardware campaign is now independently authorized but remains unrun. See the
-  [fixed proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md).
+  168-operation identity and exact proof/stock closure. The first committed
+  read-only preflight stopped before boundary zero; two independent external-
+  SPI reads proved exact stock closure and no write was needed. Proof mutation
+  is relocked while phase-specific read-only diagnosis remains enabled. See the
+  [fixed proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md) and
+  [incident record](LOADER-REENTRY-PREFLIGHT-INCIDENT-2026-08-24.md).
 - The recovery chord defaults off. Its input choice and boot-time semantics
   still need a dedicated review; generic `SYS0_PINCTRL` uncertainty is no
   longer the blocker.
@@ -120,9 +123,9 @@ revision physically interrupts a
 flash command or pulse, tests device power loss or touches firmware regions,
 and none unlocks firmware mutation.
 The additional fixed loader-reentry executor is not a general updater: it can
-accept only one independently rederived proof campaign, its owner-specific
-campaign pin is exact, and `LIVE_PROOF_CAMPAIGN_ENABLED` is true only for that
-bounded proof install and exact-stock restore.
+accept only one independently rederived proof campaign and its owner-specific
+campaign pin is exact. `LIVE_PROOF_CAMPAIGN_ENABLED` is false after the first
+read-only preflight incident; only the exact read-only diagnostic gate is true.
 Header dependencies use `-MMD -MP`.
 
 Any future image-producing release pipeline must, before it is enabled:
@@ -157,7 +160,7 @@ change `flash_approved=false`.
 
 The latest offline verification pass completed successfully on 2026-08-23:
 
-- `make check`: 256 Python tests passed, browser JavaScript syntax
+- `make check`: 261 Python tests passed, browser JavaScript syntax
   and executable validator checks passed, and the default, guarded-audit,
   all-branches integration and minimal recovery-proof firmware profiles built
   and passed ELF verification;
@@ -166,7 +169,7 @@ The latest offline verification pass completed successfully on 2026-08-23:
   4 bytes of data and 19,312 bytes of BSS;
 - neither ELF contains unresolved relocations, and core0's vector table is
   exactly `0x13c` bytes;
-- the public-tree policy check accepted 204 UTF-8 source/documentation files and
+- the public-tree policy check accepted 205 UTF-8 source/documentation files and
   found no firmware blobs, generated binaries, or disallowed material; and
 - independent warning passes using GCC `-fanalyzer` and strict conversion,
   shadowing, and undefined-macro diagnostics completed without findings.

@@ -745,7 +745,7 @@ def validate_stock_flash(stock: dict[str, object]) -> None:
 def validate_loader_reentry(evidence: dict[str, object]) -> None:
     require(evidence["schema"] ==
             "kb7.hardware.stock-loader-reentry-static-analysis" and
-            evidence["schema_version"] == 3 and
+            evidence["schema_version"] == 4 and
             evidence["analyzed_on"] == "2026-08-23" and
             evidence["evidence_class"] == "firmware_recovery",
             "unexpected stock loader-reentry evidence identity")
@@ -854,7 +854,7 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
     campaign = evidence["fixed_install_restore_campaign"]
     require(
         campaign["status"] ==
-        "owner_bound_offline_verified_hardware_authorized_unrun" and
+        "read_only_preflight_incident_verified_stock_unchanged_mutation_relocked" and
         campaign["campaign_tool"] ==
         "tools/flash-access/kb7-loader-reentry-campaign.py" and
         campaign["executor_tool"] ==
@@ -899,19 +899,26 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
         "durable_terminal_intent_before_backend_or_usb",
         "two_exact_full_chip_reads_before_and_after_each_mutation",
         "strict_close_before_authorizing_publication",
+        "reattach_not_found_or_busy_accepted_only_if_kernel_driver_is_active",
     )) and safety["final_core0_gate_rank"] == 32 and
         safety["automatic_retry"] is False and
         safety["ordinary_intent_usb_reconciliation"] is False and
-        safety["transport_or_verification_anomaly"] ==
+        safety["read_only_preflight_transport_or_close_anomaly"] ==
+        "no_flash_mutation_power_cycle_before_new_journal" and
+        safety["read_only_preflight_image_verification_anomaly"] ==
+        "external_spi_verify_no_automatic_write" and
+        safety["post_intent_transport_or_verification_anomaly"] ==
         "external_spi_no_further_usb",
         "fixed proof safety policy changed")
     authorization = campaign["authorization"]
     require(
-        authorization["live_proof_campaign_enabled"] is True and
-        authorization["fixed_proof_hardware_test_authorized"] is True and
-        authorization["execution_authorized"] is True and
+        authorization["live_read_only_preflight_enabled"] is True and
+        authorization["live_proof_campaign_enabled"] is False and
+        authorization["read_only_preflight_diagnostic_authorized"] is True and
+        authorization["fixed_proof_hardware_test_authorized"] is False and
+        authorization["execution_authorized"] is False and
         authorization["authorization_scope"] ==
-        "one fixed proof install and exact stock restore" and
+        "one exact read-only proof preflight; no program or erase" and
         authorization["expected_campaign_id"] ==
         "3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f" and
         authorization["owner_campaign_generated"] is True and
@@ -923,24 +930,22 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
                 "085dd0c2087e258d880824f657e37ecde08f4fd05234ab14d948af245d8de765",
             "planner":
                 "618bed76c236390c8203ef5395db2317dfce9cce620035bda05231fc05727d0a",
-            "strict_transport":
-                "55cacc77b4902827c47e45fa0be77b55bac8d552bae08dbe48b9aa8942c16076",
             "verifier":
                 "9b19d393cf64c66168e08de2f3d4fe352a85a2fd69545e374dee0fa015dea338",
             "writer":
                 "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
         } and
         authorization["policy_sha256"] ==
-        "15e4ae0ac2a138c64b869b063d9f495ce3d9f371f206baae25d1fa9944706540" and
+        "40d94df34ce096f06ee9de8ed2e5987a4aeec28aaef13b2f053726499856c4be" and
         authorization["executor_descriptor_sha256"] ==
-        "1b2f4941ec640e19f7798b3f9bcdae075bb7e37603b2779aea22c0fe191f40d3" and
+        "e2c8335505b08a0951104901f3ad2d90b3951ca20ee86f9ae1eea90b8b7ac30d" and
         authorization["executor_source_sha256"] ==
-        "f211a9ce2348104e6736697fa5f81c6f3a3360664ade8576a07edcb3a7f09a8a" and
+        "e43f65a91755458b257230be042029fd0a7bf75eb7f9629a6986a5757f678dd3" and
         authorization["generic_firmware_executor_mutation_enabled"] is False and
         authorization["flash_approved"] is False,
         "fixed proof campaign authorization changed")
     offline = campaign["offline_validation"]
-    require(offline["focused_campaign_and_executor_tests_passed"] == 33 and
+    require(offline["focused_campaign_and_executor_tests_passed"] == 38 and
             offline["exact_campaign_operation_count"] == 168 and
             offline["install_operation_count"] == 32 and
             offline["restore_operation_count"] == 136 and
@@ -964,9 +969,31 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
                 "fault_and_atomic_journal_matrix",
                 "private_artifact_publication_guards",
             )), "fixed proof offline validation changed")
-    require(all(value is False for value in
-                campaign["hardware_validation"].values()),
-            "fixed proof campaign hardware status must remain unvalidated")
+    require(campaign["hardware_validation"] == {
+        "read_only_preflight_attempted": True,
+        "read_only_preflight_reached_boundary_zero": False,
+        "read_only_preflight_reported_two_complete_full_chip_reads": True,
+        "read_only_preflight_exact_failure_phase_observed": False,
+        "read_only_preflight_underlying_error_observed": False,
+        "preflight_terminal_marker_observed": True,
+        "program_or_erase_command_possible_in_preflight": False,
+        "kernel_disconnect_or_reenumeration_observed_during_preflight": False,
+        "external_spi_full_chip_read_count_after_stop": 2,
+        "external_spi_reads_match_each_other": True,
+        "external_spi_reads_match_exact_baseline": True,
+        "external_spi_write_required": False,
+        "proof_install_attempted": False,
+        "checksum_valid_proof_core0_booted": False,
+        "preserved_loader_reenumerated": False,
+        "proof_image_readback_verified": False,
+        "stock_restore_attempted": False,
+        "exact_full_baseline_restored": False,
+        "normal_5038_keyboard_operation_restored": True,
+        "old_preflight_root_cause_known": False,
+        "leading_hypothesis": (
+            "host-side strict-close or kernel-driver reattachment result; "
+            "not proven"),
+    }, "fixed proof campaign hardware incident status changed")
 
     require(evidence["planner_immutability"] == {
         "header": ["0x00000000", "0x00001000"],

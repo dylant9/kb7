@@ -16,9 +16,11 @@ output, PCB captures, or copied vendor tables.
   version-stable stock SRAM relocation and preserved-loader request path, plus
   the default-off custom proof profile, its fixed offline install/restore
   campaign, and their still-unmet hardware gates. The campaign is simulation-
-  and fault-test-complete, bound to the independently rederived owner campaign,
-  and is now authorized only for its bounded owner-specific proof hardware
-  test; that test remains unrun. It contains no stock
+  and fault-test-complete and bound to the independently rederived owner
+  campaign. Its first read-only hardware preflight stopped before boundary
+  zero; independent SPI proved the flash remained exact stock. Proof mutation
+  is now relocked and only phase-reporting read-only preflight is authorized.
+  It contains no stock
   instruction bytes, owner-local paths, campaign payloads or journal data.
 
 ## Current physical evidence — 2026-08-23

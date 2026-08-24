@@ -6,8 +6,11 @@ Review date: 2026-08-23
 
 The remaining software work for the first checksum-valid custom-image proof is
 implemented, bound to the exact owner baseline and independently reverified
-offline. The exact bounded proof-install/exact-stock-restore campaign is now
-live-enabled; it remains hardware-unrun.
+offline. Its first hardware action stopped during read-only preflight before
+boundary zero; no proof-install operation was attempted. Proof mutation is now
+relocked while an exact phase-reporting read-only preflight remains enabled.
+See the dated
+[preflight incident record](LOADER-REENTRY-PREFLIGHT-INCIDENT-2026-08-24.md).
 
 The exact proof Core-0 image produced by `make -C replacement_fw recovery-proof`
 has entry `0x00000175`, length 1,228 bytes and SHA-256
@@ -28,14 +31,17 @@ general paired-firmware executor.
 
 The fixed executor currently has:
 
-- `LIVE_PROOF_CAMPAIGN_ENABLED = True` for only this pinned campaign;
+- `LIVE_READ_ONLY_PREFLIGHT_ENABLED = True` for only this pinned campaign;
+- `LIVE_PROOF_CAMPAIGN_ENABLED = False`, so `step`, `validate-reentry` and
+  `finalize --commit` cannot run;
 - expected owner campaign identifier
   `3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f`;
 - pinned supporting-source, policy and normalized executor-source hashes;
 - no caller-selected offset, payload, CDB, operation index, retry, force or
   USB-device selector; and
-- a dry-run default, with `--commit` admitted only after the independent
-  campaign, source, policy and general-executor-lock checks pass.
+- a dry-run default, with only read-only `preflight --commit` admitted after
+  the independent campaign, source, policy and general-executor-lock checks
+  pass.
 
 Two distinct owner files were supplied outside the checkout. Each is exactly
 33,554,432 bytes, they compare byte-for-byte equal, and both have SHA-256
@@ -117,11 +123,18 @@ local-only `inspect` commands.
   open, verifies two exact stock full-chip reads, strictly closes and then
   clears the journal.
 
-Any constructor, identity, BOT transport, checksum, exact-image or strict-close
-anomaly after a terminal marker is visible leaves a non-authorizing journal and
-requires external SPI. There is no ordinary intent reconciliation and no
-automatic mutation retry. Atomic state outcomes that cannot be classified are
-exit-4 local-inspection cases; that result authorizes no USB action.
+Any post-intent constructor, identity, BOT transport, checksum, exact-image or
+strict-close anomaly leaves a non-authorizing journal and requires external
+SPI. Read-only preflight is different: it has no program or erase authority.
+Its failures now identify the exact phase and retain non-authorizing
+`preflight_started`. Transport, identity and close failures prohibit more USB
+traffic in that powered session and require a power cycle before a fresh
+journal; SPI is optional. A read-pair or exact-baseline mismatch instead
+requires independent SPI verification, but never an automatic write. There is
+no ordinary intent
+reconciliation and no automatic mutation retry. Atomic state outcomes that
+cannot be classified are exit-4 local-inspection cases; that result authorizes
+no USB action.
 
 ## Owner-local campaign generation
 
@@ -149,19 +162,18 @@ to one another and SHA-256
 `2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f`.
 Generation refuses any other stock layout or proof raw identity.
 
-The offline review has now recorded the rederived campaign ID, exact operation
-counts, proof full-image hash, fixed Core-1 barrier sector, every operation
-CDB/payload hash and all simulation invariants. A separate source change has
-now set the live boolean, refreshed the normalized executor, policy and
-full-source pins, rerun private campaign verification, and updated the
-machine-readable status. This authorizes only the exact fixed campaign
-described here; it does not authorize a caller-selected firmware install or the
-general paired-firmware executor.
+The offline review records the rederived campaign ID, exact operation counts,
+proof full-image hash, fixed Core-1 barrier sector, every operation CDB/payload
+hash and all simulation invariants. Following the first read-only preflight
+incident, the mutation live boolean was reset to false. The refreshed executor
+and policy pins authorize only a diagnostic read-only preflight. They do not
+authorize the fixed install, a caller-selected firmware install or the general
+paired-firmware executor.
 
-## Authorized bounded hardware run
+## Paused bounded hardware run
 
-The exact pinned owner campaign is authorized for the following stop-gated
-hardware run:
+The following stop-gated run remains the eventual target, but proof mutation is
+not authorized in the current revision:
 
 1. keep the rehearsed full-chip external-SPI restore available, with the
    external programmer physically disconnected from the powered keyboard;
@@ -177,10 +189,14 @@ hardware run:
    SHA-256 and byte comparison to the baseline; and
 9. only then cold boot and require `10f5:5038` plus normal keyboard operation.
 
-An exit 3, terminal marker, unstable read, unexpected image, identity change or
-strict-close failure prohibits every further USB command. Preserve the private
-journal and use the already rehearsed external-SPI full-baseline restore. Never
-leave the external programmer wired while it is unpowered.
+An exit 3 after a mutation intent still prohibits every further USB command and
+requires the rehearsed external-SPI full-baseline restore. A read-only
+preflight transport/identity/close stop instead reports exit 5: preserve the
+private journal, issue no more USB command in that powered session, and power-
+cycle before any later read-only attempt. Exit 6 means exact USB image evidence
+was not established and requires an independent SPI read; write only if SPI
+itself differs from baseline. Never leave the external programmer wired while
+it is unpowered.
 
 ## Proof boundary
 

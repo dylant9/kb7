@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import fcntl
 import importlib.util
+import io
 import json
 import os
 import subprocess
@@ -177,8 +178,9 @@ class LoaderReentryExecutorTests(unittest.TestCase):
 
         return fault
 
-    def test_exact_proof_campaign_is_live_enabled_and_general_executor_stays_locked(self) -> None:
-        self.assertTrue(EXECUTOR.LIVE_PROOF_CAMPAIGN_ENABLED)
+    def test_read_only_preflight_is_enabled_while_proof_writes_stay_locked(self) -> None:
+        self.assertTrue(EXECUTOR.LIVE_READ_ONLY_PREFLIGHT_ENABLED)
+        self.assertFalse(EXECUTOR.LIVE_PROOF_CAMPAIGN_ENABLED)
         self.assertEqual(
             EXECUTOR.EXPECTED_CAMPAIGN_ID,
             "3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f")
@@ -189,9 +191,11 @@ class LoaderReentryExecutorTests(unittest.TestCase):
         self.assertEqual(EXECUTOR.EXPECTED_EXECUTOR_DESCRIPTOR_SHA256,
                          EXECUTOR._executor_descriptor_sha256())
         reviewed = mock.Mock(campaign_id=EXECUTOR.EXPECTED_CAMPAIGN_ID)
-        EXECUTOR.require_live_authorization(reviewed)
+        EXECUTOR.require_read_only_preflight_authorization(reviewed)
         with self.assertRaises(EXECUTOR.ExecutionLocked):
-            EXECUTOR.require_live_authorization(self.transaction)
+            EXECUTOR.require_live_authorization(reviewed)
+        with self.assertRaises(EXECUTOR.ExecutionLocked):
+            EXECUTOR.require_read_only_preflight_authorization(self.transaction)
         general = (ROOT / "tools/flash-access/kb7-updater-executor.py").read_text()
         self.assertIn("LIVE_MUTATION_ENABLED = False", general)
         self.assertNotIn("--commit", general)
@@ -203,6 +207,9 @@ class LoaderReentryExecutorTests(unittest.TestCase):
         self.assertTrue(issubclass(
             EXECUTOR.FixedProofNoRecoveryReadOnlyDevice,
             EXECUTOR._writer._verify.Device))
+        self.assertTrue(issubclass(
+            EXECUTOR.FixedProofNoRecoveryReadOnlyDevice,
+            EXECUTOR._ProofStrictCloseMixin))
 
     def test_usb_enumeration_address_is_added_only_by_the_fixed_proof_device(self) -> None:
         class ParentDevice:
@@ -228,6 +235,82 @@ class LoaderReentryExecutorTests(unittest.TestCase):
                 encoding="utf-8")
         self.assertNotIn("libusb_get_device_address", shared_verifier)
 
+    def test_proof_strict_close_classifies_reattach_without_false_busy_failure(
+            self) -> None:
+        class FakeLibusb:
+            def __init__(self, *, release=0, attach=0, active=0) -> None:
+                self.release = release
+                self.attach = attach
+                self.active = active
+                self.events: list[tuple[object, ...]] = []
+
+            def libusb_release_interface(self, handle, interface):
+                self.events.append(("release", handle, interface))
+                return self.release
+
+            def libusb_attach_kernel_driver(self, handle, interface):
+                self.events.append(("attach", handle, interface))
+                return self.attach
+
+            def libusb_kernel_driver_active(self, handle, interface):
+                self.events.append(("active", handle, interface))
+                return self.active
+
+            def libusb_close(self, handle):
+                self.events.append(("close", handle))
+
+            def libusb_exit(self, context):
+                self.events.append(("exit", context))
+
+        def device():
+            result = object.__new__(EXECUTOR.FixedProofNoRecoveryReadOnlyDevice)
+            result.h = "handle"
+            result.iface = 0
+            result.reattach = True
+            result.ctx = "context"
+            return result
+
+        busy_but_attached = FakeLibusb(attach=-6, active=1)
+        with mock.patch.object(EXECUTOR._writer._verify, "lib",
+                               busy_but_attached):
+            device().close()
+        self.assertEqual(busy_but_attached.events, [
+            ("release", "handle", 0),
+            ("attach", "handle", 0),
+            ("active", "handle", 0),
+            ("close", "handle"),
+            ("exit", "context"),
+        ])
+
+        not_found_but_attached = FakeLibusb(attach=-5, active=1)
+        with mock.patch.object(EXECUTOR._writer._verify, "lib",
+                               not_found_but_attached):
+            device().close()
+
+        busy_and_detached = FakeLibusb(attach=-6, active=0)
+        with mock.patch.object(EXECUTOR._writer._verify, "lib",
+                               busy_and_detached), self.assertRaisesRegex(
+                RuntimeError,
+                r"LIBUSB_ERROR_BUSY.*kernel-driver-active check returned 0"):
+            device().close()
+        self.assertEqual(busy_and_detached.events[-2:], [
+            ("close", "handle"), ("exit", "context")])
+
+        timeout_despite_active = FakeLibusb(attach=-7, active=1)
+        with mock.patch.object(EXECUTOR._writer._verify, "lib",
+                               timeout_despite_active), self.assertRaisesRegex(
+                RuntimeError, r"LIBUSB_ERROR_TIMEOUT"):
+            device().close()
+
+        release_timeout = FakeLibusb(release=-7)
+        with mock.patch.object(EXECUTOR._writer._verify, "lib",
+                               release_timeout), self.assertRaisesRegex(
+                RuntimeError, r"LIBUSB_ERROR_TIMEOUT"):
+            device().close()
+        self.assertNotIn(("attach", "handle", 0), release_timeout.events)
+        self.assertEqual(release_timeout.events[-2:], [
+            ("close", "handle"), ("exit", "context")])
+
     def test_preflight_publishes_terminal_start_before_usb_then_exact_boundary(self) -> None:
         state = FakeState(self.baseline)
 
@@ -246,23 +329,34 @@ class LoaderReentryExecutorTests(unittest.TestCase):
             ["open_read", "identity", "capture_1", "capture_2", "close"])
 
     def test_preflight_faults_retain_terminal_marker_and_never_retry_usb(self) -> None:
+        phases = {
+            "constructor": "backend_open",
+            "identity": "loader_identity",
+            "capture_1": "first_full_chip_read",
+            "capture_2": "second_full_chip_read",
+            "close": "strict_close",
+        }
         for fault in ("constructor", "identity", "capture_1", "capture_2",
                       "close"):
             with self.subTest(fault=fault):
                 path = self.case / f"preflight-{fault}.json"
                 state = FakeState(self.baseline)
                 state.fail_at = fault
-                with self.assertRaises(EXECUTOR.RecoveryRequired):
+                with self.assertRaises(
+                        EXECUTOR.ReadOnlyPreflightStopped) as caught:
                     EXECUTOR.live_preflight(
                         self.transaction, path,
                         backend_factory=lambda transaction: FakeReadBackend(
                             transaction, state), progress=False)
+                self.assertEqual(caught.exception.phase, phases[fault])
+                self.assertIn(f"{fault.split('_')[0]} fault",
+                              str(caught.exception))
                 visible = EXECUTOR.load_journal(path)
                 self.assertEqual(visible["status"], EXECUTOR.PREFLIGHT_STARTED)
                 self.assertEqual(state.close_count, 1 if fault == "close" else 0)
                 self.assertEqual(
                     EXECUTOR.inspect_state(self.transaction, path)["permitted_next"],
-                    "external_spi_only")
+                    "follow_recorded_preflight_stop_no_usb")
                 opened = 0
 
                 def must_not_open(_transaction: object):
@@ -275,6 +369,48 @@ class LoaderReentryExecutorTests(unittest.TestCase):
                         self.transaction, path, backend_factory=must_not_open,
                         progress=False)
                 self.assertEqual(opened, 0)
+
+    def test_preflight_exact_mismatch_requires_spi_verification_not_blind_restore(
+            self) -> None:
+        state = FakeState(self.baseline)
+        state.image[EXECUTOR._planner.CORE0_START] ^= 1
+        with self.assertRaises(
+                EXECUTOR.ReadOnlyPreflightVerificationStopped) as caught:
+            EXECUTOR.live_preflight(
+                self.transaction, self.journal,
+                backend_factory=lambda transaction: FakeReadBackend(
+                    transaction, state), progress=False)
+        self.assertEqual(caught.exception.phase, "exact_baseline_verification")
+        self.assertEqual(state.execute_count, 0)
+        self.assertEqual(
+            EXECUTOR.load_journal(self.journal)["status"],
+            EXECUTOR.PREFLIGHT_STARTED)
+        self.assertEqual(
+            EXECUTOR.inspect_state(
+                self.transaction, self.journal)["permitted_next"],
+            "follow_recorded_preflight_stop_no_usb")
+
+    def test_preflight_read_pair_mismatch_is_distinct_from_transport_failure(
+            self) -> None:
+        state = FakeState(self.baseline)
+
+        class UnstableReadBackend(FakeReadBackend):
+            def capture(self, *, progress: bool = True) -> bytes:
+                result = bytearray(super().capture(progress=progress))
+                if self.capture_count == 2:
+                    result[EXECUTOR._planner.CORE0_START] ^= 1
+                return bytes(result)
+
+        with self.assertRaises(
+                EXECUTOR.ReadOnlyPreflightVerificationStopped) as caught:
+            EXECUTOR.live_preflight(
+                self.transaction, self.journal,
+                backend_factory=lambda transaction: UnstableReadBackend(
+                    transaction, state), progress=False)
+        self.assertEqual(
+            caught.exception.phase, "exact_read_pair_verification")
+        self.assertIn("two exact full-chip reads mismatch", str(caught.exception))
+        self.assertEqual(state.close_count, 0)
 
     def test_preflight_atomic_publication_outcomes_never_open_usb_early(self) -> None:
         for site, expected in (("before_replace", "absent"),
@@ -301,7 +437,7 @@ class LoaderReentryExecutorTests(unittest.TestCase):
                         EXECUTOR.load_journal(path)["status"], expected)
 
         for site, exception, status in (
-                ("before_replace", EXECUTOR.RecoveryRequired,
+                ("before_replace", EXECUTOR.ReadOnlyPreflightStopped,
                  EXECUTOR.PREFLIGHT_STARTED),
                 ("after_replace", EXECUTOR.StateInspectionRequired,
                  EXECUTOR.BOUNDARY_VERIFIED)):
@@ -768,7 +904,8 @@ class LoaderReentryExecutorTests(unittest.TestCase):
             "preflight_dry_run")
         cases = (
             (0, EXECUTOR.BOUNDARY_VERIFIED, "step_dry_run"),
-            (0, EXECUTOR.PREFLIGHT_STARTED, "external_spi_only"),
+            (0, EXECUTOR.PREFLIGHT_STARTED,
+             "follow_recorded_preflight_stop_no_usb"),
             (0, EXECUTOR.INTENT, "external_spi_only"),
             (self.transaction.install_count, EXECUTOR.PROOF_INSTALLED,
              "cold_boot_then_validate_reentry_dry_run"),
@@ -915,6 +1052,65 @@ class LoaderReentryExecutorTests(unittest.TestCase):
             live.assert_not_called()
             self.assertEqual(EXECUTOR.main(arguments + ["--commit"]), 2)
             live.assert_not_called()
+
+    def test_cli_reports_read_only_phase_and_never_labels_it_spi_restore(self) -> None:
+        arguments = [
+            "preflight",
+            "--baseline-a", str(self.baseline_a),
+            "--baseline-b", str(self.baseline_b),
+            "--proof-core0-elf", str(self.proof_elf),
+            "--campaign", str(self.campaign_dir),
+            "--journal", str(self.journal),
+            "--commit",
+        ]
+        output = io.StringIO()
+        stopped = EXECUTOR.ReadOnlyPreflightStopped(
+            "strict_close",
+            RuntimeError(
+                "libusb_attach_kernel_driver failed "
+                "(-6 LIBUSB_ERROR_BUSY); kernel-driver-active check returned 0"))
+        with mock.patch.object(EXECUTOR, "load_transaction",
+                               return_value=self.transaction), \
+                mock.patch.object(
+                    EXECUTOR, "require_read_only_preflight_authorization"), \
+                mock.patch.object(EXECUTOR, "live_preflight",
+                                  side_effect=stopped), \
+                mock.patch.object(EXECUTOR.sys, "stderr", output):
+            self.assertEqual(EXECUTOR.main(arguments), 5)
+        text = output.getvalue()
+        self.assertIn("phase=strict_close", text)
+        self.assertIn("LIBUSB_ERROR_BUSY", text)
+        self.assertIn("No program or erase command was sent", text)
+        self.assertIn("External SPI is optional", text)
+        self.assertNotIn("EXTERNAL SPI RECOVERY REQUIRED", text)
+
+    def test_cli_requires_spi_verification_for_exact_usb_image_mismatch(self) -> None:
+        arguments = [
+            "preflight",
+            "--baseline-a", str(self.baseline_a),
+            "--baseline-b", str(self.baseline_b),
+            "--proof-core0-elf", str(self.proof_elf),
+            "--campaign", str(self.campaign_dir),
+            "--journal", str(self.journal),
+            "--commit",
+        ]
+        output = io.StringIO()
+        stopped = EXECUTOR.ReadOnlyPreflightVerificationStopped(
+            "exact_baseline_verification",
+            RuntimeError("stable USB image differs from baseline"))
+        with mock.patch.object(EXECUTOR, "load_transaction",
+                               return_value=self.transaction), \
+                mock.patch.object(
+                    EXECUTOR, "require_read_only_preflight_authorization"), \
+                mock.patch.object(EXECUTOR, "live_preflight",
+                                  side_effect=stopped), \
+                mock.patch.object(EXECUTOR.sys, "stderr", output):
+            self.assertEqual(EXECUTOR.main(arguments), 6)
+        text = output.getvalue()
+        self.assertIn("VERIFICATION STOPPED", text)
+        self.assertIn("Verify independently through external SPI", text)
+        self.assertIn("write only if", text)
+        self.assertNotIn("EXTERNAL SPI RECOVERY REQUIRED", text)
 
 
 if __name__ == "__main__":

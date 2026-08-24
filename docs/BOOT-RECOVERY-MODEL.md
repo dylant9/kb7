@@ -44,10 +44,13 @@ and fault testing. Its stable target is the checksum-valid proof Core 0 plus
 exact stock Core 1; one temporary Core-1 sector checksum poison protects the
 Core-0 rebuild and is restored before final commit. Two exact owner baselines
 now reproduce the reviewed 168-operation campaign ID and both stable images.
-The separate executor pins that identity and is enabled only for the bounded
-owner-specific hardware proof, which remains unrun.
+The separate executor pins that identity. Its first read-only preflight stopped
+before boundary zero, after which two external-SPI reads proved exact stock
+flash. Proof mutation is now relocked; only phase-reporting read-only preflight
+is enabled.
 See the
-[`fixed proof campaign`](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md).
+[`fixed proof campaign`](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md) and
+[`incident record`](LOADER-REENTRY-PREFLIGHT-INCIDENT-2026-08-24.md).
 
 The board pad labeled `MCU_RST` is a strong candidate for active-low `RSTN`,
 which is package lead 88 on the presumed SNC73200 LQFP128. It measured about
@@ -95,7 +98,7 @@ default-off hardware-validation gate.
 | External `RSTN` | Release restarts through ROM; SNC73200 lead 88 (pp. 21 and 43) | `MCU_RST` voltage behavior, repeated read isolation and a full restore are demonstrated; direct continuity/waveform are optional documentation |
 | ROM USB-ISP | ROM enters it when no boot identifying mark is found (p. 44) | Identity/protocol and behavior with a corrupt-but-present identifying mark remain unknown |
 | Preserved flash loader | Recovered loader is separate from mask ROM | Observed over USB as `10f5:5037`; exact full-chip reads, a marker cycle, and a guarded exact-footprint cycle at one target passed. It remains an experimental path, not a supported flasher or recovery substitute |
-| Stock preserved-loader re-entry | Not specified by the datasheet; compatible with its PRAM-reset rule | Hash-pinned instruction semantics prove the complete marker/SRAM-copy/PRAM-copy/reset/consumer route in V1.22, V1.24 and V1.33. The clean-room custom proof and fixed install/restore campaign pass offline; the exact bounded campaign is hardware-authorized but remains unrun |
+| Stock preserved-loader re-entry | Not specified by the datasheet; compatible with its PRAM-reset rule | Hash-pinned instruction semantics prove the complete marker/SRAM-copy/PRAM-copy/reset/consumer route in V1.22, V1.24 and V1.33. The clean-room custom proof and fixed install/restore campaign pass offline. Its first read-only preflight stopped before boundary zero with flash independently verified unchanged; proof mutation is relocked |
 | SWD | One SWD port; SNC73200 SWO/SWCLK/SWDIO are leads 11/12/13 (pp. 1, 11 and 19) | Connect-under-reset and core visibility are untested; no erase operation is authorized |
 | Watchdog reset | Underflow can reset through ROM; WDT uses the 32-kHz ILRC (pp. 43 and 57–58) | Stock proves two instances and feed/disable/reset-trigger writes despite the omitted register table; mailbox retention and a complete custom policy remain unvalidated secondary options |
 | Software reset | Restarts PRAM (p. 43) | Not loader entry by itself; it completes the stock route only after the preserved loader has replaced PRAM |

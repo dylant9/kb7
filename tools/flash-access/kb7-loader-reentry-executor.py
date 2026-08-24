@@ -9,8 +9,8 @@ selected canonical operation in the Core-0 envelope or the one fixed Core-1
 barrier sector.
 
 The exact owner-baseline campaign and reviewed implementation hashes are
-pinned below.  Live commit is authorized only for that fixed proof campaign;
-the general paired-firmware executor remains independently mutation-locked.
+pinned below.  Only its read-only preflight is currently live; proof mutation
+and the general paired-firmware executor remain independently hard-locked.
 """
 
 from __future__ import annotations
@@ -54,15 +54,13 @@ _planner = _campaign._planner
 _writer = _load_module(
     "kb7_isp_writer_for_loader_reentry_executor",
     TOOL_DIRECTORY / "kb7-isp-write2.py")
-_scratch = _load_module(
-    "kb7_scratch_helpers_for_loader_reentry_executor",
-    TOOL_DIRECTORY / "kb7-updater-scratch-executor.py")
 
 SafetyError = _writer.SafetyError
 PlanError = _planner.PlanError
 
 JOURNAL_SCHEMA = "kb7-loader-reentry-proof-journal-v1"
-LIVE_PROOF_CAMPAIGN_ENABLED = True
+LIVE_READ_ONLY_PREFLIGHT_ENABLED = True
+LIVE_PROOF_CAMPAIGN_ENABLED = False
 EXPECTED_CAMPAIGN_ID = (
     "3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f")
 EXPECTED_IMPLEMENTATION_HASHES: dict[str, str] = {
@@ -70,16 +68,14 @@ EXPECTED_IMPLEMENTATION_HASHES: dict[str, str] = {
         "085dd0c2087e258d880824f657e37ecde08f4fd05234ab14d948af245d8de765",
     "planner_source_sha256":
         "618bed76c236390c8203ef5395db2317dfce9cce620035bda05231fc05727d0a",
-    "strict_transport_source_sha256":
-        "55cacc77b4902827c47e45fa0be77b55bac8d552bae08dbe48b9aa8942c16076",
     "verifier_source_sha256":
         "9b19d393cf64c66168e08de2f3d4fe352a85a2fd69545e374dee0fa015dea338",
     "writer_source_sha256":
         "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
 }
 EXPECTED_POLICY_SHA256 = (
-    "15e4ae0ac2a138c64b869b063d9f495ce3d9f371f206baae25d1fa9944706540")
-EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "1b2f4941ec640e19f7798b3f9bcdae075bb7e37603b2779aea22c0fe191f40d3"
+    "40d94df34ce096f06ee9de8ed2e5987a4aeec28aaef13b2f053726499856c4be")
+EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "e2c8335505b08a0951104901f3ad2d90b3951ca20ee86f9ae1eea90b8b7ac30d"
 
 PREFLIGHT_STARTED = "preflight_started"
 BOUNDARY_VERIFIED = "boundary_verified"
@@ -113,6 +109,23 @@ class ExecutionLocked(ExecutorError):
 
 class StateInspectionRequired(ExecutorError):
     """An atomic local-state outcome must be inspected without USB."""
+
+
+class ReadOnlyPreflightStopped(ExecutorError):
+    """A read-only preflight consumed this powered USB session."""
+
+    def __init__(self, phase: str, cause: BaseException) -> None:
+        self.phase = phase
+        self.root_cause = cause
+        detail = " ".join(str(cause).split()) or "no exception detail"
+        if len(detail) > 240:
+            detail = detail[:237] + "..."
+        super().__init__(
+            f"phase={phase}; cause={type(cause).__name__}: {detail}")
+
+
+class ReadOnlyPreflightVerificationStopped(ReadOnlyPreflightStopped):
+    """Read-only USB evidence did not establish the exact stock image."""
 
 
 class RecoveryRequired(ExecutorError):
@@ -154,7 +167,6 @@ def implementation_hashes() -> dict[str, str]:
         "planner_source_sha256": _source_sha256(_planner.__file__),
         "writer_source_sha256": _source_sha256(_writer.__file__),
         "verifier_source_sha256": _source_sha256(_writer._verify.__file__),
-        "strict_transport_source_sha256": _source_sha256(_scratch.__file__),
     }
 
 
@@ -192,9 +204,16 @@ def policy_descriptor() -> dict[str, object]:
         "durable_terminal_intent_before_backend_or_usb": True,
         "two_exact_full_chip_reads_before_and_after": True,
         "strict_close_before_authorizing_publication": True,
+        "reattach_not_found_or_busy_accepted_only_if_kernel_driver_is_active":
+            True,
         "automatic_retry": False,
         "ordinary_intent_reconciliation": False,
-        "transport_or_verification_anomaly": "external_spi_no_further_usb",
+        "read_only_preflight_transport_or_close_anomaly": (
+            "no_flash_mutation_power_cycle_before_new_journal"),
+        "read_only_preflight_image_verification_anomaly": (
+            "external_spi_verify_no_automatic_write"),
+        "post_intent_transport_or_verification_anomaly": (
+            "external_spi_no_further_usb"),
         "proof_validation": {
             "exact_proof_full_image": True,
             "same_usb_topology": True,
@@ -202,7 +221,8 @@ def policy_descriptor() -> dict[str, object]:
             "cause_of_reenumeration_is_operator_evidence": True,
         },
         "finalization": "exact full baseline then clear state",
-        "fixed_proof_hardware_test_authorized": True,
+        "read_only_preflight_diagnostic_authorized": True,
+        "fixed_proof_hardware_test_authorized": False,
         "authorized_campaign_id": EXPECTED_CAMPAIGN_ID,
         "authorization_scope": "one fixed proof install and exact stock restore",
         "generic_executor_live_mutation_enabled": False,
@@ -231,10 +251,7 @@ def load_transaction(campaign_dir: Path, baseline_a: Path, baseline_b: Path,
     )
 
 
-def require_live_authorization(transaction: Transaction) -> None:
-    if not LIVE_PROOF_CAMPAIGN_ENABLED:
-        raise ExecutionLocked(
-            "fixed proof campaign commit is hard-disabled in this source revision")
+def _require_reviewed_authorization(transaction: Transaction) -> None:
     if not EXPECTED_CAMPAIGN_ID or transaction.campaign_id != EXPECTED_CAMPAIGN_ID:
         raise ExecutionLocked("campaign identifier is not the reviewed live pin")
     current = implementation_hashes()
@@ -264,6 +281,20 @@ def require_live_authorization(transaction: Transaction) -> None:
             not isinstance(assignments[0], ast.Constant) or
             assignments[0].value is not False):
         raise ExecutionLocked("general firmware executor is not mutation-locked")
+
+
+def require_read_only_preflight_authorization(transaction: Transaction) -> None:
+    if not LIVE_READ_ONLY_PREFLIGHT_ENABLED:
+        raise ExecutionLocked(
+            "fixed proof read-only preflight is hard-disabled in this source revision")
+    _require_reviewed_authorization(transaction)
+
+
+def require_live_authorization(transaction: Transaction) -> None:
+    if not LIVE_PROOF_CAMPAIGN_ENABLED:
+        raise ExecutionLocked(
+            "fixed proof campaign mutation is hard-disabled in this source revision")
+    _require_reviewed_authorization(transaction)
 
 
 def expected_boundary_image(transaction: Transaction, index: int) -> bytes:
@@ -751,14 +782,97 @@ class _ProofUsbEnumerationMixin:
         self.device_address = int(api.libusb_get_device_address(usb_device))
 
 
+_LIBUSB_ERROR_NAMES = {
+    -1: "LIBUSB_ERROR_IO",
+    -2: "LIBUSB_ERROR_INVALID_PARAM",
+    -3: "LIBUSB_ERROR_ACCESS",
+    -4: "LIBUSB_ERROR_NO_DEVICE",
+    -5: "LIBUSB_ERROR_NOT_FOUND",
+    -6: "LIBUSB_ERROR_BUSY",
+    -7: "LIBUSB_ERROR_TIMEOUT",
+    -8: "LIBUSB_ERROR_OVERFLOW",
+    -9: "LIBUSB_ERROR_PIPE",
+    -10: "LIBUSB_ERROR_INTERRUPTED",
+    -11: "LIBUSB_ERROR_NO_MEM",
+    -12: "LIBUSB_ERROR_NOT_SUPPORTED",
+    -99: "LIBUSB_ERROR_OTHER",
+}
+
+
+def _libusb_result(result: int) -> str:
+    return f"{result} {_LIBUSB_ERROR_NAMES.get(result, 'LIBUSB_ERROR_UNKNOWN')}"
+
+
+def _strict_close_proof_device(device) -> None:
+    """Close a clean proof BOT session and verify host-driver ownership.
+
+    A nonzero attach result is not by itself a failure: on Linux, libusb may
+    report BUSY because a kernel driver has already claimed the released
+    interface.  Accept that result only when a direct host-side query reports
+    that a kernel driver is active.  No retry, reset, halt clear or later CDB is
+    issued here.
+    """
+    api = _writer._verify.lib
+    first_error: BaseException | None = None
+    release_succeeded = False
+    try:
+        result = api.libusb_release_interface(device.h, device.iface)
+        if result != 0:
+            first_error = RuntimeError(
+                "libusb_release_interface failed "
+                f"({_libusb_result(result)})")
+        else:
+            release_succeeded = True
+        if release_succeeded and device.reattach:
+            result = api.libusb_attach_kernel_driver(device.h, device.iface)
+            if result != 0:
+                try:
+                    active = api.libusb_kernel_driver_active(
+                        device.h, device.iface)
+                except BaseException as error:
+                    first_error = RuntimeError(
+                        "libusb_attach_kernel_driver failed "
+                        f"({_libusb_result(result)}); "
+                        "kernel-driver-active check raised "
+                        f"{type(error).__name__}: {error}")
+                else:
+                    if result not in (-5, -6) or active != 1:
+                        first_error = RuntimeError(
+                            "libusb_attach_kernel_driver failed "
+                            f"({_libusb_result(result)}); "
+                            "kernel-driver-active check returned "
+                            f"{_libusb_result(active) if active < 0 else active}")
+    except BaseException as error:
+        first_error = error
+    try:
+        api.libusb_close(device.h)
+    except BaseException as error:
+        if first_error is None:
+            first_error = RuntimeError(
+                f"libusb_close raised {type(error).__name__}: {error}")
+    try:
+        api.libusb_exit(device.ctx)
+    except BaseException as error:
+        if first_error is None:
+            first_error = RuntimeError(
+                f"libusb_exit raised {type(error).__name__}: {error}")
+    if first_error is not None:
+        raise first_error
+
+
+class _ProofStrictCloseMixin:
+    def close(self) -> None:
+        _strict_close_proof_device(self)
+
+
 class FixedProofStrictWriteDevice(
-        _ProofUsbEnumerationMixin, _scratch._StrictCloseMixin,
+        _ProofUsbEnumerationMixin, _ProofStrictCloseMixin,
         _writer.WriteDevice):
     """Strict mutation BOT transport; no endpoint recovery on anomaly."""
 
 
 class FixedProofNoRecoveryReadOnlyDevice(
-        _ProofUsbEnumerationMixin, _scratch._StrictCloseMixin,
+        _ProofUsbEnumerationMixin, _ProofStrictCloseMixin,
         _writer._verify.Device):
     """Read-only BOT transport; no endpoint recovery on anomaly."""
 
@@ -908,8 +1022,13 @@ def _require_step_state(transaction: Transaction,
     if status == RESTORE_READY:
         return transaction.install_count
     if status != BOUNDARY_VERIFIED:
-        if status in (PREFLIGHT_STARTED, INTENT, REENTRY_STARTED,
-                      FINALIZE_STARTED):
+        if status == PREFLIGHT_STARTED:
+            raise ReadOnlyPreflightVerificationStopped(
+                "terminal_state",
+                RuntimeError(
+                    "the stop phase is not journal-bound; follow the original "
+                    "output or independently verify through SPI"))
+        if status in (INTENT, REENTRY_STARTED, FINALIZE_STARTED):
             raise RecoveryRequired("terminal campaign state requires external SPI")
         raise ExecutorError("journal is not step-authorizing")
     return int(journal["boundary_index"])
@@ -925,24 +1044,40 @@ def live_preflight(transaction: Transaction, journal_path: Path, *,
         publish_initial(
             transaction, journal_path, started, fault=journal_fault)
         backend = None
+        phase = "backend_open"
         try:
             backend = backend_factory(transaction)
+            phase = "loader_identity"
             raw_identity = backend.identity()
-            observed = _two_reads(backend, progress=progress)
+            phase = "first_full_chip_read"
+            first = backend.capture(progress=progress)
+            phase = "second_full_chip_read"
+            second = backend.capture(progress=progress)
+            phase = "exact_read_pair_verification"
+            _writer.require_exact_image(
+                "two exact full-chip reads", first, second)
+            observed = first
+            phase = "exact_baseline_verification"
             _require_image(transaction, transaction.campaign.baseline, observed,
                            "proof preflight baseline")
+            phase = "identity_binding"
             identity = _bound_identity(raw_identity, observed)
+            phase = "strict_close"
             backend.close()
             backend = None
         except BaseException as error:
-            raise RecoveryRequired(
-                "preflight transport, verification, or close failed after its "
-                "terminal marker; use external SPI") from error
+            if phase in ("exact_read_pair_verification",
+                         "exact_baseline_verification"):
+                raise ReadOnlyPreflightVerificationStopped(
+                    phase, error) from error
+            raise ReadOnlyPreflightStopped(phase, error) from error
         target = boundary_journal(transaction, identity, 0)
         outcome = publish_transition(
             transaction, journal_path, started, target, fault=journal_fault)
         if outcome == "source_retained_after_error":
-            raise RecoveryRequired("verified preflight state was not published")
+            raise ReadOnlyPreflightStopped(
+                "boundary_publication",
+                RuntimeError("verified preflight boundary was not published"))
         if outcome != "target_confirmed":
             raise StateInspectionRequired(
                 "verified preflight state is visible after a publication error")
@@ -1114,7 +1249,7 @@ def inspect_state(transaction: Transaction, journal_path: Path) -> dict[str, obj
         PROOF_INSTALLED: "cold_boot_then_validate_reentry_dry_run",
         RESTORE_READY: "step_dry_run",
         COMPLETE: "finalize_dry_run",
-        PREFLIGHT_STARTED: "external_spi_only",
+        PREFLIGHT_STARTED: "follow_recorded_preflight_stop_no_usb",
         INTENT: "external_spi_only",
         REENTRY_STARTED: "external_spi_only",
         FINALIZE_STARTED: "external_spi_only",
@@ -1138,6 +1273,9 @@ def _print_plan(command: str, transaction: Transaction,
     print("mutable   : Core0 envelope + one fixed Core1 barrier sector")
     print("preserved : header, loader, manifest, all flash after Core1")
     print("general fw: mutation hard-disabled")
+    print("proof write: mutation hard-disabled" if
+          not LIVE_PROOF_CAMPAIGN_ENABLED else
+          "proof write: fixed campaign enabled")
     if journal is not None:
         print(f"status    : {journal['status']}")
         print(f"boundary  : {journal['boundary_index']}")
@@ -1191,16 +1329,20 @@ def main(argv: list[str] | None = None) -> int:
                     raise ExecutorError("finalize requires complete state")
             print("\nDRY RUN -- no USB device was opened and nothing was changed.")
             return 0
-        require_live_authorization(transaction)
-        print("\nCOMMIT REQUESTED -- keep proven external SPI recovery available.")
         if args.command == "preflight":
+            require_read_only_preflight_authorization(transaction)
+            print("\nREAD-ONLY PREFLIGHT REQUESTED -- no program or erase command "
+                  "is authorized.")
             result = live_preflight(transaction, args.journal)
-        elif args.command == "step":
-            result = live_step(transaction, args.journal)
-        elif args.command == "validate-reentry":
-            result = live_validate_reentry(transaction, args.journal)
         else:
-            result = live_finalize(transaction, args.journal)
+            require_live_authorization(transaction)
+            print("\nCOMMIT REQUESTED -- keep proven external SPI recovery available.")
+            if args.command == "step":
+                result = live_step(transaction, args.journal)
+            elif args.command == "validate-reentry":
+                result = live_validate_reentry(transaction, args.journal)
+            else:
+                result = live_finalize(transaction, args.journal)
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0
     except StateInspectionRequired as error:
@@ -1208,6 +1350,22 @@ def main(argv: list[str] | None = None) -> int:
         print("This result authorizes no USB action. Run inspect locally.",
               file=sys.stderr)
         return 4
+    except ReadOnlyPreflightVerificationStopped as error:
+        print(f"\nREAD-ONLY PREFLIGHT VERIFICATION STOPPED: {error}",
+              file=sys.stderr)
+        print("No program or erase command was sent, but USB readback did not "
+              "establish the exact baseline. Do not boot or issue another USB "
+              "command in this powered session. Verify independently through "
+              "external SPI; write only if that independent read differs from "
+              "the baseline.", file=sys.stderr)
+        return 6
+    except ReadOnlyPreflightStopped as error:
+        print(f"\nREAD-ONLY PREFLIGHT STOPPED: {error}", file=sys.stderr)
+        print("No program or erase command was sent. Do not issue another USB "
+              "command in this powered session; power-cycle before using a new "
+              "journal. External SPI is optional independent verification, not "
+              "a required flash restore.", file=sys.stderr)
+        return 5
     except RecoveryRequired as error:
         print(f"\nEXTERNAL SPI RECOVERY REQUIRED: {error}", file=sys.stderr)
         print("Do not issue another USB command; restore and verify by external SPI.",

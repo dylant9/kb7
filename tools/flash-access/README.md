@@ -292,7 +292,7 @@ default after writing; add `-N` to verify only the written region.
 | `kb7-updater-executor.py` | Two-read live preflight, durable journal binding and image-derived reconciliation | **read-only CLI; mutation hard-disabled; not an installer** |
 | `kb7-updater-scratch-executor.py` | One-operation-per-process replay of the fixed 22-command V1.22 scratch plan, mandatory boundary-9 host termination, and local-only state inspection | **destructive; dry-run by default; current v3 passed once at the fixed plan** |
 | `kb7-loader-reentry-campaign.py` | Derive and reverify a fixed proof-Core0 install plus exact-stock restore campaign with a temporary Core1 checksum barrier | **offline only; private artifacts; does not authorize execution** |
-| `kb7-loader-reentry-executor.py` | One-operation fixed proof installer/restorer with terminal intents, exact full-chip reads, re-entry gate and local inspection | **destructive; dry-run default; exact owner campaign hardware-authorized and unrun** |
+| `kb7-loader-reentry-executor.py` | Fixed proof campaign executor with phase-reporting read-only preflight, terminal intents, exact full-chip reads, re-entry gate and local inspection | **proof mutation relocked; only exact read-only preflight enabled** |
 | `../../docs/LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md` | Exact offline safety model, private campaign generation, stop rules and later hardware outline | documentation only |
 | `../../docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md` | Exact v3 durable-command-complete/pre-WIP self-termination sequence and stop rules | documentation only |
 | `../../docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-VALIDATION-2026-08-23.md` | Observed v3 host-termination, reconciliation, restoration and boot result | documentation only |
@@ -492,11 +492,21 @@ campaign ID are pinned. The two private baselines independently reproduce 168
 operations, proof full-image SHA-256
 `d08e8e32af512abf0d2a73248f88d08a5520348af64ad699a67194ee3db40bac`,
 one barrier sector at `0x00022000`, and exact stock restoration. The independent
-live gate is now true only for that pinned owner campaign; all raw authority and
-the general paired-firmware mutation path remain unavailable.
+read-only preflight gate is now true only for that pinned owner campaign. The
+proof-mutation gate is false, so no install/restore operation can execute; all
+raw authority and the general paired-firmware mutation path remain unavailable.
+The first committed preflight stopped before boundary zero. Two independent
+external-SPI reads then matched each other and the stock baseline exactly, so
+no flash write was required. The revised preflight reports its exact failing
+phase and a bounded underlying exception. A `NOT_FOUND` or `BUSY` driver-
+reattach result is accepted only if the host confirms that a kernel driver is
+already active. Transport/identity/close failures stop that powered USB session
+without requiring a flash restore; exact read-pair or baseline mismatch instead
+requires independent SPI verification and never an automatic write. See the
+[incident record](../../docs/LOADER-REENTRY-PREFLIGHT-INCIDENT-2026-08-24.md).
 Read the
 [fixed campaign runbook](../../docs/LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md)
-before running the authorized bounded hardware test. This
+before any later bounded hardware test. This
 does not change the general paired-firmware executor's read-only lock.
 
 ### Offline paired updater planner

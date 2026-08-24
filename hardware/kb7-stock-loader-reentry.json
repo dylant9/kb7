@@ -1,6 +1,6 @@
 {
   "schema": "kb7.hardware.stock-loader-reentry-static-analysis",
-  "schema_version": 3,
+  "schema_version": 4,
   "analyzed_on": "2026-08-23",
   "evidence_class": "firmware_recovery",
   "mailbox": {
@@ -103,7 +103,7 @@
     "flash_approved": false
   },
   "fixed_install_restore_campaign": {
-    "status": "owner_bound_offline_verified_hardware_authorized_unrun",
+    "status": "read_only_preflight_incident_verified_stock_unchanged_mutation_relocked",
     "campaign_tool": "tools/flash-access/kb7-loader-reentry-campaign.py",
     "executor_tool": "tools/flash-access/kb7-loader-reentry-executor.py",
     "campaign_format": "KB7 V1.22 fixed loader-reentry proof campaign v1",
@@ -138,15 +138,20 @@
       "durable_terminal_intent_before_backend_or_usb": true,
       "two_exact_full_chip_reads_before_and_after_each_mutation": true,
       "strict_close_before_authorizing_publication": true,
+      "reattach_not_found_or_busy_accepted_only_if_kernel_driver_is_active": true,
       "automatic_retry": false,
       "ordinary_intent_usb_reconciliation": false,
-      "transport_or_verification_anomaly": "external_spi_no_further_usb"
+      "read_only_preflight_transport_or_close_anomaly": "no_flash_mutation_power_cycle_before_new_journal",
+      "read_only_preflight_image_verification_anomaly": "external_spi_verify_no_automatic_write",
+      "post_intent_transport_or_verification_anomaly": "external_spi_no_further_usb"
     },
     "authorization": {
-      "live_proof_campaign_enabled": true,
-      "fixed_proof_hardware_test_authorized": true,
-      "execution_authorized": true,
-      "authorization_scope": "one fixed proof install and exact stock restore",
+      "live_read_only_preflight_enabled": true,
+      "live_proof_campaign_enabled": false,
+      "read_only_preflight_diagnostic_authorized": true,
+      "fixed_proof_hardware_test_authorized": false,
+      "execution_authorized": false,
+      "authorization_scope": "one exact read-only proof preflight; no program or erase",
       "expected_campaign_id": "3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f",
       "owner_campaign_generated": true,
       "owner_campaign_independently_reverified": true,
@@ -155,18 +160,17 @@
       "implementation_source_sha256": {
         "campaign": "085dd0c2087e258d880824f657e37ecde08f4fd05234ab14d948af245d8de765",
         "planner": "618bed76c236390c8203ef5395db2317dfce9cce620035bda05231fc05727d0a",
-        "strict_transport": "55cacc77b4902827c47e45fa0be77b55bac8d552bae08dbe48b9aa8942c16076",
         "verifier": "9b19d393cf64c66168e08de2f3d4fe352a85a2fd69545e374dee0fa015dea338",
         "writer": "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5"
       },
-      "policy_sha256": "15e4ae0ac2a138c64b869b063d9f495ce3d9f371f206baae25d1fa9944706540",
-      "executor_descriptor_sha256": "1b2f4941ec640e19f7798b3f9bcdae075bb7e37603b2779aea22c0fe191f40d3",
-      "executor_source_sha256": "f211a9ce2348104e6736697fa5f81c6f3a3360664ade8576a07edcb3a7f09a8a",
+      "policy_sha256": "40d94df34ce096f06ee9de8ed2e5987a4aeec28aaef13b2f053726499856c4be",
+      "executor_descriptor_sha256": "e2c8335505b08a0951104901f3ad2d90b3951ca20ee86f9ae1eea90b8b7ac30d",
+      "executor_source_sha256": "e43f65a91755458b257230be042029fd0a7bf75eb7f9629a6986a5757f678dd3",
       "generic_firmware_executor_mutation_enabled": false,
       "flash_approved": false
     },
     "offline_validation": {
-      "focused_campaign_and_executor_tests_passed": 33,
+      "focused_campaign_and_executor_tests_passed": 38,
       "exact_campaign_operation_count": 168,
       "install_operation_count": 32,
       "restore_operation_count": 136,
@@ -190,13 +194,27 @@
       "private_artifact_publication_guards": true
     },
     "hardware_validation": {
+      "read_only_preflight_attempted": true,
+      "read_only_preflight_reached_boundary_zero": false,
+      "read_only_preflight_reported_two_complete_full_chip_reads": true,
+      "read_only_preflight_exact_failure_phase_observed": false,
+      "read_only_preflight_underlying_error_observed": false,
+      "preflight_terminal_marker_observed": true,
+      "program_or_erase_command_possible_in_preflight": false,
+      "kernel_disconnect_or_reenumeration_observed_during_preflight": false,
+      "external_spi_full_chip_read_count_after_stop": 2,
+      "external_spi_reads_match_each_other": true,
+      "external_spi_reads_match_exact_baseline": true,
+      "external_spi_write_required": false,
       "proof_install_attempted": false,
       "checksum_valid_proof_core0_booted": false,
       "preserved_loader_reenumerated": false,
       "proof_image_readback_verified": false,
       "stock_restore_attempted": false,
       "exact_full_baseline_restored": false,
-      "normal_5038_keyboard_operation_restored": false
+      "normal_5038_keyboard_operation_restored": true,
+      "old_preflight_root_cause_known": false,
+      "leading_hypothesis": "host-side strict-close or kernel-driver reattachment result; not proven"
     }
   },
   "planner_immutability": {

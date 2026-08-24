@@ -15,8 +15,9 @@ continues to fail. A separately bounded
 [minimal loader-reentry proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md)
 now passes offline derivation, symbolic ordering checks and executor fault
 tests. Its exact owner-specific 168-operation campaign pin is independently
-rederived and is now authorized only for the bounded hardware proof, which
-remains unrun.
+rederived. The first read-only preflight stopped before boundary zero and two
+external-SPI reads proved exact stock flash. Proof mutation is now relocked;
+only phase-reporting read-only preflight is authorized.
 
 ## Entry conditions
 

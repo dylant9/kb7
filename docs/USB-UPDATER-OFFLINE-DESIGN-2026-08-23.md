@@ -71,8 +71,10 @@ rank-32 Core0 gate committed last. Its separate executor accepts exactly one
 campaign operation per process and no caller-selected address, payload, CDB or
 firmware bundle. The two exact owner baselines now independently reproduce its
 pinned 168-operation campaign and exact proof/stock closures. Offline
-simulation and fault tests pass; the exact bounded campaign is independently
-hardware-authorized but unrun. This does not alter or unlock the
+simulation and fault tests pass. Its first read-only preflight stopped before
+boundary zero and independent SPI proved the flash unchanged. Proof mutation
+is now relocked; only read-only phase diagnosis remains enabled. This does not
+alter or unlock the
 general paired executor described above.
 
 The planner was exercised offline against two matching V1.22 full-chip inputs

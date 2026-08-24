@@ -19,7 +19,7 @@ image generation is disabled.
 ## Current status — 2026-08-23
 
 - The offline/software implementation is complete to the evidence currently
-  available. `make check` passes 256 Python tests, browser validation, four ARM
+  available. `make check` passes 261 Python tests, browser validation, four ARM
   build profiles, hardware-fact checks and the public-tree safety audit.
 - Two independent reads of the installed 32-MiB Macronix SPI NOR are
   bit-identical. They match the earlier USB-extracted V1.22 components and
@@ -52,10 +52,16 @@ image generation is disabled.
   the exact 168-operation campaign ID
   `3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f`,
   including exact proof-image and stock-restoration closure. The exact fixed
-  campaign is now independently authorized for its one bounded hardware test;
-  it remains hardware-unrun. The general paired-firmware executor
+  campaign reached its first hardware action, but the read-only preflight
+  stopped after two reported full-chip reads and before boundary zero. Two
+  subsequent independent SPI reads proved that flash remained byte-exact
+  stock, and the keyboard returned to normal operation without a write. Proof
+  mutation is now relocked; only a phase-reporting read-only preflight is
+  enabled. The precise old failure is unavailable because the old executor
+  discarded its underlying exception. The general paired-firmware executor
   remains locked and `flash_approved=false`. See the
-  [fixed proof campaign](docs/LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md).
+  [fixed proof campaign](docs/LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md) and
+  [preflight incident](docs/LOADER-REENTRY-PREFLIGHT-INCIDENT-2026-08-24.md).
 - The flash-access tooling adds proven external SPI recovery workflows,
   read-only USB-ISP diagnostics and fixed, dry-run-default USB mutation
   experiments. On 2026-08-23 one guarded V1.22 cycle at offset `0x0008e000`
