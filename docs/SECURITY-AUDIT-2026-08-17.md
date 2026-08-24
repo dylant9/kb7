@@ -111,8 +111,9 @@ one internally derived mutation per CLI invocation, requires two exact
 full-chip pre/post reads and strict close-before-publication, and has no USB
 reconciliation for an ordinary intent. The supporting sources/policy are
 pinned, and two exact owner baselines now independently reproduce the pinned
-168-operation campaign ID and both stable targets. Live execution remains
-independently hard-disabled. This is an offline mechanism, not a reduction in the hardware
+168-operation campaign ID and both stable targets. The exact fixed campaign is
+now authorized for one bounded hardware proof, which remains unrun. This is not
+a reduction in the hardware
 severity of finding 12. See the
 [fixed proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md).
 
@@ -170,7 +171,8 @@ severity of finding 12. See the
     handlers slept forever, and USB recovery was unavailable. The later static
     loader-reentry result supplies a viable early-stage design, and the later
     fixed install/restore campaign supplies a fail-closed offline test route,
-    but its custom proof is still hardware-unrun and live-locked.
+    and its custom proof is still hardware-unrun; only that bounded campaign is
+    live-enabled.
 
 13. **Software reset was incorrectly treated as loader entry.** The later
     datasheet review proved that it restarts PRAM. The subsequent stock audit

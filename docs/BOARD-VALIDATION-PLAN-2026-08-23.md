@@ -14,8 +14,9 @@ remains false, the paired executor remains mutation-locked, and `make bundle`
 continues to fail. A separately bounded
 [minimal loader-reentry proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md)
 now passes offline derivation, symbolic ordering checks and executor fault
-tests. Its exact owner-specific 168-operation campaign pin is now independently
-rederived, but live commit remains hard-disabled.
+tests. Its exact owner-specific 168-operation campaign pin is independently
+rederived and is now authorized only for the bounded hardware proof, which
+remains unrun.
 
 ## Entry conditions
 

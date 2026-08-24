@@ -76,8 +76,8 @@ hardware measurements:
   executor is dry-run-default, has terminal pre-USB intent states and no raw
   flash fields. Supporting source/policy pins and 33 focused campaign/executor
   tests pass. Two exact owner baselines independently reproduce its pinned
-  168-operation identity and exact proof/stock closure, but live commit remains
-  independently hard-disabled. See the
+  168-operation identity and exact proof/stock closure. The exact bounded
+  hardware campaign is now independently authorized but remains unrun. See the
   [fixed proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md).
 - The recovery chord defaults off. Its input choice and boot-time semantics
   still need a dedicated review; generic `SYS0_PINCTRL` uncertainty is no
@@ -121,7 +121,8 @@ flash command or pulse, tests device power loss or touches firmware regions,
 and none unlocks firmware mutation.
 The additional fixed loader-reentry executor is not a general updater: it can
 accept only one independently rederived proof campaign, its owner-specific
-campaign pin is exact, and `LIVE_PROOF_CAMPAIGN_ENABLED` remains false.
+campaign pin is exact, and `LIVE_PROOF_CAMPAIGN_ENABLED` is true only for that
+bounded proof install and exact-stock restore.
 Header dependencies use `-MMD -MP`.
 
 Any future image-producing release pipeline must, before it is enabled:
@@ -148,8 +149,9 @@ proof and an assigned USB identity; none is silently enabled. The
 external-SPI stock restore/verification rehearsal is complete and remains the
 final rollback route. The minimal loader-reentry profile passes offline and is
 planner-compatible, not a checksum-compatible or hardware-approved image; no
-replacement firmware has run on hardware. The fixed installer/restorer is also
-offline-ready but live-locked and does not change `flash_approved=false`.
+replacement firmware has run on hardware. The fixed installer/restorer is
+offline-ready and authorized only for the bounded unrun proof; this does not
+change `flash_approved=false`.
 
 ## Verification record
 

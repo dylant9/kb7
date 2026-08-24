@@ -75,8 +75,8 @@ The separate
 can balance this exact Core-0 ELF while retaining stock Core 1 and derive an
 exact-stock reverse plan. The supplied owner baselines now reproduce the pinned
 168-operation campaign ID and exact proof/stock closures. Its source/policy
-gates pass offline, but the independent live-enable constant remains false and
-commit remains disabled.
+gates pass offline, and the independent fixed executor is now enabled only for
+that bounded owner campaign. The proof remains hardware-unrun.
 
 `make bundle` intentionally exits with an error. The offline-correctable audit
 findings have regression-tested repairs, described in

@@ -6,7 +6,8 @@ Review date: 2026-08-23
 
 The remaining software work for the first checksum-valid custom-image proof is
 implemented, bound to the exact owner baseline and independently reverified
-offline. Live execution is deliberately locked.
+offline. The exact bounded proof-install/exact-stock-restore campaign is now
+live-enabled; it remains hardware-unrun.
 
 The exact proof Core-0 image produced by `make -C replacement_fw recovery-proof`
 has entry `0x00000175`, length 1,228 bytes and SHA-256
@@ -27,14 +28,14 @@ general paired-firmware executor.
 
 The fixed executor currently has:
 
-- `LIVE_PROOF_CAMPAIGN_ENABLED = False`;
+- `LIVE_PROOF_CAMPAIGN_ENABLED = True` for only this pinned campaign;
 - expected owner campaign identifier
   `3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f`;
 - pinned supporting-source, policy and normalized executor-source hashes;
 - no caller-selected offset, payload, CDB, operation index, retry, force or
   USB-device selector; and
-- a dry-run default with `--commit` rejected before any USB open because the
-  independent live-enable constant remains false.
+- a dry-run default, with `--commit` admitted only after the independent
+  campaign, source, policy and general-executor-lock checks pass.
 
 Two distinct owner files were supplied outside the checkout. Each is exactly
 33,554,432 bytes, they compare byte-for-byte equal, and both have SHA-256
@@ -150,16 +151,17 @@ Generation refuses any other stock layout or proof raw identity.
 
 The offline review has now recorded the rederived campaign ID, exact operation
 counts, proof full-image hash, fixed Core-1 barrier sector, every operation
-CDB/payload hash and all simulation invariants. A later hardware authorization
-would still require a separate source change that sets the live boolean,
-refreshes the normalized executor and full-source pins, reruns private campaign
-verification, and updates the machine-readable status. The current source
-cannot commit even if a user supplies `--commit`.
+CDB/payload hash and all simulation invariants. A separate source change has
+now set the live boolean, refreshed the normalized executor, policy and
+full-source pins, rerun private campaign verification, and updated the
+machine-readable status. This authorizes only the exact fixed campaign
+described here; it does not authorize a caller-selected firmware install or the
+general paired-firmware executor.
 
-## Later hardware run, after a separate enable review
+## Authorized bounded hardware run
 
-The hardware campaign is not authorized by this document. If a separate live
-enable review is approved later, its stop-gated outline is:
+The exact pinned owner campaign is authorized for the following stop-gated
+hardware run:
 
 1. keep the rehearsed full-chip external-SPI restore available, with the
    external programmer physically disconnected from the powered keyboard;

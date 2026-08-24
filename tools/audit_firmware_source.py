@@ -192,16 +192,16 @@ def main() -> int:
             "import usb", "from usb", "libusb", "--commit", "--device")):
         failures.append("offline loader-reentry campaign gained a live device surface")
     for marker in (
-            "LIVE_PROOF_CAMPAIGN_ENABLED = False",
+            "LIVE_PROOF_CAMPAIGN_ENABLED = True",
             'EXPECTED_CAMPAIGN_ID = (',
             '"3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f"',
             'EXPECTED_POLICY_SHA256 = (',
-            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "f9806840c78debae5137448157706cf1',
+            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "1b2f4941ec640e19f7798b3f9bcdae0',
             '"durable_terminal_intent_before_backend_or_usb": True',
             '"ordinary_intent_reconciliation": False',
             '"transport_or_verification_anomaly": "external_spi_no_further_usb"'):
         if marker not in executor_source:
-            failures.append(f"fixed loader-reentry executor lock is missing: {marker}")
+            failures.append(f"fixed loader-reentry executor guard is missing: {marker}")
     for forbidden in ("--offset", "--payload", "--cdb", "--force",
                       "--retry", "--operation-index", "--device"):
         if forbidden in executor_source:

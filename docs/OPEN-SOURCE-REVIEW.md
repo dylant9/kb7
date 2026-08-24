@@ -40,7 +40,8 @@ that the contributor does not possess.
   offsets identify only the request, relocation, reset and marker-consumer facts
   needed to reproduce the protocol; no stock instruction bytes, raw binary,
   disassembly or decompiler output is included.
-- Independently authored fixed proof-campaign and live-locked executor source.
+- Independently authored fixed proof-campaign and owner-campaign-bound executor
+  source, enabled only for the bounded hardware proof.
   The builder derives a checksum-valid clean-room Core 0 plus exact stock Core 1
   and an exact-stock reverse sequence; the executor exposes no raw flash fields
   and pins the independently rederived owner campaign identity while retaining

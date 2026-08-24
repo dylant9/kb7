@@ -131,8 +131,9 @@ for those cases.
 
 The [fixed proof campaign and runbook](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md)
 implements that offline plan. The exact owner campaign is generated,
-independently rederived and pinned, but its separate application-domain
-executor remains hard-disabled pending a distinct live-enable review. The
+independently rederived and pinned, and its separate application-domain
+executor is now authorized only for that bounded hardware proof. The proof
+remains hardware-unrun. The
 general paired-firmware executor remains
 mutation-locked, `flash_approved` remains false, and the scratch executor still
 cannot address application or loader regions.

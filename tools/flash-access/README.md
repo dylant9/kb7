@@ -292,7 +292,7 @@ default after writing; add `-N` to verify only the written region.
 | `kb7-updater-executor.py` | Two-read live preflight, durable journal binding and image-derived reconciliation | **read-only CLI; mutation hard-disabled; not an installer** |
 | `kb7-updater-scratch-executor.py` | One-operation-per-process replay of the fixed 22-command V1.22 scratch plan, mandatory boundary-9 host termination, and local-only state inspection | **destructive; dry-run by default; current v3 passed once at the fixed plan** |
 | `kb7-loader-reentry-campaign.py` | Derive and reverify a fixed proof-Core0 install plus exact-stock restore campaign with a temporary Core1 checksum barrier | **offline only; private artifacts; does not authorize execution** |
-| `kb7-loader-reentry-executor.py` | One-operation fixed proof installer/restorer with terminal intents, exact full-chip reads, re-entry gate and local inspection | **dry-run default; live commit hard-disabled; hardware-unrun** |
+| `kb7-loader-reentry-executor.py` | One-operation fixed proof installer/restorer with terminal intents, exact full-chip reads, re-entry gate and local inspection | **destructive; dry-run default; exact owner campaign hardware-authorized and unrun** |
 | `../../docs/LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md` | Exact offline safety model, private campaign generation, stop rules and later hardware outline | documentation only |
 | `../../docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md` | Exact v3 durable-command-complete/pre-WIP self-termination sequence and stop rules | documentation only |
 | `../../docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-VALIDATION-2026-08-23.md` | Observed v3 host-termination, reconciliation, restoration and boot result | documentation only |
@@ -491,11 +491,12 @@ The supporting sources, policy, normalized executor source and exact owner
 campaign ID are pinned. The two private baselines independently reproduce 168
 operations, proof full-image SHA-256
 `d08e8e32af512abf0d2a73248f88d08a5520348af64ad699a67194ee3db40bac`,
-one barrier sector at `0x00022000`, and exact stock restoration. However,
-`LIVE_PROOF_CAMPAIGN_ENABLED` remains false, so `--commit` stops before USB.
+one barrier sector at `0x00022000`, and exact stock restoration. The independent
+live gate is now true only for that pinned owner campaign; all raw authority and
+the general paired-firmware mutation path remain unavailable.
 Read the
 [fixed campaign runbook](../../docs/LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md)
-before considering a later enable review. This
+before running the authorized bounded hardware test. This
 does not change the general paired-firmware executor's read-only lock.
 
 ### Offline paired updater planner

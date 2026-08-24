@@ -17,7 +17,8 @@ output, PCB captures, or copied vendor tables.
   the default-off custom proof profile, its fixed offline install/restore
   campaign, and their still-unmet hardware gates. The campaign is simulation-
   and fault-test-complete, bound to the independently rederived owner campaign,
-  and still has no live execution authorization. It contains no stock
+  and is now authorized only for its bounded owner-specific proof hardware
+  test; that test remains unrun. It contains no stock
   instruction bytes, owner-local paths, campaign payloads or journal data.
 
 ## Current physical evidence — 2026-08-23

@@ -9,7 +9,8 @@ selected canonical operation in the Core-0 envelope or the one fixed Core-1
 barrier sector.
 
 The exact owner-baseline campaign and reviewed implementation hashes are
-pinned below.  Production commit remains independently hard-disabled.
+pinned below.  Live commit is authorized only for that fixed proof campaign;
+the general paired-firmware executor remains independently mutation-locked.
 """
 
 from __future__ import annotations
@@ -61,7 +62,7 @@ SafetyError = _writer.SafetyError
 PlanError = _planner.PlanError
 
 JOURNAL_SCHEMA = "kb7-loader-reentry-proof-journal-v1"
-LIVE_PROOF_CAMPAIGN_ENABLED = False
+LIVE_PROOF_CAMPAIGN_ENABLED = True
 EXPECTED_CAMPAIGN_ID = (
     "3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f")
 EXPECTED_IMPLEMENTATION_HASHES: dict[str, str] = {
@@ -77,8 +78,8 @@ EXPECTED_IMPLEMENTATION_HASHES: dict[str, str] = {
         "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
 }
 EXPECTED_POLICY_SHA256 = (
-    "340c1d3fe3075286bee33d36cf367bcc2989ac4bf754af46dc09c89ae1615a4d")
-EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "f9806840c78debae5137448157706cf12c031d0a81b86395219bf3b662a33fc9"
+    "15e4ae0ac2a138c64b869b063d9f495ce3d9f371f206baae25d1fa9944706540")
+EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "1b2f4941ec640e19f7798b3f9bcdae075bb7e37603b2779aea22c0fe191f40d3"
 
 PREFLIGHT_STARTED = "preflight_started"
 BOUNDARY_VERIFIED = "boundary_verified"
@@ -201,6 +202,9 @@ def policy_descriptor() -> dict[str, object]:
             "cause_of_reenumeration_is_operator_evidence": True,
         },
         "finalization": "exact full baseline then clear state",
+        "fixed_proof_hardware_test_authorized": True,
+        "authorized_campaign_id": EXPECTED_CAMPAIGN_ID,
+        "authorization_scope": "one fixed proof install and exact stock restore",
         "generic_executor_live_mutation_enabled": False,
     }
 

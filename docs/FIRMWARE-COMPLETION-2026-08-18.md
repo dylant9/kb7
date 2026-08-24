@@ -56,8 +56,9 @@ sector checksum poison while rebuilding Core 0, commits a rank-32 Core-0 gate
 last, and derives the reverse sequence to the exact full baseline. Its separate
 executor has terminal pre-USB intents, two exact pre/post full-chip reads,
 strict close-before-publication, no raw flash fields and no ordinary USB
-reconciliation. Supporting source and policy hashes are pinned, but live
-execution is hard-disabled. The supplied pair of exact owner baselines now
+reconciliation. Supporting source and policy hashes are pinned, and live
+execution is enabled only for the exact bounded proof campaign. The supplied
+pair of exact owner baselines now
 reproduces the pinned 168-operation campaign, its checksum-valid proof target,
 and its byte-exact stock-restoration target. See the
 [fixed proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md).
@@ -253,7 +254,8 @@ execution and no firmware-region write.
    `10f5:5038` are observed, it is not an operational recovery claim. The
    fixed proof campaign and executor now pass owner-bound offline simulation,
    exact operation rederivation and fault testing. The exact campaign ID is
-   pinned, but live commit remains independently hard-disabled. The general
+   pinned, and the exact bounded hardware proof is independently authorized but
+   remains unrun. The general
    paired-firmware executor remains mutation-locked
    and external SPI remains the final recovery route. The narrow marker and guarded erase-
    footprint experiments passed at their fixed stock-loader scratch targets,

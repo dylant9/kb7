@@ -853,7 +853,8 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
 
     campaign = evidence["fixed_install_restore_campaign"]
     require(
-        campaign["status"] == "owner_bound_offline_verified_hardware_unrun" and
+        campaign["status"] ==
+        "owner_bound_offline_verified_hardware_authorized_unrun" and
         campaign["campaign_tool"] ==
         "tools/flash-access/kb7-loader-reentry-campaign.py" and
         campaign["executor_tool"] ==
@@ -906,7 +907,11 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
         "fixed proof safety policy changed")
     authorization = campaign["authorization"]
     require(
-        authorization["live_proof_campaign_enabled"] is False and
+        authorization["live_proof_campaign_enabled"] is True and
+        authorization["fixed_proof_hardware_test_authorized"] is True and
+        authorization["execution_authorized"] is True and
+        authorization["authorization_scope"] ==
+        "one fixed proof install and exact stock restore" and
         authorization["expected_campaign_id"] ==
         "3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f" and
         authorization["owner_campaign_generated"] is True and
@@ -926,14 +931,14 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
                 "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
         } and
         authorization["policy_sha256"] ==
-        "340c1d3fe3075286bee33d36cf367bcc2989ac4bf754af46dc09c89ae1615a4d" and
+        "15e4ae0ac2a138c64b869b063d9f495ce3d9f371f206baae25d1fa9944706540" and
         authorization["executor_descriptor_sha256"] ==
-        "f9806840c78debae5137448157706cf12c031d0a81b86395219bf3b662a33fc9" and
+        "1b2f4941ec640e19f7798b3f9bcdae075bb7e37603b2779aea22c0fe191f40d3" and
         authorization["executor_source_sha256"] ==
-        "b8fcac0158a051f0121f2ef94cb7cfa89e4cc17004a35dc80f58b1807ac09ee7" and
+        "f211a9ce2348104e6736697fa5f81c6f3a3360664ade8576a07edcb3a7f09a8a" and
         authorization["generic_firmware_executor_mutation_enabled"] is False and
         authorization["flash_approved"] is False,
-        "fixed proof campaign must remain live-locked")
+        "fixed proof campaign authorization changed")
     offline = campaign["offline_validation"]
     require(offline["focused_campaign_and_executor_tests_passed"] == 33 and
             offline["exact_campaign_operation_count"] == 168 and

@@ -177,8 +177,8 @@ class LoaderReentryExecutorTests(unittest.TestCase):
 
         return fault
 
-    def test_production_commit_is_hard_locked_and_general_executor_stays_locked(self) -> None:
-        self.assertFalse(EXECUTOR.LIVE_PROOF_CAMPAIGN_ENABLED)
+    def test_exact_proof_campaign_is_live_enabled_and_general_executor_stays_locked(self) -> None:
+        self.assertTrue(EXECUTOR.LIVE_PROOF_CAMPAIGN_ENABLED)
         self.assertEqual(
             EXECUTOR.EXPECTED_CAMPAIGN_ID,
             "3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f")
@@ -188,6 +188,8 @@ class LoaderReentryExecutorTests(unittest.TestCase):
                          EXECUTOR._policy_sha256())
         self.assertEqual(EXECUTOR.EXPECTED_EXECUTOR_DESCRIPTOR_SHA256,
                          EXECUTOR._executor_descriptor_sha256())
+        reviewed = mock.Mock(campaign_id=EXECUTOR.EXPECTED_CAMPAIGN_ID)
+        EXECUTOR.require_live_authorization(reviewed)
         with self.assertRaises(EXECUTOR.ExecutionLocked):
             EXECUTOR.require_live_authorization(self.transaction)
         general = (ROOT / "tools/flash-access/kb7-updater-executor.py").read_text()
@@ -858,10 +860,9 @@ class LoaderReentryExecutorTests(unittest.TestCase):
             EXECUTOR.implementation_hashes())
         descriptor = EXECUTOR._executor_descriptor_sha256()
         self.assertEqual(len(descriptor), 64)
+        reviewed = mock.Mock(campaign_id=EXECUTOR.EXPECTED_CAMPAIGN_ID)
         authorization = (
             mock.patch.object(EXECUTOR, "LIVE_PROOF_CAMPAIGN_ENABLED", True),
-            mock.patch.object(EXECUTOR, "EXPECTED_CAMPAIGN_ID",
-                              self.transaction.campaign_id),
             mock.patch.object(EXECUTOR, "EXPECTED_IMPLEMENTATION_HASHES",
                               dict(EXECUTOR.IMPLEMENTATION_HASHES)),
             mock.patch.object(EXECUTOR, "EXPECTED_POLICY_SHA256",
@@ -871,11 +872,9 @@ class LoaderReentryExecutorTests(unittest.TestCase):
                               descriptor),
         )
         with authorization[0], authorization[1], authorization[2], \
-                authorization[3], authorization[4]:
-            EXECUTOR.require_live_authorization(self.transaction)
+                authorization[3]:
+            EXECUTOR.require_live_authorization(reviewed)
         with mock.patch.object(EXECUTOR, "LIVE_PROOF_CAMPAIGN_ENABLED", True), \
-                mock.patch.object(EXECUTOR, "EXPECTED_CAMPAIGN_ID",
-                                  self.transaction.campaign_id), \
                 mock.patch.object(EXECUTOR, "EXPECTED_IMPLEMENTATION_HASHES",
                                   dict(EXECUTOR.IMPLEMENTATION_HASHES)), \
                 mock.patch.object(EXECUTOR, "EXPECTED_POLICY_SHA256",
@@ -886,7 +885,7 @@ class LoaderReentryExecutorTests(unittest.TestCase):
                 mock.patch.object(EXECUTOR, "implementation_hashes",
                                   return_value={"drift": "0" * 64}):
             with self.assertRaises(EXECUTOR.ExecutionLocked):
-                EXECUTOR.require_live_authorization(self.transaction)
+                EXECUTOR.require_live_authorization(reviewed)
 
     def test_cli_has_no_raw_authority_and_dry_run_cannot_open_usb(self) -> None:
         for command in ("preflight", "step", "validate-reentry", "finalize",

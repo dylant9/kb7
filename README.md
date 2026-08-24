@@ -51,8 +51,9 @@ image generation is disabled.
   policy/source identities. The two owner baselines now independently rederive
   the exact 168-operation campaign ID
   `3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f`,
-  including exact proof-image and stock-restoration closure. Live execution
-  remains independently hard-disabled. The general paired-firmware executor
+  including exact proof-image and stock-restoration closure. The exact fixed
+  campaign is now independently authorized for its one bounded hardware test;
+  it remains hardware-unrun. The general paired-firmware executor
   remains locked and `flash_approved=false`. See the
   [fixed proof campaign](docs/LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md).
 - The flash-access tooling adds proven external SPI recovery workflows,
@@ -204,7 +205,8 @@ result and stricter stop rules.
 - `tools/flash-access/` — ESP32/`flashrom` recovery notes, read-only USB-ISP
   verification tools, F6 command analysis and fixed guarded USB write-path
   experiments, plus a V1.22 updater planner/checker, read-only firmware
-  executor scaffold, separate fixed scratch-only executor, and a live-locked
+  executor scaffold, separate fixed scratch-only executor, and a fixed,
+  owner-campaign-bound
   fixed loader-reentry proof campaign. It contains no stock bytes and no
   supported or general USB firmware flasher.
 - `tools/check_public_tree.py` — rejects compiled/vendor artifacts, archive and
@@ -254,8 +256,8 @@ bundle` deliberately fails: no installable package can be produced by that
 target. The fixed loader-reentry campaign builder can balance this exact proof
 ELF against two exact owner baselines, but emits only private, execution-
 unapproved sector payloads and model metadata. Its separate executor is
-dry-run-default, pins the exact reviewed owner campaign ID, and remains
-independently live-locked.
+dry-run-default, pins the exact reviewed owner campaign ID, and is authorized
+only for the bounded proof-install/exact-stock-restore hardware campaign.
 
 ## Public-repository boundary
 
