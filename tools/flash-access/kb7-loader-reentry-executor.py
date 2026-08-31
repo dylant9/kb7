@@ -9,8 +9,9 @@ selected canonical operation in the Core-0 envelope or the one fixed Core-1
 barrier sector.
 
 The exact owner-baseline campaign and reviewed implementation hashes are
-pinned below.  Only its read-only preflight is currently live; proof mutation
-and the general paired-firmware executor remain independently hard-locked.
+pinned below.  Its fixed proof campaign is live only for the reviewed owner
+artifacts; the general paired-firmware executor remains independently
+hard-locked.
 """
 
 from __future__ import annotations
@@ -60,7 +61,7 @@ PlanError = _planner.PlanError
 
 JOURNAL_SCHEMA = "kb7-loader-reentry-proof-journal-v1"
 LIVE_READ_ONLY_PREFLIGHT_ENABLED = True
-LIVE_PROOF_CAMPAIGN_ENABLED = False
+LIVE_PROOF_CAMPAIGN_ENABLED = True
 EXPECTED_CAMPAIGN_ID = (
     "3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f")
 EXPECTED_IMPLEMENTATION_HASHES: dict[str, str] = {
@@ -74,8 +75,8 @@ EXPECTED_IMPLEMENTATION_HASHES: dict[str, str] = {
         "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
 }
 EXPECTED_POLICY_SHA256 = (
-    "40d94df34ce096f06ee9de8ed2e5987a4aeec28aaef13b2f053726499856c4be")
-EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "e2c8335505b08a0951104901f3ad2d90b3951ca20ee86f9ae1eea90b8b7ac30d"
+    "8ba06722fdab35dc5cfa9f374518e51a5fa6b54444fc29d5b4ac376672a786ac")
+EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "47f643305883ef6341b12e7fd8878b46d54a76039601759b3a8fdd95b4d3c3ff"
 
 PREFLIGHT_STARTED = "preflight_started"
 BOUNDARY_VERIFIED = "boundary_verified"
@@ -222,7 +223,7 @@ def policy_descriptor() -> dict[str, object]:
         },
         "finalization": "exact full baseline then clear state",
         "read_only_preflight_diagnostic_authorized": True,
-        "fixed_proof_hardware_test_authorized": False,
+        "fixed_proof_hardware_test_authorized": True,
         "authorized_campaign_id": EXPECTED_CAMPAIGN_ID,
         "authorization_scope": "one fixed proof install and exact stock restore",
         "generic_executor_live_mutation_enabled": False,

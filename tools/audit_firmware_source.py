@@ -193,11 +193,11 @@ def main() -> int:
         failures.append("offline loader-reentry campaign gained a live device surface")
     for marker in (
             "LIVE_READ_ONLY_PREFLIGHT_ENABLED = True",
-            "LIVE_PROOF_CAMPAIGN_ENABLED = False",
+            "LIVE_PROOF_CAMPAIGN_ENABLED = True",
             'EXPECTED_CAMPAIGN_ID = (',
             '"3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f"',
             'EXPECTED_POLICY_SHA256 = (',
-            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "e2c8335505b08a0951104901f3ad2d90',
+            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "47f643305883ef6341b12e7fd8878b46',
             '"durable_terminal_intent_before_backend_or_usb": True',
             '"ordinary_intent_reconciliation": False',
             '"reattach_not_found_or_busy_accepted_only_if_kernel_driver_is_active"',

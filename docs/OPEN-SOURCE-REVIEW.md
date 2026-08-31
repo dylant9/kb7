@@ -44,10 +44,11 @@ that the contributor does not possess.
   source, enabled only for the bounded hardware proof.
   The builder derives a checksum-valid clean-room Core 0 plus exact stock Core 1
   and an exact-stock reverse sequence; the executor exposes no raw flash fields
-  and pins the independently rederived owner campaign identity while retaining
-  a separate false live-enable flag. The public machine record includes only
-  hashes, operation counts, fixed geometry, false authorization flags and the
-  hardware-unrun boundary. Private campaign descriptors, sector images,
+  and pins the independently rederived owner campaign identity. After the
+  revised read-only preflight passed, a new pin enables only that fixed
+  campaign. The public machine record includes only hashes, operation counts,
+  fixed geometry, bounded authorization flags and the hardware-unrun proof
+  boundary. Private campaign descriptors, sector images,
   baselines and journals remain excluded. See the
   [fixed proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md).
 - Independently authored external-SPI recovery helpers, read-only USB-ISP
@@ -112,9 +113,9 @@ No external scripts, fonts, images, packages, or vendored libraries are bundled.
   installable image. Its ELF is only planner-compatible; the ordinary Makefile
   still cannot emit a bundle, and the paired-firmware executor remains
   mutation-locked. The separate fixed proof executor now pins the independently
-  rederived private campaign ID but retains an independent false live-enable
-  constant. Static proof of the stock route and an exact offline campaign do
-  not authorize a device run or host recovery opcode.
+  rederived private campaign ID and is live only for that exact bounded
+  install/restore test. It does not authorize a general device run or host
+  recovery opcode.
 
 ## Excluded and retained only outside the public repository
 

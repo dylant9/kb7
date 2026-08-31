@@ -61,10 +61,12 @@ pair of exact owner baselines now
 reproduces the pinned 168-operation campaign, its checksum-valid proof target,
 and its byte-exact stock-restoration target. The first committed read-only
 preflight stopped before boundary zero; two independent SPI reads proved the
-flash was still exact stock and no write was needed. Proof mutation is relocked
-while only an exact phase-reporting read-only preflight is enabled. See the
+flash was still exact stock and no write was needed. The revised preflight then
+passed exact USB reads, strict close and boundary zero, followed by normal
+operation. A new pin authorizes only the fixed proof install and stock restore.
+See the
 [fixed proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md) and
-[incident record](LOADER-REENTRY-PREFLIGHT-INCIDENT-2026-08-24.md).
+[preflight validation](LOADER-REENTRY-PREFLIGHT-VALIDATION-2026-08-24.md).
 
 ## Completed software-owned work
 
@@ -258,8 +260,9 @@ execution and no firmware-region write.
    fixed proof campaign and executor now pass owner-bound offline simulation,
    exact operation rederivation and fault testing. The exact campaign ID is
    pinned. Its first read-only hardware preflight stopped before boundary zero,
-   while independent SPI proved no flash change; proof mutation is now relocked
-   pending diagnosis. The general
+   while independent SPI proved no flash change. The revised preflight passed
+   exact USB reads, strict close and boundary zero; the exact fixed campaign is
+   reauthorized but remains hardware-unrun beyond preflight. The general
    paired-firmware executor remains mutation-locked
    and external SPI remains the final recovery route. The narrow marker and guarded erase-
    footprint experiments passed at their fixed stock-loader scratch targets,

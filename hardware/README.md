@@ -18,9 +18,11 @@ output, PCB captures, or copied vendor tables.
   campaign, and their still-unmet hardware gates. The campaign is simulation-
   and fault-test-complete and bound to the independently rederived owner
   campaign. Its first read-only hardware preflight stopped before boundary
-  zero; independent SPI proved the flash remained exact stock. Proof mutation
-  is now relocked and only phase-reporting read-only preflight is authorized.
-  It contains no stock
+  zero; independent SPI proved the flash remained exact stock. The revised
+  preflight then passed two exact USB reads, strict close, boundary-zero
+  publication and a normal working boot. Only the separately pinned fixed
+  proof-install/exact-stock-restore campaign is now authorized; the general
+  updater remains locked. It contains no stock
   instruction bytes, owner-local paths, campaign payloads or journal data.
 
 ## Current physical evidence — 2026-08-23

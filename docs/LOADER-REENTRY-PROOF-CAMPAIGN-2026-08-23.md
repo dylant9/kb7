@@ -6,11 +6,13 @@ Review date: 2026-08-23
 
 The remaining software work for the first checksum-valid custom-image proof is
 implemented, bound to the exact owner baseline and independently reverified
-offline. Its first hardware action stopped during read-only preflight before
-boundary zero; no proof-install operation was attempted. Proof mutation is now
-relocked while an exact phase-reporting read-only preflight remains enabled.
-See the dated
-[preflight incident record](LOADER-REENTRY-PREFLIGHT-INCIDENT-2026-08-24.md).
+offline. Its first read-only preflight stopped before boundary zero and two
+external-SPI reads proved exact stock. The revised phase-reporting preflight
+then passed two exact USB reads, strict close and boundary-zero publication;
+the owner returned to normal working `10f5:5038` without SPI intervention. A
+new pinned revision authorizes only this exact campaign, which remains
+hardware-unrun beyond preflight. See the dated
+[preflight validation](LOADER-REENTRY-PREFLIGHT-VALIDATION-2026-08-24.md).
 
 The exact proof Core-0 image produced by `make -C replacement_fw recovery-proof`
 has entry `0x00000175`, length 1,228 bytes and SHA-256
@@ -32,8 +34,7 @@ general paired-firmware executor.
 The fixed executor currently has:
 
 - `LIVE_READ_ONLY_PREFLIGHT_ENABLED = True` for only this pinned campaign;
-- `LIVE_PROOF_CAMPAIGN_ENABLED = False`, so `step`, `validate-reentry` and
-  `finalize --commit` cannot run;
+- `LIVE_PROOF_CAMPAIGN_ENABLED = True` only for the exact reviewed campaign;
 - expected owner campaign identifier
   `3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f`;
 - pinned supporting-source, policy and normalized executor-source hashes;
@@ -165,15 +166,14 @@ Generation refuses any other stock layout or proof raw identity.
 The offline review records the rederived campaign ID, exact operation counts,
 proof full-image hash, fixed Core-1 barrier sector, every operation CDB/payload
 hash and all simulation invariants. Following the first read-only preflight
-incident, the mutation live boolean was reset to false. The refreshed executor
-and policy pins authorize only a diagnostic read-only preflight. They do not
-authorize the fixed install, a caller-selected firmware install or the general
-paired-firmware executor.
+incident, mutation was relocked. The revised preflight then completed exact
+boundary zero and a normal working boot. The refreshed executor and policy
+pins now authorize the fixed install and exact stock restore, but no
+caller-selected firmware install and no general paired-firmware executor.
 
-## Paused bounded hardware run
+## Bounded hardware run
 
-The following stop-gated run remains the eventual target, but proof mutation is
-not authorized in the current revision:
+The following stop-gated run is authorized only for the pinned owner campaign:
 
 1. keep the rehearsed full-chip external-SPI restore available, with the
    external programmer physically disconnected from the powered keyboard;

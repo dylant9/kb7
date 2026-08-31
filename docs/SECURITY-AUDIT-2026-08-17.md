@@ -113,10 +113,12 @@ reconciliation for an ordinary intent. The supporting sources/policy are
 pinned, and two exact owner baselines now independently reproduce the pinned
 168-operation campaign ID and both stable targets. Its first read-only
 preflight stopped before boundary zero; independent SPI verified exact stock
-flash. Proof mutation is relocked and only phase-reporting read-only preflight
-is enabled. This is not a reduction in the hardware
+flash. The revised preflight passed exact USB reads, strict close and boundary
+zero, followed by a normal working boot. Only the fixed campaign is
+reauthorized. This is not a reduction in the hardware
 severity of finding 12. See the
-[fixed proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md).
+[fixed proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md) and
+[preflight validation](LOADER-REENTRY-PREFLIGHT-VALIDATION-2026-08-24.md).
 
 ## Critical and high-severity findings
 
@@ -172,8 +174,9 @@ severity of finding 12. See the
     handlers slept forever, and USB recovery was unavailable. The later static
     loader-reentry result supplies a viable early-stage design, and the later
     fixed install/restore campaign supplies a fail-closed offline test route.
-    Its custom proof is still hardware-unrun; after the read-only preflight
-    incident no proof mutation is live-enabled.
+    Its custom proof is still hardware-unrun. After the initial read-only
+    incident, the revised preflight passed exact boundary zero and a new pin
+    enables only the fixed proof-install/exact-stock-restore campaign.
 
 13. **Software reset was incorrectly treated as loader entry.** The later
     datasheet review proved that it restarts PRAM. The subsequent stock audit

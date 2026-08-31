@@ -78,10 +78,12 @@ hardware measurements:
   tests pass. Two exact owner baselines independently reproduce its pinned
   168-operation identity and exact proof/stock closure. The first committed
   read-only preflight stopped before boundary zero; two independent external-
-  SPI reads proved exact stock closure and no write was needed. Proof mutation
-  is relocked while phase-specific read-only diagnosis remains enabled. See the
+  SPI reads proved exact stock closure and no write was needed. The revised
+  preflight then passed exact USB reads, strict close, boundary zero and a
+  normal working boot. A new pin authorizes only the fixed proof/install/restore
+  campaign. See the
   [fixed proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md) and
-  [incident record](LOADER-REENTRY-PREFLIGHT-INCIDENT-2026-08-24.md).
+  [preflight validation](LOADER-REENTRY-PREFLIGHT-VALIDATION-2026-08-24.md).
 - The recovery chord defaults off. Its input choice and boot-time semantics
   still need a dedicated review; generic `SYS0_PINCTRL` uncertainty is no
   longer the blocker.
@@ -124,8 +126,9 @@ flash command or pulse, tests device power loss or touches firmware regions,
 and none unlocks firmware mutation.
 The additional fixed loader-reentry executor is not a general updater: it can
 accept only one independently rederived proof campaign and its owner-specific
-campaign pin is exact. `LIVE_PROOF_CAMPAIGN_ENABLED` is false after the first
-read-only preflight incident; only the exact read-only diagnostic gate is true.
+campaign pin is exact. `LIVE_PROOF_CAMPAIGN_ENABLED` is true only for that
+fixed campaign after the revised read-only preflight passed; the general
+paired-firmware executor remains independently locked.
 Header dependencies use `-MMD -MP`.
 
 Any future image-producing release pipeline must, before it is enabled:
@@ -169,7 +172,7 @@ The latest offline verification pass completed successfully on 2026-08-23:
   4 bytes of data and 19,312 bytes of BSS;
 - neither ELF contains unresolved relocations, and core0's vector table is
   exactly `0x13c` bytes;
-- the public-tree policy check accepted 205 UTF-8 source/documentation files and
+- the public-tree policy check accepted 206 UTF-8 source/documentation files and
   found no firmware blobs, generated binaries, or disallowed material; and
 - independent warning passes using GCC `-fanalyzer` and strict conversion,
   shadowing, and undefined-macro diagnostics completed without findings.

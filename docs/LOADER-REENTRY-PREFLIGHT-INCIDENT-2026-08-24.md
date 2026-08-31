@@ -40,8 +40,8 @@ interface. There is no evidence of persistent USB or flash damage.
 
 ## Corrective change
 
-Proof mutation is relocked while this incident is investigated. The revised
-executor permits only its exact read-only preflight and now:
+At that point, proof mutation was relocked while the incident was investigated.
+That diagnostic executor permitted only its exact read-only preflight and:
 
 - reports the failing phase as backend open, loader identity, first read,
   second read, exact read-pair verification, exact baseline verification,
@@ -68,3 +68,14 @@ This incident proves that the attempted preflight left this unit's flash
 byte-exact stock, as independently read through external SPI. It does not prove
 which old preflight phase failed, that every read-only USB anomaly is harmless,
 or that the custom proof image can boot and re-enter `10f5:5037`.
+
+## Follow-up
+
+The revised executor subsequently completed both exact full-chip reads,
+baseline and identity verification, strict close and boundary-zero
+publication. The owner then power-cycled to normal `10f5:5038` operation
+without SPI intervention. That bounded result is recorded separately in the
+[preflight validation](LOADER-REENTRY-PREFLIGHT-VALIDATION-2026-08-24.md).
+It resolves the operational read-only blocker but does not reveal the old
+discarded exception or turn the leading close/reattachment hypothesis into a
+proven historical cause.

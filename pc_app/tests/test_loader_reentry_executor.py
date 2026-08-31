@@ -178,9 +178,9 @@ class LoaderReentryExecutorTests(unittest.TestCase):
 
         return fault
 
-    def test_read_only_preflight_is_enabled_while_proof_writes_stay_locked(self) -> None:
+    def test_exact_proof_campaign_is_enabled_while_general_executor_stays_locked(self) -> None:
         self.assertTrue(EXECUTOR.LIVE_READ_ONLY_PREFLIGHT_ENABLED)
-        self.assertFalse(EXECUTOR.LIVE_PROOF_CAMPAIGN_ENABLED)
+        self.assertTrue(EXECUTOR.LIVE_PROOF_CAMPAIGN_ENABLED)
         self.assertEqual(
             EXECUTOR.EXPECTED_CAMPAIGN_ID,
             "3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f")
@@ -192,8 +192,7 @@ class LoaderReentryExecutorTests(unittest.TestCase):
                          EXECUTOR._executor_descriptor_sha256())
         reviewed = mock.Mock(campaign_id=EXECUTOR.EXPECTED_CAMPAIGN_ID)
         EXECUTOR.require_read_only_preflight_authorization(reviewed)
-        with self.assertRaises(EXECUTOR.ExecutionLocked):
-            EXECUTOR.require_live_authorization(reviewed)
+        EXECUTOR.require_live_authorization(reviewed)
         with self.assertRaises(EXECUTOR.ExecutionLocked):
             EXECUTOR.require_read_only_preflight_authorization(self.transaction)
         general = (ROOT / "tools/flash-access/kb7-updater-executor.py").read_text()

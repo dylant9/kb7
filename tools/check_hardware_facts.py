@@ -745,7 +745,7 @@ def validate_stock_flash(stock: dict[str, object]) -> None:
 def validate_loader_reentry(evidence: dict[str, object]) -> None:
     require(evidence["schema"] ==
             "kb7.hardware.stock-loader-reentry-static-analysis" and
-            evidence["schema_version"] == 4 and
+            evidence["schema_version"] == 5 and
             evidence["analyzed_on"] == "2026-08-23" and
             evidence["evidence_class"] == "firmware_recovery",
             "unexpected stock loader-reentry evidence identity")
@@ -854,7 +854,7 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
     campaign = evidence["fixed_install_restore_campaign"]
     require(
         campaign["status"] ==
-        "read_only_preflight_incident_verified_stock_unchanged_mutation_relocked" and
+        "read_only_preflight_passed_fixed_proof_hardware_reauthorized_unrun" and
         campaign["campaign_tool"] ==
         "tools/flash-access/kb7-loader-reentry-campaign.py" and
         campaign["executor_tool"] ==
@@ -913,12 +913,12 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
     authorization = campaign["authorization"]
     require(
         authorization["live_read_only_preflight_enabled"] is True and
-        authorization["live_proof_campaign_enabled"] is False and
+        authorization["live_proof_campaign_enabled"] is True and
         authorization["read_only_preflight_diagnostic_authorized"] is True and
-        authorization["fixed_proof_hardware_test_authorized"] is False and
-        authorization["execution_authorized"] is False and
+        authorization["fixed_proof_hardware_test_authorized"] is True and
+        authorization["execution_authorized"] is True and
         authorization["authorization_scope"] ==
-        "one exact read-only proof preflight; no program or erase" and
+        "one fixed proof install and exact stock restore" and
         authorization["expected_campaign_id"] ==
         "3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f" and
         authorization["owner_campaign_generated"] is True and
@@ -936,11 +936,11 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
                 "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
         } and
         authorization["policy_sha256"] ==
-        "40d94df34ce096f06ee9de8ed2e5987a4aeec28aaef13b2f053726499856c4be" and
+        "8ba06722fdab35dc5cfa9f374518e51a5fa6b54444fc29d5b4ac376672a786ac" and
         authorization["executor_descriptor_sha256"] ==
-        "e2c8335505b08a0951104901f3ad2d90b3951ca20ee86f9ae1eea90b8b7ac30d" and
+        "47f643305883ef6341b12e7fd8878b46d54a76039601759b3a8fdd95b4d3c3ff" and
         authorization["executor_source_sha256"] ==
-        "e43f65a91755458b257230be042029fd0a7bf75eb7f9629a6986a5757f678dd3" and
+        "208f5773edca7caea9fe4b88e250f822f8af6c666dd82372ce7f52323ffb195c" and
         authorization["generic_firmware_executor_mutation_enabled"] is False and
         authorization["flash_approved"] is False,
         "fixed proof campaign authorization changed")
@@ -970,9 +970,25 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
                 "private_artifact_publication_guards",
             )), "fixed proof offline validation changed")
     require(campaign["hardware_validation"] == {
+        "read_only_preflight_attempt_count": 2,
         "read_only_preflight_attempted": True,
-        "read_only_preflight_reached_boundary_zero": False,
+        "read_only_preflight_reached_boundary_zero": True,
         "read_only_preflight_reported_two_complete_full_chip_reads": True,
+        "revised_read_only_preflight_passed": True,
+        "revised_read_only_preflight_exact_baseline_verified": True,
+        "revised_read_only_preflight_strict_close_passed": True,
+        "revised_read_only_preflight_journal_status": "boundary_verified",
+        "revised_read_only_preflight_boundary_index": 0,
+        "revised_read_only_preflight_device_path": "3-2.2",
+        "revised_read_only_preflight_usb_address": 9,
+        "revised_read_only_preflight_executor_source_sha256":
+            "e43f65a91755458b257230be042029fd0a7bf75eb7f9629a6986a5757f678dd3",
+        "revised_read_only_preflight_descriptor_sha256":
+            "bacdb380a9b49d25f314d4172813d0174d6a533e74bb0861304fde84f448a37a",
+        "revised_read_only_preflight_loader_fingerprint_sha256":
+            "99e75493ef2f627b072560ef7ee45f3c01648eca715ce03a4001727eace9e7c6",
+        "revised_read_only_preflight_normal_5038_boot_confirmed": True,
+        "revised_read_only_preflight_spi_required": False,
         "read_only_preflight_exact_failure_phase_observed": False,
         "read_only_preflight_underlying_error_observed": False,
         "preflight_terminal_marker_observed": True,

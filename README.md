@@ -52,16 +52,18 @@ image generation is disabled.
   the exact 168-operation campaign ID
   `3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f`,
   including exact proof-image and stock-restoration closure. The exact fixed
-  campaign reached its first hardware action, but the read-only preflight
-  stopped after two reported full-chip reads and before boundary zero. Two
-  subsequent independent SPI reads proved that flash remained byte-exact
-  stock, and the keyboard returned to normal operation without a write. Proof
-  mutation is now relocked; only a phase-reporting read-only preflight is
-  enabled. The precise old failure is unavailable because the old executor
-  discarded its underlying exception. The general paired-firmware executor
-  remains locked and `flash_approved=false`. See the
+  campaign's first read-only preflight stopped after two reported full-chip
+  reads and before boundary zero. Two subsequent independent SPI reads proved
+  that flash remained byte-exact stock. A revised phase-reporting preflight
+  then completed two exact USB reads, strict close and boundary-zero
+  publication; a normal power cycle returned to working `10f5:5038` without
+  SPI intervention. The precise old failure remains unavailable because the
+  old executor discarded its exception. A new hash-pinned revision now
+  authorizes only the exact fixed proof-install/stock-restore campaign; it
+  requires its own fresh journal and preflight. The general paired-firmware
+  executor remains locked and `flash_approved=false`. See the
   [fixed proof campaign](docs/LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md) and
-  [preflight incident](docs/LOADER-REENTRY-PREFLIGHT-INCIDENT-2026-08-24.md).
+  [preflight validation](docs/LOADER-REENTRY-PREFLIGHT-VALIDATION-2026-08-24.md).
 - The flash-access tooling adds proven external SPI recovery workflows,
   read-only USB-ISP diagnostics and fixed, dry-run-default USB mutation
   experiments. On 2026-08-23 one guarded V1.22 cycle at offset `0x0008e000`

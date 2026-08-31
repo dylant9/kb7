@@ -72,8 +72,10 @@ campaign operation per process and no caller-selected address, payload, CDB or
 firmware bundle. The two exact owner baselines now independently reproduce its
 pinned 168-operation campaign and exact proof/stock closures. Offline
 simulation and fault tests pass. Its first read-only preflight stopped before
-boundary zero and independent SPI proved the flash unchanged. Proof mutation
-is now relocked; only read-only phase diagnosis remains enabled. This does not
+boundary zero and independent SPI proved the flash unchanged. The revised
+preflight passed exact USB reads, strict close and boundary zero, followed by
+normal operation; only the fixed proof/install/restore campaign is now
+reauthorized. This does not
 alter or unlock the
 general paired executor described above.
 

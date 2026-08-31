@@ -16,8 +16,9 @@ continues to fail. A separately bounded
 now passes offline derivation, symbolic ordering checks and executor fault
 tests. Its exact owner-specific 168-operation campaign pin is independently
 rederived. The first read-only preflight stopped before boundary zero and two
-external-SPI reads proved exact stock flash. Proof mutation is now relocked;
-only phase-reporting read-only preflight is authorized.
+external-SPI reads proved exact stock flash. The revised preflight then passed
+two exact USB reads, strict close, boundary zero and a normal working boot. A
+new source/policy pin authorizes only the fixed proof install and stock restore.
 
 ## Entry conditions
 
