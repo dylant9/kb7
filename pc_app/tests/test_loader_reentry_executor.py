@@ -1163,7 +1163,7 @@ class LoaderReentryLockTests(_ExecutorFixture):
         self.assertFalse(EXECUTOR.LIVE_PROOF_CAMPAIGN_ENABLED)
         self.assertEqual(
             EXECUTOR.EXPECTED_CAMPAIGN_ID,
-            "113897c215c88a1aea2e483601a968b88e2686fad2df5c6752cb66276d9f43e2")
+            "1ce62e95ee2c6c84b5abb8996f7964bacae661869152ead20f5c7138b2b0b508")
         self.assertEqual(EXECUTOR.EXPECTED_IMPLEMENTATION_HASHES,
                          dict(EXECUTOR.IMPLEMENTATION_HASHES))
         self.assertEqual(EXECUTOR.EXPECTED_POLICY_SHA256,

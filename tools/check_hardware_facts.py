@@ -875,9 +875,9 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
         "2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f" and
         campaign["proof_core0_raw"] == {
             "entry": "0x00000175",
-            "length": 1224,
+            "length": 1260,
             "sha256":
-                "b4ac207328a5f738ce0ddd4e0ea2fc82f9afa5bfe5b8f613de42106a3a3886e1",
+                "b0b3b75ab06bd00b152f86446de623b9029ff3ab9d164f6f4387243d2556b272",
         },
         "fixed proof campaign identity changed")
     require(campaign["stable_proof_target"] == {
@@ -885,11 +885,11 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
         "core1": "exact stock V1.22 Core1",
         "header_loader_manifest": "exact stock V1.22",
         "proof_full_sha256":
-            "0e115dfd9b454dae6ac77cfe2ef05fac123b65e8a86a2866266edb5d380ab1fb",
+            "58780441a9a5d6208aa2056c778e73b480e837d8b9f61c6b0be5629079307da9",
         "core0_target_sha256":
-            "774f91c54bf46f5e7265877b613f0c82737d8757f37c05a6a5f162972975aaa2",
+            "53dcb5d1c41aae3334fe5e85699cd3faf08619293f422e5681a1fb5b71595e7d",
         "core0_envelope_sha256":
-            "e34b0e58ba28fc6cfe9a06d8b452616128ce59e7026743a8ce71554a37f331f2",
+            "ec45eeec422483af3b97f917fd33a004ff8269595b16618998654e2e15157950",
     }, "fixed proof stable target changed")
     require(campaign["mutation_domain"] == {
         "core0_envelope": ["0x00011000", "0x00021000"],
@@ -930,14 +930,14 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
         authorization["usb_read_reliability_gate"] ==
         "fixed baseline-aware 512/1024/2048/4096-byte sweep required" and
         authorization["expected_campaign_id"] ==
-        "113897c215c88a1aea2e483601a968b88e2686fad2df5c6752cb66276d9f43e2" and
+        "1ce62e95ee2c6c84b5abb8996f7964bacae661869152ead20f5c7138b2b0b508" and
         authorization["owner_campaign_generated"] is True and
         authorization["owner_campaign_independently_reverified"] is True and
         authorization["two_owner_baselines_distinct_and_byte_identical"] is True and
         authorization["supporting_source_hashes_pinned"] is True and
         authorization["implementation_source_sha256"] == {
             "campaign":
-                "960854a11e67546d97b06dac47d69ef84bbe563ea303384c0a7d7a5ccccf810a",
+                "8d8153c95ca45c81cc5c0a06c463894d98f519a5b142348592e3472b8a7ef980",
             "planner":
                 "618bed76c236390c8203ef5395db2317dfce9cce620035bda05231fc05727d0a",
             "verifier":
@@ -946,11 +946,11 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
                 "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
         } and
         authorization["policy_sha256"] ==
-        "550ced94770c82d5218b33821ad253c283f122ffc6f7aa8d9e8e750e215af0e1" and
+        "31dabd15ec1bcb3bfc3d9b82cd5de287b43cf43754460ef4dd5edb88abcb51d7" and
         authorization["executor_descriptor_sha256"] ==
-        "25691cd554bf75595e6ddcfcb4bd9cbfc1bca0a9e0be5965a264ae12a60af0a2" and
+        "77595e1ab48287f1a092f2450f8f4d36698bba8f7b9e4ea7feac949779eff730" and
         authorization["executor_source_sha256"] ==
-        "54acfc3795ca269f677e824735d23cb03370ed4261456b1588b8cb0b09dd6254" and
+        "808af98b355e618379028cec90770e01ebc23a0d4d22edea8e84465e5e41ba23" and
         authorization[
             "live_authorization_checked_inside_backends_and_live_entry_points"]
         is True and

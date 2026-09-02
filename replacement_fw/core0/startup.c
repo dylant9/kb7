@@ -42,6 +42,22 @@ void systick_handler(void) {
 }
 
 void reset_handler(void) {
+#if KB7_BUILD_LOADER_REENTRY_PROOF
+    /*
+     * Independent review F1 (2026-09-02): the proof profile routes every
+     * IRQ to the parking fault handler, so an interrupt left enabled and
+     * pending by the loader must not be able to fire before the deliberate
+     * loader entry below.  Mask, disable and clear everything first.
+     */
+    kb7_disable_irq();
+    KB7_MMIO32(SNC_NVIC_ICER) = UINT32_C(0xffffffff);
+    KB7_MMIO32(SNC_NVIC_ICER + 4U) = UINT32_C(0xffffffff);
+    KB7_MMIO32(SNC_NVIC_ICPR) = UINT32_C(0xffffffff);
+    KB7_MMIO32(SNC_NVIC_ICPR + 4U) = UINT32_C(0xffffffff);
+    KB7_MMIO32(SNC_SYST_CSR) = 0U;
+    kb7_dsb();
+    kb7_isb();
+#endif
     uint32_t *source = &__data_load_start__;
     for (uint32_t *destination = &__data_start__; destination < &__data_end__;) {
         *destination++ = *source++;

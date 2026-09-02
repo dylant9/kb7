@@ -50,7 +50,7 @@ image generation is disabled.
   state/transport fault coverage, no caller-selected flash fields, and pinned
   policy/source identities. The two owner baselines now independently rederive
   the exact 168-operation campaign ID
-  `113897c215c88a1aea2e483601a968b88e2686fad2df5c6752cb66276d9f43e2`,
+  `1ce62e95ee2c6c84b5abb8996f7964bacae661869152ead20f5c7138b2b0b508`,
   including exact proof-image and stock-restoration closure. The campaign's
   2026-08-24 preflight history includes an old stopped attempt and a later
   exact boundary-zero pass. A subsequent 2026-08-31 read-only preflight found

@@ -181,6 +181,12 @@ rederive the 168-operation campaign ID
 `0e115dfd9b454dae6ac77cfe2ef05fac123b65e8a86a2866266edb5d380ab1fb`. The identities recorded above are the 2026-08-23
 values. Authorization is unchanged by this regeneration.
 
+Later on 2026-09-02 the proof profile additionally masks interrupts, disables
+and clears the NVIC and stops SysTick as the first work of its reset handler
+(independent follow-up review, F1), so the proof image is now
+`b0b3b75ab06bd00b152f86446de623b9029ff3ab9d164f6f4387243d2556b272` (1260 bytes, entry unchanged) and the campaign ID
+`1ce62e95ee2c6c84b5abb8996f7964bacae661869152ead20f5c7138b2b0b508` with proof full-image SHA-256 `58780441a9a5d6208aa2056c778e73b480e837d8b9f61c6b0be5629079307da9`. Same 168 operations.
+
 ## Bounded hardware run — paused
 
 The following sequence is retained as the future stop-gated outline. It is not

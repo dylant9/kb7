@@ -514,7 +514,7 @@ reads before restore is authorized.
 The supporting sources, policy, normalized executor source and exact owner
 campaign ID are pinned. The two private baselines independently reproduce 168
 operations, proof full-image SHA-256
-`0e115dfd9b454dae6ac77cfe2ef05fac123b65e8a86a2866266edb5d380ab1fb`,
+`58780441a9a5d6208aa2056c778e73b480e837d8b9f61c6b0be5629079307da9`,
 one barrier sector at `0x00022000`, and exact stock restoration. On this
 branch both the read-only preflight and proof-mutation gates are false; the
 separate preflight-only branch enables the read-only preflight alone. A

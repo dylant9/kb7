@@ -200,7 +200,7 @@ def main() -> int:
                         "kb7-updater-executor.py").read_text(encoding="utf-8")
     for marker in (
             'EXPECTED_BASELINE_SHA256 = (',
-            '"b4ac207328a5f738ce0ddd4e0ea2fc82f9afa5bfe5b8f613de42106a3a3886e1"',
+            '"b0b3b75ab06bd00b152f86446de623b9029ff3ab9d164f6f4387243d2556b272"',
             '"campaign_self_authorizes_execution": False',
             '"requires_separate_executor_authorization": True',
             'phase="install_poison_core0"',
@@ -223,9 +223,9 @@ def main() -> int:
                 f"{expected!r} assignment (observed {observed!r})")
     for marker in (
             'EXPECTED_CAMPAIGN_ID = (',
-            '"113897c215c88a1aea2e483601a968b88e2686fad2df5c6752cb66276d9f43e2"',
+            '"1ce62e95ee2c6c84b5abb8996f7964bacae661869152ead20f5c7138b2b0b508"',
             'EXPECTED_POLICY_SHA256 = (',
-            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "25691cd554bf75595e6ddcfcb4bd9cbf',
+            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "77595e1ab48287f1a092f2450f8f4d36',
             '"durable_terminal_intent_before_backend_or_usb": True',
             '"live_authorization_checked_before_journal_publication_and_backend"',
             '"modelled_region_exact_against_boundary_images": True',

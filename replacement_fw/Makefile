@@ -130,9 +130,9 @@ recovery-proof:
 		test "`sha256sum build/loader-reentry-trampoline.bin | awk '{ print $$1 }'`" = \
 			43bde11ee9089c930b8e67c6b7d569aec736d719f59f24c6b207d80309a2f539; \
 		$(OBJCOPY) -O binary build/core0.elf build/loader-reentry-proof-core0.bin; \
-		test "`wc -c < build/loader-reentry-proof-core0.bin`" -eq 1224; \
+		test "`wc -c < build/loader-reentry-proof-core0.bin`" -eq 1260; \
 		test "`sha256sum build/loader-reentry-proof-core0.bin | awk '{ print $$1 }'`" = \
-			b4ac207328a5f738ce0ddd4e0ea2fc82f9afa5bfe5b8f613de42106a3a3886e1; \
+			b0b3b75ab06bd00b152f86446de623b9029ff3ab9d164f6f4387243d2556b272; \
 		$(OBJDUMP) -d build/core0.elf | grep -q '60001000'; \
 		$(OBJDUMP) -d build/core0.elf | grep -q 'e000ed0c'; \
 		$(OBJDUMP) -d build/core0.elf | grep -q '05fa0004'; \
