@@ -267,7 +267,9 @@ ELF against two exact owner baselines, but emits only private,
 execution-unapproved sector payloads and model metadata. Its separate executor
 pins the exact reviewed owner campaign ID, but both its USB preflight and
 mutation paths are hard-disabled in the CLI, the live entry points and both
-USB backends pending the fixed short-chunk read-reliability gate.
+USB backends. The fixed short-chunk read-reliability gate passed on
+2026-09-02 once the NOR lead stubs were removed; re-enabling even the
+read-only preflight remains a separate reviewed revision.
 
 ## Public-repository boundary
 

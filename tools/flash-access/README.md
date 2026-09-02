@@ -16,9 +16,13 @@ makes the replacement firmware flash-approved.
 
 ---
 
-## ⚠️ Read this first: the unpowered-programmer hazard
+## ⚠️ Read this first: the flash-bus lead hazards
 
-**Never leave the ESP32 wired to the flash bus while it is powered off.**
+Two distinct harness hazards corrupt the SoC's own reads of the NOR while
+flashrom reads over the same leads at 1-4 MHz stay perfectly clean. Both were
+found on the development unit; both are avoidable.
+
+### 1. Never leave the ESP32 wired to the flash bus while it is powered off
 
 An unpowered CMOS input clamps any signal driven above ~0.7 V through its
 ESD protection diode into the dead VCC rail. With the ESP32 attached-but-off,
@@ -34,8 +38,23 @@ Observed consequences, all of which vanished the moment the ESP32 was unplugged:
   disappeared completely, 1200/1200 commands clean, once disconnected
 
 Either **power the programmer** or **physically disconnect it**. Wired-and-dead
-is the one state to avoid. If you build a permanent harness, put a jumper inline
-on the four SPI lines.
+is one state to avoid.
+
+### 2. Never leave long lead stubs on the bus, even with the programmer removed
+
+The SoC's XIP flash controller clocks the NOR far faster than flashrom drives
+the leads. A ~300 mm unterminated stub soldered to CS/CLK/DI/DO reflects those
+edges. On 2026-09-02 the fixed read-reliability sweep failed 14 of 400 reads
+with the programmer physically detached and the stubs still attached, then
+passed 400 of 400 after the stubs were cut to ~20 mm and insulated
+([record](../../docs/USB-ISP-READ-RELIABILITY-VALIDATION-2026-09-02.md)). The
+failure signature is per command, typically a whole command zero-filled or
+served from exactly half its requested address, which is a lost clock in the
+SPI address phase at the SoC-NOR interface, not a USB or NOR-content fault.
+
+Rules: keep any permanent leads at ~20 mm or less with an inline connector or
+jumper at the NOR end; power the programmer or physically disconnect it; and
+treat "programmer disconnected" as insufficient by itself.
 
 ---
 
@@ -283,7 +302,7 @@ default after writing; add `-N` to verify only the written region.
 |---|---|---|
 | `kb7-enter-isp.py` | Switch a running keyboard into ISP mode | volatile; asks before sending |
 | `kb7-isp-verify.py` | Historical full-chip read/CRC diagnostic through the SoC controller | **read-only, but not current pass/fail authority: legacy CRC failure exits 0** |
-| `kb7-isp-repeat.py` | Fixed baseline-aware sweep of five pinned ranges at 512/1024/2048/4096-byte command sizes | **read-only; dry-run default; hardware-unrun gate** |
+| `kb7-isp-repeat.py` | Fixed baseline-aware sweep of five pinned ranges at 512/1024/2048/4096-byte command sizes | **read-only; dry-run default; failed 386/400 with 300 mm NOR lead stubs, passed 400/400 after removing them (2026-09-02)** |
 | `kb7-isp-write2.py` | Two-stage marker-program/sector-erase validation experiment | **destructive; dry-run by default; not a firmware flasher** |
 | `kb7-isp-erase-granularity.py` | Fixed four-stage guarded test of the observable `F6 15` erase footprint | **destructive; dry-run by default; passed once at the fixed target** |
 | `kb7-isp-scratch-restart.py` | Fixed two-sector experiment with two deliberate no-readback/reconciliation checkpoints | **destructive; dry-run by default; passed once at the fixed plan** |

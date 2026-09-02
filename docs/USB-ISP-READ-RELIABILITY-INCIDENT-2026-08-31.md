@@ -73,9 +73,10 @@ wrong result fails. Transport anomalies emit no clear-halt traffic or explicit
 interface close/rebind in that session, while a clean completion requires a
 strictly checked release and kernel-driver ownership handoff.
 
-The fixed read-reliability gate passes offline tests but has not run on
-hardware. Until it passes, both
-`LIVE_READ_ONLY_PREFLIGHT_ENABLED` and `LIVE_PROOF_CAMPAIGN_ENABLED` are false.
+The fixed read-reliability gate has since run on hardware twice; see the
+[resolution](#resolution-2026-09-02) below. Both
+`LIVE_READ_ONLY_PREFLIGHT_ENABLED` and `LIVE_PROOF_CAMPAIGN_ENABLED` remain
+false in this source revision.
 The loader-reentry executor refuses in its CLI, in every live entry point and
 inside both USB backends before any journal state is published or any device
 is opened; the general paired-firmware executor remains locked, and
@@ -86,6 +87,22 @@ revision that enables only the fixed campaign's full read-only preflight while
 leaving mutation false. That full preflight must then establish two exact
 32-MiB baseline reads and strict close before a separate review may consider a
 new mutation-enabled pin.
+
+## Resolution (2026-09-02)
+
+The fixed gate ran twice on the development unit in separate powered sessions
+with the external programmer physically detached both times. With the ~300 mm
+SPI leads soldered to the NOR still attached as open stubs it failed 14 of 400
+reads (exit 1); after the stubs were cut to ~20 mm and insulated it passed
+400 of 400 (exit 0) and the keyboard returned to normal `10f5:5038` operation.
+Offline tracing of the V1.22 loader's `F6 05` handler shows the requested
+address reaches the flash controller untouched, so the dominant wrong-read
+signature, a whole command served from exactly half its address, is a lost
+clock in the SPI address phase at the SoC-NOR interface. The `e71b…` capture
+above has the same failure family at a higher rate. Full record:
+[USB-ISP-READ-RELIABILITY-VALIDATION-2026-09-02.md](USB-ISP-READ-RELIABILITY-VALIDATION-2026-09-02.md).
+The gate pass changes no authorization; the next step remains a separately
+reviewed preflight-only revision.
 
 ## Evidence boundary
 
