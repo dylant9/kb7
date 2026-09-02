@@ -111,14 +111,14 @@ one internally derived mutation per CLI invocation, requires two exact
 full-chip pre/post reads and strict close-before-publication, and has no USB
 reconciliation for an ordinary intent. The supporting sources/policy are
 pinned, and two exact owner baselines now independently reproduce the pinned
-168-operation campaign ID and both stable targets. Its first read-only
-preflight stopped before boundary zero; independent SPI verified exact stock
-flash. The revised preflight passed exact USB reads, strict close and boundary
-zero, followed by a normal working boot. Only the fixed campaign is
-reauthorized. This is not a reduction in the hardware
+168-operation campaign ID and both stable targets. Later evidence found a
+separately SPI-confirmed two-byte physical corruption and, after restoration, a
+command-aligned USB acquisition failure. Both proof preflight and mutation are
+relocked pending the fixed baseline-aware short-read gate. This is not a
+reduction in the hardware
 severity of finding 12. See the
 [fixed proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md) and
-[preflight validation](LOADER-REENTRY-PREFLIGHT-VALIDATION-2026-08-24.md).
+[read-reliability incident](USB-ISP-READ-RELIABILITY-INCIDENT-2026-08-31.md).
 
 ## Critical and high-severity findings
 
@@ -174,9 +174,9 @@ severity of finding 12. See the
     handlers slept forever, and USB recovery was unavailable. The later static
     loader-reentry result supplies a viable early-stage design, and the later
     fixed install/restore campaign supplies a fail-closed offline test route.
-    Its custom proof is still hardware-unrun. After the initial read-only
-    incident, the revised preflight passed exact boundary zero and a new pin
-    enables only the fixed proof-install/exact-stock-restore campaign.
+    Its custom proof is still hardware-unrun. Later physical-corruption and USB
+    acquisition evidence has relocked both proof preflight and mutation pending
+    the fixed read-reliability gate.
 
 13. **Software reset was incorrectly treated as loader entry.** The later
     datasheet review proved that it restarts PRAM. The subsequent stock audit

@@ -6,13 +6,14 @@ Review date: 2026-08-23
 
 The remaining software work for the first checksum-valid custom-image proof is
 implemented, bound to the exact owner baseline and independently reverified
-offline. Its first read-only preflight stopped before boundary zero and two
-external-SPI reads proved exact stock. The revised phase-reporting preflight
-then passed two exact USB reads, strict close and boundary-zero publication;
-the owner returned to normal working `10f5:5038` without SPI intervention. A
-new pinned revision authorizes only this exact campaign, which remains
-hardware-unrun beyond preflight. See the dated
-[preflight validation](LOADER-REENTRY-PREFLIGHT-VALIDATION-2026-08-24.md).
+offline. Historical preflights include one exact boundary-zero pass. A later
+2026-08-31 read-only preflight found two changed Core-1 bytes that external SPI
+independently confirmed. The owner restored and independently read back the
+exact baseline over SPI, after which the board returned to working
+`10f5:5038`. A separate post-restore full USB capture then exposed widespread
+command-aligned acquisition corruption. Both proof preflight and mutation are
+relocked pending the new fixed short-chunk read-reliability gate. See the
+[incident record](USB-ISP-READ-RELIABILITY-INCIDENT-2026-08-31.md).
 
 The exact proof Core-0 image produced by `make -C replacement_fw recovery-proof`
 has entry `0x00000175`, length 1,228 bytes and SHA-256
@@ -33,16 +34,15 @@ general paired-firmware executor.
 
 The fixed executor currently has:
 
-- `LIVE_READ_ONLY_PREFLIGHT_ENABLED = True` for only this pinned campaign;
-- `LIVE_PROOF_CAMPAIGN_ENABLED = True` only for the exact reviewed campaign;
+- `LIVE_READ_ONLY_PREFLIGHT_ENABLED = False`;
+- `LIVE_PROOF_CAMPAIGN_ENABLED = False`;
 - expected owner campaign identifier
   `3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f`;
 - pinned supporting-source, policy and normalized executor-source hashes;
 - no caller-selected offset, payload, CDB, operation index, retry, force or
   USB-device selector; and
-- a dry-run default, with only read-only `preflight --commit` admitted after
-  the independent campaign, source, policy and general-executor-lock checks
-  pass.
+- no live USB command admitted until a new source/policy revision is reviewed
+  after the fixed read-reliability gate passes on hardware.
 
 Two distinct owner files were supplied outside the checkout. Each is exactly
 33,554,432 bytes, they compare byte-for-byte equal, and both have SHA-256
@@ -166,14 +166,19 @@ Generation refuses any other stock layout or proof raw identity.
 The offline review records the rederived campaign ID, exact operation counts,
 proof full-image hash, fixed Core-1 barrier sector, every operation CDB/payload
 hash and all simulation invariants. Following the first read-only preflight
-incident, mutation was relocked. The revised preflight then completed exact
-boundary zero and a normal working boot. The refreshed executor and policy
-pins now authorize the fixed install and exact stock restore, but no
-caller-selected firmware install and no general paired-firmware executor.
+incident, mutation was relocked and later conditionally reauthorized after an
+exact revised preflight. The 2026-08-31 incidents supersede that authorization:
+both preflight and mutation are locked, no caller-selected firmware install
+exists, and the general paired-firmware executor remains locked.
 
-## Bounded hardware run
+## Bounded hardware run — paused
 
-The following stop-gated run is authorized only for the pinned owner campaign:
+The following sequence is retained as the future stop-gated outline. It is not
+currently authorized. Before it can be reconsidered, the fixed baseline-aware
+512/1024/2048/4096-byte read sweep must pass on hardware. That pass may justify
+only a new reviewed source/policy pin for the full read-only preflight; proof
+mutation must remain false. Only after two exact 32-MiB preflight reads and
+strict close pass may a separate review consider reopening the fixed campaign:
 
 1. keep the rehearsed full-chip external-SPI restore available, with the
    external programmer physically disconnected from the powered keyboard;

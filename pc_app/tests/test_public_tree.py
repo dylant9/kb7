@@ -125,6 +125,19 @@ class PublicTreeTests(unittest.TestCase):
                 "owner-local updater metadata" in failure
                 for failure in result["failures"]))
 
+    def test_isp_read_reliability_result_is_rejected_when_renamed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "innocent-result.json").write_text(
+                '{"schema":"kb7-fixed-isp-read-reliability-v1"}\n')
+
+            result = MODULE.inspect(root)
+
+            self.assertFalse(result["passed"])
+            self.assertTrue(any(
+                "owner-local diagnostic result" in failure
+                for failure in result["failures"]))
+
     def test_updater_authentication_and_private_keys_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

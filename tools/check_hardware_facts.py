@@ -745,7 +745,7 @@ def validate_stock_flash(stock: dict[str, object]) -> None:
 def validate_loader_reentry(evidence: dict[str, object]) -> None:
     require(evidence["schema"] ==
             "kb7.hardware.stock-loader-reentry-static-analysis" and
-            evidence["schema_version"] == 5 and
+            evidence["schema_version"] == 6 and
             evidence["analyzed_on"] == "2026-08-23" and
             evidence["evidence_class"] == "firmware_recovery",
             "unexpected stock loader-reentry evidence identity")
@@ -854,7 +854,7 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
     campaign = evidence["fixed_install_restore_campaign"]
     require(
         campaign["status"] ==
-        "read_only_preflight_passed_fixed_proof_hardware_reauthorized_unrun" and
+        "proof_mutation_and_preflight_relocked_pending_usb_read_reliability" and
         campaign["campaign_tool"] ==
         "tools/flash-access/kb7-loader-reentry-campaign.py" and
         campaign["executor_tool"] ==
@@ -912,13 +912,15 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
         "fixed proof safety policy changed")
     authorization = campaign["authorization"]
     require(
-        authorization["live_read_only_preflight_enabled"] is True and
-        authorization["live_proof_campaign_enabled"] is True and
-        authorization["read_only_preflight_diagnostic_authorized"] is True and
-        authorization["fixed_proof_hardware_test_authorized"] is True and
-        authorization["execution_authorized"] is True and
+        authorization["live_read_only_preflight_enabled"] is False and
+        authorization["live_proof_campaign_enabled"] is False and
+        authorization["read_only_preflight_diagnostic_authorized"] is False and
+        authorization["fixed_proof_hardware_test_authorized"] is False and
+        authorization["execution_authorized"] is False and
         authorization["authorization_scope"] ==
-        "one fixed proof install and exact stock restore" and
+        "paused pending exact short-chunk USB read-reliability evidence" and
+        authorization["usb_read_reliability_gate"] ==
+        "fixed baseline-aware 512/1024/2048/4096-byte sweep required" and
         authorization["expected_campaign_id"] ==
         "3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f" and
         authorization["owner_campaign_generated"] is True and
@@ -936,16 +938,17 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
                 "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
         } and
         authorization["policy_sha256"] ==
-        "8ba06722fdab35dc5cfa9f374518e51a5fa6b54444fc29d5b4ac376672a786ac" and
+        "2f2e46ae5f9460c0f37100f111fe528e6649dd806475938e09351ed0b5db510c" and
         authorization["executor_descriptor_sha256"] ==
-        "47f643305883ef6341b12e7fd8878b46d54a76039601759b3a8fdd95b4d3c3ff" and
+        "ef17000a9941409fb0c463e92b4cbb6317523ead3b831492f6b96224a41249be" and
         authorization["executor_source_sha256"] ==
-        "208f5773edca7caea9fe4b88e250f822f8af6c666dd82372ce7f52323ffb195c" and
+        "396a60bfa11b007d97328bcf62dc08a6c9e31a5f99ee3a84ab8b3dc8ae332992" and
         authorization["generic_firmware_executor_mutation_enabled"] is False and
         authorization["flash_approved"] is False,
         "fixed proof campaign authorization changed")
     offline = campaign["offline_validation"]
-    require(offline["focused_campaign_and_executor_tests_passed"] == 38 and
+    require(offline[
+                "focused_campaign_executor_and_read_reliability_tests_passed"] == 50 and
             offline["exact_campaign_operation_count"] == 168 and
             offline["install_operation_count"] == 32 and
             offline["restore_operation_count"] == 136 and
@@ -970,7 +973,7 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
                 "private_artifact_publication_guards",
             )), "fixed proof offline validation changed")
     require(campaign["hardware_validation"] == {
-        "read_only_preflight_attempt_count": 2,
+        "read_only_preflight_attempt_count": 3,
         "read_only_preflight_attempted": True,
         "read_only_preflight_reached_boundary_zero": True,
         "read_only_preflight_reported_two_complete_full_chip_reads": True,
@@ -989,8 +992,8 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
             "99e75493ef2f627b072560ef7ee45f3c01648eca715ce03a4001727eace9e7c6",
         "revised_read_only_preflight_normal_5038_boot_confirmed": True,
         "revised_read_only_preflight_spi_required": False,
-        "read_only_preflight_exact_failure_phase_observed": False,
-        "read_only_preflight_underlying_error_observed": False,
+        "read_only_preflight_exact_failure_phase_observed": True,
+        "read_only_preflight_underlying_error_observed": True,
         "preflight_terminal_marker_observed": True,
         "program_or_erase_command_possible_in_preflight": False,
         "kernel_disconnect_or_reenumeration_observed_during_preflight": False,
@@ -1007,9 +1010,80 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
         "normal_5038_keyboard_operation_restored": True,
         "old_preflight_root_cause_known": False,
         "leading_hypothesis": (
-            "host-side strict-close or kernel-driver reattachment result; "
-            "not proven"),
+            "first stop remains consistent with host-side strict-close or "
+            "kernel-driver reattachment; third stop proved a separate "
+            "exact-baseline mismatch"),
     }, "fixed proof campaign hardware incident status changed")
+
+    require(campaign["usb_read_reliability_incident_2026_08_31"] == {
+        "proof_program_or_erase_command_sent": False,
+        "proof_install_attempted": False,
+        "preflight_two_usb_reads_identical": True,
+        "preflight_observed_sha256":
+            "25f1bb67fb2c6d40319edaf45fce1f1f70e4829474160116a0ab1d26c8b5d205",
+        "preflight_difference_count": 2,
+        "preflight_difference_range": ["0x00040000", "0x00040002"],
+        "preflight_expected_hex": "80ff",
+        "preflight_observed_hex": "0000",
+        "preflight_region0_passed": True,
+        "preflight_region1_declared_checksum": "0xc8ed2815",
+        "preflight_region1_observed_checksum": "0xcd464c45",
+        "preflight_region1_passed": False,
+        "preflight_region2_passed": True,
+        "external_spi_reproduced_preflight_sha256": True,
+        "external_spi_proved_physical_nor_corruption": True,
+        "full_baseline_restored_over_external_spi": True,
+        "post_restore_spi_read_sha256":
+            "2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f",
+        "post_restore_spi_read_exact_baseline": True,
+        "post_restore_normal_5038_boot_confirmed": True,
+        "post_restore_usb_capture_sha256":
+            "e71b622cf2978a39271696048e5c7ccc1b5de91b4449d855b5637865ac0bb86b",
+        "post_restore_usb_capture_reference_difference_count": 2031715,
+        "post_restore_usb_capture_total_4k_pages": 8192,
+        "post_restore_usb_capture_exact_4k_pages": 7634,
+        "post_restore_usb_capture_bad_4k_pages": 558,
+        "post_restore_usb_capture_zero_filled_bad_pages": 194,
+        "post_restore_usb_capture_ff_filled_bad_pages": 40,
+        "post_restore_usb_capture_exact_half_address_pages_minimum": 88,
+        "post_restore_usb_capture_first_bad_page": "0x00015000",
+        "post_restore_usb_capture_command_bytes": 4096,
+        "post_restore_usb_capture_all_bad_pages_command_aligned": True,
+        "post_restore_usb_capture_region0_computed_checksum": "0x3be332fc",
+        "post_restore_usb_capture_region1_computed_checksum": "0x89cb434b",
+        "post_restore_usb_capture_region2_computed_checksum": "0x0741feb9",
+        "post_capture_normal_5038_boot_confirmed": True,
+        "usb_capture_represents_exact_physical_flash": False,
+        "legacy_verifier_crc_failure_exit_status": 0,
+        "legacy_verifier_success_status_was_false": True,
+        "fixed_read_reliability_tool":
+            "tools/flash-access/kb7-isp-repeat.py",
+        "fixed_read_reliability_schema":
+            "kb7-fixed-isp-read-reliability-v1",
+        "fixed_read_reliability_source_sha256":
+            "27d85c69e902c3059f046dfb1862c30b572c94b1dd9020d97ec69755bca097a9",
+        "fixed_read_reliability_descriptor_sha256":
+            "c38b3ee1435734b483ec4fed3fe3315d31d427e2e6c4fa751b90806f75101a9c",
+        "fixed_read_reliability_plan_sha256":
+            "b1f80b218d832d323873ae2225847caf01c280694aa5df10c90c041a3dbe6f94",
+        "fixed_read_reliability_passes_per_range_chunk": 20,
+        "fixed_read_reliability_chunks": [512, 1024, 2048, 4096],
+        "fixed_read_reliability_offsets": [
+            "0x00015000", "0x00040000", "0x00072000",
+            "0x01012000", "0x01fe9000",
+        ],
+        "fixed_read_reliability_caller_selectable_plan_fields": False,
+        "fixed_read_reliability_strict_clean_close": True,
+        "fixed_read_reliability_no_recovery_traffic_after_anomaly": True,
+        "fixed_read_reliability_transport_or_close_stop_exit_status": 3,
+        "fixed_read_reliability_transport_or_close_stop_policy":
+            "no_more_usb_in_powered_session_power_cycle_before_later_read_only_attempt",
+        "fixed_read_reliability_hardware_run_completed": False,
+        "gate_pass_allows_automatic_proof_mutation_authorization": False,
+        "gate_pass_next_review_scope": "read_only_full_preflight_only",
+        "mutation_reauthorization_requires_separate_exact_full_preflight_and_review": True,
+        "proof_campaign_may_be_reauthorized": False,
+    }, "USB read-reliability incident evidence changed")
 
     require(evidence["planner_immutability"] == {
         "header": ["0x00000000", "0x00001000"],

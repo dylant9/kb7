@@ -282,8 +282,8 @@ default after writing; add `-N` to verify only the written region.
 | Script | Purpose | Safety |
 |---|---|---|
 | `kb7-enter-isp.py` | Switch a running keyboard into ISP mode | volatile; asks before sending |
-| `kb7-isp-verify.py` | Read flash **through the SoC's own controller** and verify region CRCs | **read-only** — mutating opcodes are unrepresentable |
-| `kb7-isp-repeat.py` | Re-read one region N times across chunk sizes to measure read repeatability | read-only |
+| `kb7-isp-verify.py` | Historical full-chip read/CRC diagnostic through the SoC controller | **read-only, but not current pass/fail authority: legacy CRC failure exits 0** |
+| `kb7-isp-repeat.py` | Fixed baseline-aware sweep of five pinned ranges at 512/1024/2048/4096-byte command sizes | **read-only; dry-run default; hardware-unrun gate** |
 | `kb7-isp-write2.py` | Two-stage marker-program/sector-erase validation experiment | **destructive; dry-run by default; not a firmware flasher** |
 | `kb7-isp-erase-granularity.py` | Fixed four-stage guarded test of the observable `F6 15` erase footprint | **destructive; dry-run by default; passed once at the fixed target** |
 | `kb7-isp-scratch-restart.py` | Fixed two-sector experiment with two deliberate no-readback/reconciliation checkpoints | **destructive; dry-run by default; passed once at the fixed plan** |
@@ -292,7 +292,7 @@ default after writing; add `-N` to verify only the written region.
 | `kb7-updater-executor.py` | Two-read live preflight, durable journal binding and image-derived reconciliation | **read-only CLI; mutation hard-disabled; not an installer** |
 | `kb7-updater-scratch-executor.py` | One-operation-per-process replay of the fixed 22-command V1.22 scratch plan, mandatory boundary-9 host termination, and local-only state inspection | **destructive; dry-run by default; current v3 passed once at the fixed plan** |
 | `kb7-loader-reentry-campaign.py` | Derive and reverify a fixed proof-Core0 install plus exact-stock restore campaign with a temporary Core1 checksum barrier | **offline only; private artifacts; does not authorize execution** |
-| `kb7-loader-reentry-executor.py` | Fixed proof campaign executor with phase-reporting read-only preflight, terminal intents, exact full-chip reads, re-entry gate and local inspection | **only the exact owner-bound proof install/restore campaign is enabled** |
+| `kb7-loader-reentry-executor.py` | Fixed proof campaign executor with terminal intents, exact full-chip reads, re-entry gate and local inspection | **USB preflight and mutation hard-disabled pending the read-reliability gate** |
 | `../../docs/LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md` | Exact offline safety model, private campaign generation, stop rules and later hardware outline | documentation only |
 | `../../docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md` | Exact v3 durable-command-complete/pre-WIP self-termination sequence and stop rules | documentation only |
 | `../../docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-VALIDATION-2026-08-23.md` | Observed v3 host-termination, reconciliation, restoration and boot result | documentation only |
@@ -303,9 +303,14 @@ default after writing; add `-N` to verify only the written region.
 | `F6-ERASE-ENCODING.md` | Calibrated static proof of the erase address units and CDB layouts | documentation only |
 | `F6-WRITE-ENCODING.md` | Final program/erase investigation record and safety verdict | documentation only |
 
-`kb7-isp-verify.py` is the useful one: it exercises the same flash read path the
-bootloader uses at boot, so it can distinguish "the chip is bad" from "the SoC's
-read of the chip is bad" — a distinction the SPI programmer cannot make.
+`kb7-isp-verify.py` remains useful as a historical diagnostic, but one USB
+capture cannot distinguish physical NOR state from a command-read acquisition
+failure. Its legacy CLI also exits 0 after region CRC failure and prints an
+unsupported diagnosis. Use independent SPI to classify physical flash state.
+For USB-path qualification, `kb7-isp-repeat.py` now requires every completed
+short read to be byte-exact against the pinned baseline; stable-but-wrong reads
+fail. See the
+[2026-08-31 incident](../../docs/USB-ISP-READ-RELIABILITY-INCIDENT-2026-08-31.md).
 
 `kb7-isp-write2.py` is deliberately not a general writer. It accepts only the
 reviewed marker-program and sector-erase experiment, opens no USB device in its
@@ -491,22 +496,20 @@ The supporting sources, policy, normalized executor source and exact owner
 campaign ID are pinned. The two private baselines independently reproduce 168
 operations, proof full-image SHA-256
 `d08e8e32af512abf0d2a73248f88d08a5520348af64ad699a67194ee3db40bac`,
-one barrier sector at `0x00022000`, and exact stock restoration. The independent
-read-only preflight gate is true only for that pinned owner campaign. The first
-attempt stopped before boundary zero; two external-SPI reads proved exact
-stock. The revised preflight then passed both exact USB reads, strict close and
-boundary-zero publication, followed by a normal working `10f5:5038` boot. A
-new source/policy pin therefore enables only the fixed install/restore
-operations; raw authority and the general paired-firmware mutation path remain
-unavailable. A `NOT_FOUND` or `BUSY` driver-reattach result is accepted only if
-the host confirms that a kernel driver is already active. Transport, image or
-close anomalies retain the documented fail-closed stop rules. See the
-[incident record](../../docs/LOADER-REENTRY-PREFLIGHT-INCIDENT-2026-08-24.md)
-and the successful
-[preflight validation](../../docs/LOADER-REENTRY-PREFLIGHT-VALIDATION-2026-08-24.md).
-Read the
+one barrier sector at `0x00022000`, and exact stock restoration. Both the
+read-only preflight and proof-mutation gates are now false. A 2026-08-31
+preflight exposed independently SPI-confirmed two-byte physical corruption;
+after exact SPI restoration, a separate full USB capture exposed widespread
+command-aligned acquisition corruption. The fixed short-chunk, baseline-aware
+read sweep is offline-tested but hardware-unrun. Raw authority and the general
+paired-firmware mutation path remain unavailable. See the
+[read-reliability incident](../../docs/USB-ISP-READ-RELIABILITY-INCIDENT-2026-08-31.md).
+Passing the sweep would permit review of a read-only full preflight revision,
+not mutation; mutation needs a later exact full-preflight result and separate
+pin review.
+Read the historical
 [fixed campaign runbook](../../docs/LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md)
-before any later bounded hardware test. This
+for the model and stop rules before any later bounded hardware test. This
 does not change the general paired-firmware executor's read-only lock.
 
 ### Offline paired updater planner

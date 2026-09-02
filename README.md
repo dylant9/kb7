@@ -16,10 +16,10 @@ full-chip external-SPI restore has been rehearsed; that recovery result does not
 validate the replacement image. Public defaults remain fail-closed and flash-
 image generation is disabled.
 
-## Current status — 2026-08-23
+## Current status — 2026-08-31
 
 - The offline/software implementation is complete to the evidence currently
-  available. `make check` passes 261 Python tests, browser validation, four ARM
+  available. `make check` passes 274 Python tests, browser validation, four ARM
   build profiles, hardware-fact checks and the public-tree safety audit.
 - Two independent reads of the installed 32-MiB Macronix SPI NOR are
   bit-identical. They match the earlier USB-extracted V1.22 components and
@@ -51,19 +51,20 @@ image generation is disabled.
   policy/source identities. The two owner baselines now independently rederive
   the exact 168-operation campaign ID
   `3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f`,
-  including exact proof-image and stock-restoration closure. The exact fixed
-  campaign's first read-only preflight stopped after two reported full-chip
-  reads and before boundary zero. Two subsequent independent SPI reads proved
-  that flash remained byte-exact stock. A revised phase-reporting preflight
-  then completed two exact USB reads, strict close and boundary-zero
-  publication; a normal power cycle returned to working `10f5:5038` without
-  SPI intervention. The precise old failure remains unavailable because the
-  old executor discarded its exception. A new hash-pinned revision now
-  authorizes only the exact fixed proof-install/stock-restore campaign; it
-  requires its own fresh journal and preflight. The general paired-firmware
-  executor remains locked and `flash_approved=false`. See the
+  including exact proof-image and stock-restoration closure. The campaign's
+  2026-08-24 preflight history includes an old stopped attempt and a later
+  exact boundary-zero pass. A subsequent 2026-08-31 read-only preflight found
+  two stable changed Core-1 bytes; external SPI independently reproduced them,
+  after which a full SPI restore and separate readback returned the exact
+  baseline and normal `10f5:5038` operation. A later full USB capture exposed
+  a distinct command-aligned acquisition failure, including zero-filled and
+  half-address pages. The legacy full-chip verifier returned status 0 despite
+  failed CRCs, so it is not current pass/fail authority. Both proof preflight
+  and proof mutation are now locked pending a fixed baseline-aware short-read
+  sweep. The general paired-firmware executor remains locked and
+  `flash_approved=false`. See the
   [fixed proof campaign](docs/LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md) and
-  [preflight validation](docs/LOADER-REENTRY-PREFLIGHT-VALIDATION-2026-08-24.md).
+  [read-reliability incident](docs/USB-ISP-READ-RELIABILITY-INCIDENT-2026-08-31.md).
 - The flash-access tooling adds proven external SPI recovery workflows,
   read-only USB-ISP diagnostics and fixed, dry-run-default USB mutation
   experiments. On 2026-08-23 one guarded V1.22 cycle at offset `0x0008e000`
@@ -262,10 +263,11 @@ ELF and verifies its minimal linked form; it neither makes that ELF
 checksum-compatible by itself nor emits a bundle or touches hardware. `make
 bundle` deliberately fails: no installable package can be produced by that
 target. The fixed loader-reentry campaign builder can balance this exact proof
-ELF against two exact owner baselines, but emits only private, execution-
-unapproved sector payloads and model metadata. Its separate executor is
-dry-run-default, pins the exact reviewed owner campaign ID, and is authorized
-only for the bounded proof-install/exact-stock-restore hardware campaign.
+ELF against two exact owner baselines, but emits only private,
+execution-unapproved sector payloads and model metadata. Its separate executor
+pins the exact reviewed owner campaign ID, but both its USB preflight and
+mutation paths are hard-disabled pending the fixed short-chunk
+read-reliability gate.
 
 ## Public-repository boundary
 

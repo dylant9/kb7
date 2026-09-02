@@ -57,6 +57,9 @@ DENIED_JSON_SCHEMAS = {
     "kb7-usb-updater-scratch-journal-v3",
     "kb7-loader-reentry-proof-journal-v1",
 }
+DENIED_JSON_RESULT_SCHEMAS = {
+    "kb7-fixed-isp-read-reliability-v1",
+}
 DENIED_JSON_FORMATS = {
     "KB7 offline updater detached authentication v1",
     "KB7 V1.22 fixed loader-reentry proof campaign v1",
@@ -129,6 +132,9 @@ def inspect(root: Path) -> dict[str, object]:
             if (isinstance(structured, dict) and
                     structured.get("schema") in DENIED_JSON_SCHEMAS):
                 failures.append(f"owner-local updater journal: {relative}")
+            if (isinstance(structured, dict) and
+                    structured.get("schema") in DENIED_JSON_RESULT_SCHEMAS):
+                failures.append(f"owner-local diagnostic result: {relative}")
             if (isinstance(structured, dict) and
                     structured.get("format") in DENIED_JSON_FORMATS):
                 failures.append(f"owner-local updater metadata: {relative}")

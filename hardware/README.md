@@ -17,12 +17,12 @@ output, PCB captures, or copied vendor tables.
   the default-off custom proof profile, its fixed offline install/restore
   campaign, and their still-unmet hardware gates. The campaign is simulation-
   and fault-test-complete and bound to the independently rederived owner
-  campaign. Its first read-only hardware preflight stopped before boundary
-  zero; independent SPI proved the flash remained exact stock. The revised
-  preflight then passed two exact USB reads, strict close, boundary-zero
-  publication and a normal working boot. Only the separately pinned fixed
-  proof-install/exact-stock-restore campaign is now authorized; the general
-  updater remains locked. It contains no stock
+  campaign. Historical read-only preflights include one exact boundary-zero
+  pass. A later preflight found two physical Core-1 bytes changed,
+  independently confirmed over SPI; after exact SPI restoration, a separate
+  USB capture exposed command-aligned loader-read corruption. Both proof
+  preflight and proof mutation are now locked pending the fixed short-chunk
+  read gate, and the general updater remains locked. It contains no stock
   instruction bytes, owner-local paths, campaign payloads or journal data.
 
 ## Current physical evidence — 2026-08-23

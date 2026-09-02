@@ -77,13 +77,12 @@ hardware measurements:
   flash fields. Supporting source/policy pins and focused campaign/executor
   tests pass. Two exact owner baselines independently reproduce its pinned
   168-operation identity and exact proof/stock closure. The first committed
-  read-only preflight stopped before boundary zero; two independent external-
-  SPI reads proved exact stock closure and no write was needed. The revised
-  preflight then passed exact USB reads, strict close, boundary zero and a
-  normal working boot. A new pin authorizes only the fixed proof/install/restore
-  campaign. See the
+  preflight history includes an exact boundary-zero pass. Later evidence found
+  an independently SPI-confirmed two-byte physical corruption and, after exact
+  restoration, a separate command-aligned USB acquisition failure. Both proof
+  preflight and mutation are relocked pending the fixed short-read gate. See the
   [fixed proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md) and
-  [preflight validation](LOADER-REENTRY-PREFLIGHT-VALIDATION-2026-08-24.md).
+  [incident record](USB-ISP-READ-RELIABILITY-INCIDENT-2026-08-31.md).
 - The recovery chord defaults off. Its input choice and boot-time semantics
   still need a dedicated review; generic `SYS0_PINCTRL` uncertainty is no
   longer the blocker.
@@ -126,9 +125,10 @@ flash command or pulse, tests device power loss or touches firmware regions,
 and none unlocks firmware mutation.
 The additional fixed loader-reentry executor is not a general updater: it can
 accept only one independently rederived proof campaign and its owner-specific
-campaign pin is exact. `LIVE_PROOF_CAMPAIGN_ENABLED` is true only for that
-fixed campaign after the revised read-only preflight passed; the general
-paired-firmware executor remains independently locked.
+campaign pin is exact. `LIVE_READ_ONLY_PREFLIGHT_ENABLED` and
+`LIVE_PROOF_CAMPAIGN_ENABLED` are both false pending the fixed baseline-aware
+short-read hardware gate; the general paired-firmware executor remains
+independently locked.
 Header dependencies use `-MMD -MP`.
 
 Any future image-producing release pipeline must, before it is enabled:
@@ -155,15 +155,15 @@ proof and an assigned USB identity; none is silently enabled. The
 external-SPI stock restore/verification rehearsal is complete and remains the
 final rollback route. The minimal loader-reentry profile passes offline and is
 planner-compatible, not a checksum-compatible or hardware-approved image; no
-replacement firmware has run on hardware. The fixed installer/restorer is
-offline-ready and authorized only for the bounded unrun proof; this does not
-change `flash_approved=false`.
+replacement firmware has run on hardware. The fixed installer/restorer remains
+offline-ready but all live paths are locked pending the USB read-reliability
+gate; `flash_approved=false`.
 
 ## Verification record
 
-The latest offline verification pass completed successfully on 2026-08-23:
+The latest offline verification pass completed successfully on 2026-08-31:
 
-- `make check`: 261 Python tests passed, browser JavaScript syntax
+- `make check`: 274 Python tests passed, browser JavaScript syntax
   and executable validator checks passed, and the default, guarded-audit,
   all-branches integration and minimal recovery-proof firmware profiles built
   and passed ELF verification;
@@ -172,7 +172,7 @@ The latest offline verification pass completed successfully on 2026-08-23:
   4 bytes of data and 19,312 bytes of BSS;
 - neither ELF contains unresolved relocations, and core0's vector table is
   exactly `0x13c` bytes;
-- the public-tree policy check accepted 206 UTF-8 source/documentation files and
+- the public-tree policy check accepted 208 UTF-8 source/documentation files and
   found no firmware blobs, generated binaries, or disallowed material; and
 - independent warning passes using GCC `-fanalyzer` and strict conversion,
   shadowing, and undefined-macro diagnostics completed without findings.

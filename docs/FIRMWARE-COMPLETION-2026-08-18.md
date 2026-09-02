@@ -59,14 +59,12 @@ strict close-before-publication, no raw flash fields and no ordinary USB
 reconciliation. Supporting source and policy hashes are pinned. The supplied
 pair of exact owner baselines now
 reproduces the pinned 168-operation campaign, its checksum-valid proof target,
-and its byte-exact stock-restoration target. The first committed read-only
-preflight stopped before boundary zero; two independent SPI reads proved the
-flash was still exact stock and no write was needed. The revised preflight then
-passed exact USB reads, strict close and boundary zero, followed by normal
-operation. A new pin authorizes only the fixed proof install and stock restore.
-See the
+and its byte-exact stock-restoration target. Later read-only evidence found an
+independently SPI-confirmed two-byte physical corruption and, after exact SPI
+restoration, a separate command-aligned USB acquisition failure. Both proof
+preflight and mutation are relocked pending the fixed short-read gate. See the
 [fixed proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md) and
-[preflight validation](LOADER-REENTRY-PREFLIGHT-VALIDATION-2026-08-24.md).
+[incident record](USB-ISP-READ-RELIABILITY-INCIDENT-2026-08-31.md).
 
 ## Completed software-owned work
 
@@ -259,10 +257,10 @@ execution and no firmware-region write.
    `10f5:5038` are observed, it is not an operational recovery claim. The
    fixed proof campaign and executor now pass owner-bound offline simulation,
    exact operation rederivation and fault testing. The exact campaign ID is
-   pinned. Its first read-only hardware preflight stopped before boundary zero,
-   while independent SPI proved no flash change. The revised preflight passed
-   exact USB reads, strict close and boundary zero; the exact fixed campaign is
-   reauthorized but remains hardware-unrun beyond preflight. The general
+   pinned. Later evidence found a separately SPI-confirmed two-byte physical
+   corruption and a post-restore command-aligned USB acquisition failure. The
+   exact fixed campaign remains hardware-unrun and is relocked pending the
+   fixed short-read reliability gate. The general
    paired-firmware executor remains mutation-locked
    and external SPI remains the final recovery route. The narrow marker and guarded erase-
    footprint experiments passed at their fixed stock-loader scratch targets,

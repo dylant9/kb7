@@ -60,8 +60,8 @@ SafetyError = _writer.SafetyError
 PlanError = _planner.PlanError
 
 JOURNAL_SCHEMA = "kb7-loader-reentry-proof-journal-v1"
-LIVE_READ_ONLY_PREFLIGHT_ENABLED = True
-LIVE_PROOF_CAMPAIGN_ENABLED = True
+LIVE_READ_ONLY_PREFLIGHT_ENABLED = False
+LIVE_PROOF_CAMPAIGN_ENABLED = False
 EXPECTED_CAMPAIGN_ID = (
     "3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f")
 EXPECTED_IMPLEMENTATION_HASHES: dict[str, str] = {
@@ -75,8 +75,8 @@ EXPECTED_IMPLEMENTATION_HASHES: dict[str, str] = {
         "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
 }
 EXPECTED_POLICY_SHA256 = (
-    "8ba06722fdab35dc5cfa9f374518e51a5fa6b54444fc29d5b4ac376672a786ac")
-EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "47f643305883ef6341b12e7fd8878b46d54a76039601759b3a8fdd95b4d3c3ff"
+    "2f2e46ae5f9460c0f37100f111fe528e6649dd806475938e09351ed0b5db510c")
+EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "ef17000a9941409fb0c463e92b4cbb6317523ead3b831492f6b96224a41249be"
 
 PREFLIGHT_STARTED = "preflight_started"
 BOUNDARY_VERIFIED = "boundary_verified"
@@ -222,10 +222,13 @@ def policy_descriptor() -> dict[str, object]:
             "cause_of_reenumeration_is_operator_evidence": True,
         },
         "finalization": "exact full baseline then clear state",
-        "read_only_preflight_diagnostic_authorized": True,
-        "fixed_proof_hardware_test_authorized": True,
+        "read_only_preflight_diagnostic_authorized": False,
+        "fixed_proof_hardware_test_authorized": False,
         "authorized_campaign_id": EXPECTED_CAMPAIGN_ID,
-        "authorization_scope": "one fixed proof install and exact stock restore",
+        "authorization_scope": (
+            "paused pending exact short-chunk USB read-reliability evidence"),
+        "usb_read_reliability_gate": (
+            "fixed baseline-aware 512/1024/2048/4096-byte sweep required"),
         "generic_executor_live_mutation_enabled": False,
     }
 
@@ -1274,6 +1277,9 @@ def _print_plan(command: str, transaction: Transaction,
     print("mutable   : Core0 envelope + one fixed Core1 barrier sector")
     print("preserved : header, loader, manifest, all flash after Core1")
     print("general fw: mutation hard-disabled")
+    print("read preflight: hard-disabled" if
+          not LIVE_READ_ONLY_PREFLIGHT_ENABLED else
+          "read preflight: exact campaign enabled")
     print("proof write: mutation hard-disabled" if
           not LIVE_PROOF_CAMPAIGN_ENABLED else
           "proof write: fixed campaign enabled")

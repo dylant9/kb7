@@ -2,6 +2,11 @@
 
 Date: 2026-08-24
 
+> Historical result. A later 2026-08-31 preflight and USB acquisition incident
+> supersedes its authorization conclusion. Both proof preflight and mutation
+> are now locked pending the fixed baseline-aware short-read gate. See the
+> [USB-ISP read-reliability incident](USB-ISP-READ-RELIABILITY-INCIDENT-2026-08-31.md).
+
 ## Result
 
 The revised fixed-campaign executor completed its committed read-only
@@ -43,7 +48,7 @@ It makes the old close/driver-reattachment behavior the leading explanation,
 but cannot recover the discarded old exception and therefore does not prove
 the historical root cause.
 
-## Authorization result
+## Authorization result at the time
 
 The successful diagnostic closes the read-only blocker that caused proof
 mutation to be relocked. A separately hash-pinned follow-up revision therefore

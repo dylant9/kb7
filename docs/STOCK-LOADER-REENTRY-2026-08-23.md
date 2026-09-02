@@ -131,11 +131,11 @@ for those cases.
 
 The [fixed proof campaign and runbook](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md)
 implements that offline plan. The exact owner campaign is generated,
-independently rederived and pinned. Its first executor hardware action stopped
-during read-only preflight before boundary zero; two later external-SPI reads
-proved exact stock flash. The revised preflight then passed exact USB reads,
-strict close and boundary zero, followed by a normal working boot. Only the
-fixed campaign is reauthorized, and the proof itself remains hardware-unrun. The
-general paired-firmware executor remains
+independently rederived and pinned. Historical preflights include an exact
+boundary-zero pass, but later evidence found an independently SPI-confirmed
+two-byte physical corruption followed, after restoration, by a separate
+command-aligned USB acquisition failure. Both fixed proof preflight and
+mutation are relocked pending the baseline-aware short-read gate, and the proof
+itself remains hardware-unrun. The general paired-firmware executor remains
 mutation-locked, `flash_approved` remains false, and the scratch executor still
 cannot address application or loader regions.

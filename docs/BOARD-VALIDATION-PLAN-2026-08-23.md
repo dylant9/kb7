@@ -15,10 +15,11 @@ continues to fail. A separately bounded
 [minimal loader-reentry proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md)
 now passes offline derivation, symbolic ordering checks and executor fault
 tests. Its exact owner-specific 168-operation campaign pin is independently
-rederived. The first read-only preflight stopped before boundary zero and two
-external-SPI reads proved exact stock flash. The revised preflight then passed
-two exact USB reads, strict close, boundary zero and a normal working boot. A
-new source/policy pin authorizes only the fixed proof install and stock restore.
+rederived. Later read-only evidence found both a separately SPI-confirmed
+two-byte physical corruption and a post-restore command-aligned USB acquisition
+failure. Both fixed proof preflight and mutation are relocked pending the
+baseline-aware short-read gate. See the
+[incident record](USB-ISP-READ-RELIABILITY-INCIDENT-2026-08-31.md).
 
 ## Entry conditions
 
