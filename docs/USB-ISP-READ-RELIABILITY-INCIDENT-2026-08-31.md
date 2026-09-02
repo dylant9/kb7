@@ -76,8 +76,10 @@ strictly checked release and kernel-driver ownership handoff.
 The fixed read-reliability gate passes offline tests but has not run on
 hardware. Until it passes, both
 `LIVE_READ_ONLY_PREFLIGHT_ENABLED` and `LIVE_PROOF_CAMPAIGN_ENABLED` are false.
-The loader-reentry executor cannot open USB or mutate flash, the general
-paired-firmware executor remains locked, and `flash_approved=false`.
+The loader-reentry executor refuses in its CLI, in every live entry point and
+inside both USB backends before any journal state is published or any device
+is opened; the general paired-firmware executor remains locked, and
+`flash_approved=false`.
 
 A gate pass does not authorize proof mutation. It permits review of a new
 revision that enables only the fixed campaign's full read-only preflight while

@@ -266,8 +266,8 @@ target. The fixed loader-reentry campaign builder can balance this exact proof
 ELF against two exact owner baselines, but emits only private,
 execution-unapproved sector payloads and model metadata. Its separate executor
 pins the exact reviewed owner campaign ID, but both its USB preflight and
-mutation paths are hard-disabled pending the fixed short-chunk
-read-reliability gate.
+mutation paths are hard-disabled in the CLI, the live entry points and both
+USB backends pending the fixed short-chunk read-reliability gate.
 
 ## Public-repository boundary
 

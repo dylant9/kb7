@@ -938,17 +938,20 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
                 "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
         } and
         authorization["policy_sha256"] ==
-        "2f2e46ae5f9460c0f37100f111fe528e6649dd806475938e09351ed0b5db510c" and
+        "db2bcecd0342f0f4ba62a43246714996c7b6d7b51906a5c1e9e7b5c418009b4a" and
         authorization["executor_descriptor_sha256"] ==
-        "ef17000a9941409fb0c463e92b4cbb6317523ead3b831492f6b96224a41249be" and
+        "7b326419d7e59a6b6fa8e89c28ba0098c8be030556b512477554c8fc16bf0378" and
         authorization["executor_source_sha256"] ==
-        "396a60bfa11b007d97328bcf62dc08a6c9e31a5f99ee3a84ab8b3dc8ae332992" and
+        "07e28785119c91a409272ed554b059205259772e55fceef9ff7285dccf56d344" and
+        authorization[
+            "live_authorization_checked_inside_backends_and_live_entry_points"]
+        is True and
         authorization["generic_firmware_executor_mutation_enabled"] is False and
         authorization["flash_approved"] is False,
         "fixed proof campaign authorization changed")
     offline = campaign["offline_validation"]
     require(offline[
-                "focused_campaign_executor_and_read_reliability_tests_passed"] == 50 and
+                "focused_campaign_executor_and_read_reliability_tests_passed"] == 54 and
             offline["exact_campaign_operation_count"] == 168 and
             offline["install_operation_count"] == 32 and
             offline["restore_operation_count"] == 136 and

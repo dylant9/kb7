@@ -114,10 +114,10 @@ No external scripts, fonts, images, packages, or vendored libraries are bundled.
 - The default-off loader-reentry proof is a local build profile, not an
   installable image. Its ELF is only planner-compatible; the ordinary Makefile
   still cannot emit a bundle, and the paired-firmware executor remains
-  mutation-locked. The separate fixed proof executor now pins the independently
-  rederived private campaign ID and is live only for that exact bounded
-  install/restore test. It does not authorize a general device run or host
-  recovery opcode.
+  mutation-locked. The separate fixed proof executor pins the independently
+  rederived private campaign ID and is locked: both its read-only preflight and
+  mutation gates are false in the CLI, the live entry points and both USB
+  backends. It does not authorize a general device run or host recovery opcode.
 
 ## Excluded and retained only outside the public repository
 

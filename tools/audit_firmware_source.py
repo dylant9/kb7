@@ -197,8 +197,17 @@ def main() -> int:
             'EXPECTED_CAMPAIGN_ID = (',
             '"3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f"',
             'EXPECTED_POLICY_SHA256 = (',
-            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "ef17000a9941409fb0c463e92b4cbb63',
+            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "7b326419d7e59a6b6fa8e89c28ba0098',
             '"durable_terminal_intent_before_backend_or_usb": True',
+            '"live_authorization_checked_before_journal_publication_and_backend"',
+            'require_live_authorization(transaction)\n'
+            '        self._device = device_factory()',
+            'require_read_only_preflight_authorization(transaction)\n'
+            '        self._device = device_factory()',
+            'require_read_only_preflight_authorization(transaction)\n'
+            '    with journal_lock(transaction, journal_path):',
+            'require_live_authorization(transaction)\n'
+            '    with journal_lock(transaction, journal_path):',
             '"ordinary_intent_reconciliation": False',
             '"reattach_not_found_or_busy_accepted_only_if_kernel_driver_is_active"',
             '"read_only_preflight_transport_or_close_anomaly"',

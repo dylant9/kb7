@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import fcntl
 import importlib.util
 import io
@@ -100,7 +101,30 @@ class FakeMutationBackend(FakeReadBackend):
             self.state.image, self.transaction.operations[self.index])
 
 
-class LoaderReentryExecutorTests(unittest.TestCase):
+def simulated_authorization(transaction: object, *, preflight: bool = True,
+                            mutation: bool = True) -> contextlib.ExitStack:
+    """Patch only the two gate constants and the reviewed campaign identity.
+
+    Every other reviewed-authorization check (implementation hashes, executor
+    source and descriptor pins, policy hash, general executor lock) still runs
+    against the real checkout, so an unpinned executor edit fails these tests.
+    """
+    stack = contextlib.ExitStack()
+    stack.enter_context(mock.patch.object(
+        EXECUTOR, "LIVE_READ_ONLY_PREFLIGHT_ENABLED", preflight))
+    stack.enter_context(mock.patch.object(
+        EXECUTOR, "LIVE_PROOF_CAMPAIGN_ENABLED", mutation))
+    stack.enter_context(mock.patch.object(
+        EXECUTOR, "EXPECTED_CAMPAIGN_ID", transaction.campaign_id))
+    # The campaign identity is part of the pinned policy descriptor, so the
+    # policy pin is recomputed for the synthetic campaign; the executor source
+    # and descriptor pins are still checked against the file on disk.
+    stack.enter_context(mock.patch.object(
+        EXECUTOR, "EXPECTED_POLICY_SHA256", EXECUTOR._policy_sha256()))
+    return stack
+
+
+class _ExecutorFixture(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls._temporary = tempfile.TemporaryDirectory(
@@ -178,37 +202,18 @@ class LoaderReentryExecutorTests(unittest.TestCase):
 
         return fault
 
-    def test_exact_proof_campaign_and_preflight_are_relocked(self) -> None:
-        self.assertFalse(EXECUTOR.LIVE_READ_ONLY_PREFLIGHT_ENABLED)
-        self.assertFalse(EXECUTOR.LIVE_PROOF_CAMPAIGN_ENABLED)
-        self.assertEqual(
-            EXECUTOR.EXPECTED_CAMPAIGN_ID,
-            "3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f")
-        self.assertEqual(EXECUTOR.EXPECTED_IMPLEMENTATION_HASHES,
-                         dict(EXECUTOR.IMPLEMENTATION_HASHES))
-        self.assertEqual(EXECUTOR.EXPECTED_POLICY_SHA256,
-                         EXECUTOR._policy_sha256())
-        self.assertEqual(EXECUTOR.EXPECTED_EXECUTOR_DESCRIPTOR_SHA256,
-                         EXECUTOR._executor_descriptor_sha256())
-        reviewed = mock.Mock(campaign_id=EXECUTOR.EXPECTED_CAMPAIGN_ID)
-        with self.assertRaises(EXECUTOR.ExecutionLocked):
-            EXECUTOR.require_read_only_preflight_authorization(reviewed)
-        with self.assertRaises(EXECUTOR.ExecutionLocked):
-            EXECUTOR.require_live_authorization(reviewed)
-        general = (ROOT / "tools/flash-access/kb7-updater-executor.py").read_text()
-        self.assertIn("LIVE_MUTATION_ENABLED = False", general)
-        self.assertNotIn("--commit", general)
-        self.assertFalse(
-            EXECUTOR.FixedProofNoRecoveryReadOnlyDevice.clear_halt_on_error)
-        self.assertTrue(issubclass(
-            EXECUTOR.FixedProofStrictWriteDevice,
-            EXECUTOR._writer.WriteDevice))
-        self.assertTrue(issubclass(
-            EXECUTOR.FixedProofNoRecoveryReadOnlyDevice,
-            EXECUTOR._writer._verify.Device))
-        self.assertTrue(issubclass(
-            EXECUTOR.FixedProofNoRecoveryReadOnlyDevice,
-            EXECUTOR._ProofStrictCloseMixin))
+class LoaderReentryExecutorTests(_ExecutorFixture):
+    """Live-path behaviour under simulated reviewed authorization.
+
+    Only the two gate constants and the reviewed campaign identity are patched;
+    hashes, pins and the general executor lock come from the real checkout.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        authorization = simulated_authorization(self.transaction)
+        authorization.__enter__()
+        self.addCleanup(authorization.close)
 
     def test_usb_enumeration_address_is_added_only_by_the_fixed_proof_device(self) -> None:
         class ParentDevice:
@@ -990,6 +995,60 @@ class LoaderReentryExecutorTests(unittest.TestCase):
         with self.assertRaises(EXECUTOR.ExecutorError):
             EXECUTOR.inspect_state(self.transaction, link)
 
+    def test_read_only_backend_opens_only_under_reviewed_authorization(self) -> None:
+        closed: list[str] = []
+
+        class Device:
+            def close(self) -> None:
+                closed.append("close")
+
+        backend = EXECUTOR.FixedProofReadOnlyBackend(
+            self.transaction, device_factory=Device)
+        backend.close()
+        self.assertEqual(closed, ["close"])
+        with mock.patch.object(
+                EXECUTOR, "LIVE_READ_ONLY_PREFLIGHT_ENABLED", False):
+            with self.assertRaises(EXECUTOR.ExecutionLocked):
+                EXECUTOR.FixedProofReadOnlyBackend(
+                    self.transaction, device_factory=Device)
+        self.assertEqual(closed, ["close"])
+
+
+class LoaderReentryLockTests(_ExecutorFixture):
+    """Production constants: both gates false, owner campaign pin in force."""
+
+    def test_exact_proof_campaign_and_preflight_are_relocked(self) -> None:
+        self.assertFalse(EXECUTOR.LIVE_READ_ONLY_PREFLIGHT_ENABLED)
+        self.assertFalse(EXECUTOR.LIVE_PROOF_CAMPAIGN_ENABLED)
+        self.assertEqual(
+            EXECUTOR.EXPECTED_CAMPAIGN_ID,
+            "3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f")
+        self.assertEqual(EXECUTOR.EXPECTED_IMPLEMENTATION_HASHES,
+                         dict(EXECUTOR.IMPLEMENTATION_HASHES))
+        self.assertEqual(EXECUTOR.EXPECTED_POLICY_SHA256,
+                         EXECUTOR._policy_sha256())
+        self.assertEqual(EXECUTOR.EXPECTED_EXECUTOR_DESCRIPTOR_SHA256,
+                         EXECUTOR._executor_descriptor_sha256())
+        reviewed = mock.Mock(campaign_id=EXECUTOR.EXPECTED_CAMPAIGN_ID)
+        with self.assertRaises(EXECUTOR.ExecutionLocked):
+            EXECUTOR.require_read_only_preflight_authorization(reviewed)
+        with self.assertRaises(EXECUTOR.ExecutionLocked):
+            EXECUTOR.require_live_authorization(reviewed)
+        general = (ROOT / "tools/flash-access/kb7-updater-executor.py").read_text()
+        self.assertIn("LIVE_MUTATION_ENABLED = False", general)
+        self.assertNotIn("--commit", general)
+        self.assertFalse(
+            EXECUTOR.FixedProofNoRecoveryReadOnlyDevice.clear_halt_on_error)
+        self.assertTrue(issubclass(
+            EXECUTOR.FixedProofStrictWriteDevice,
+            EXECUTOR._writer.WriteDevice))
+        self.assertTrue(issubclass(
+            EXECUTOR.FixedProofNoRecoveryReadOnlyDevice,
+            EXECUTOR._writer._verify.Device))
+        self.assertTrue(issubclass(
+            EXECUTOR.FixedProofNoRecoveryReadOnlyDevice,
+            EXECUTOR._ProofStrictCloseMixin))
+
     def test_import_time_hashes_and_executor_descriptor_detect_source_drift(self) -> None:
         self.assertEqual(
             dict(EXECUTOR.IMPLEMENTATION_HASHES),
@@ -1110,6 +1169,115 @@ class LoaderReentryExecutorTests(unittest.TestCase):
         self.assertIn("Verify independently through external SPI", text)
         self.assertIn("write only if", text)
         self.assertNotIn("EXTERNAL SPI RECOVERY REQUIRED", text)
+
+    def test_backends_refuse_to_open_a_device_while_relocked(self) -> None:
+        opened: list[str] = []
+
+        def factory():
+            opened.append("device")
+            raise AssertionError("device factory must not run while relocked")
+
+        with self.assertRaises(EXECUTOR.ExecutionLocked):
+            EXECUTOR.FixedProofReadOnlyBackend(
+                self.transaction, device_factory=factory)
+        with self.assertRaises(EXECUTOR.ExecutionLocked):
+            EXECUTOR.FixedProofMutationBackend(
+                self.transaction, 0, device_factory=factory)
+        # A preflight-only revision must still keep the mutation backend shut.
+        with simulated_authorization(self.transaction, mutation=False):
+            with self.assertRaises(EXECUTOR.ExecutionLocked):
+                EXECUTOR.FixedProofMutationBackend(
+                    self.transaction, 0, device_factory=factory)
+        # Open gates without the reviewed campaign identity are still refused.
+        with mock.patch.object(
+                EXECUTOR, "LIVE_READ_ONLY_PREFLIGHT_ENABLED", True), \
+                mock.patch.object(EXECUTOR, "LIVE_PROOF_CAMPAIGN_ENABLED", True):
+            with self.assertRaises(EXECUTOR.ExecutionLocked):
+                EXECUTOR.FixedProofReadOnlyBackend(
+                    self.transaction, device_factory=factory)
+            with self.assertRaises(EXECUTOR.ExecutionLocked):
+                EXECUTOR.FixedProofMutationBackend(
+                    self.transaction, 0, device_factory=factory)
+        self.assertEqual(opened, [])
+
+    def test_live_entry_points_refuse_before_journal_publication_while_relocked(
+            self) -> None:
+        constructed: list[str] = []
+
+        def read_factory(_transaction: object):
+            constructed.append("read")
+            raise AssertionError("backend must not be built while relocked")
+
+        def mutation_factory(_transaction: object, _index: int):
+            constructed.append("mutation")
+            raise AssertionError("backend must not be built while relocked")
+
+        with self.assertRaises(EXECUTOR.ExecutionLocked):
+            EXECUTOR.live_preflight(
+                self.transaction, self.journal,
+                backend_factory=read_factory, progress=False)
+        self.assertFalse(self.journal.exists())
+        self.assertFalse(EXECUTOR.journal_lock_path(self.journal).exists())
+        install = self.transaction.install_count
+        final = len(self.transaction.operations)
+        scenarios = (
+            ("step", EXECUTOR.live_step, mutation_factory, 0, None, 10),
+            ("validate-reentry", EXECUTOR.live_validate_reentry, read_factory,
+             install, EXECUTOR.PROOF_INSTALLED, 10),
+            ("finalize", EXECUTOR.live_finalize, read_factory,
+             final, EXECUTOR.COMPLETE, 11),
+        )
+        for name, function, factory, index, status, address in scenarios:
+            with self.subTest(command=name):
+                path = self.case / f"locked-{name}.json"
+                journal = EXECUTOR.boundary_journal(
+                    self.transaction,
+                    self.identity(address=address, initial_address=10),
+                    index, status=status)
+                EXECUTOR.write_journal_atomic(path, journal, require_absent=True)
+                before = path.read_bytes()
+                with self.assertRaises(EXECUTOR.ExecutionLocked):
+                    function(self.transaction, path,
+                             backend_factory=factory, progress=False)
+                self.assertEqual(path.read_bytes(), before)
+                self.assertFalse(EXECUTOR.journal_lock_path(path).exists())
+        with simulated_authorization(self.transaction, mutation=False):
+            path = self.case / "locked-step-preflight-only.json"
+            journal = EXECUTOR.boundary_journal(
+                self.transaction, self.identity(initial_address=10), 0)
+            EXECUTOR.write_journal_atomic(path, journal, require_absent=True)
+            before = path.read_bytes()
+            with self.assertRaises(EXECUTOR.ExecutionLocked):
+                EXECUTOR.live_step(self.transaction, path,
+                                   backend_factory=mutation_factory,
+                                   progress=False)
+            self.assertEqual(path.read_bytes(), before)
+        self.assertEqual(constructed, [])
+
+    def test_policy_descriptor_pins_the_backend_authorization_guard(self) -> None:
+        policy = EXECUTOR.policy_descriptor()
+        key = "live_authorization_checked_before_journal_publication_and_backend"
+        self.assertIs(policy[key], True)
+        self.assertEqual(EXECUTOR._policy_sha256(),
+                         EXECUTOR.EXPECTED_POLICY_SHA256)
+        weakened = dict(policy)
+        weakened[key] = False
+        self.assertNotEqual(EXECUTOR._planner.canonical_sha256(weakened),
+                            EXECUTOR.EXPECTED_POLICY_SHA256)
+        source = EXECUTOR_PATH.read_text(encoding="utf-8")
+        for guard in (
+                "require_live_authorization(transaction)\n"
+                "        self._device = device_factory()",
+                "require_read_only_preflight_authorization(transaction)\n"
+                "        self._device = device_factory()",
+                "require_read_only_preflight_authorization(transaction)\n"
+                "    with journal_lock(transaction, journal_path):",
+                "require_live_authorization(transaction)\n"
+                "    with journal_lock(transaction, journal_path):"):
+            self.assertIn(guard, source)
+        self.assertEqual(source.count(
+            "require_live_authorization(transaction)\n"
+            "    with journal_lock(transaction, journal_path):"), 3)
 
 
 if __name__ == "__main__":

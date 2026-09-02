@@ -9,8 +9,10 @@ selected canonical operation in the Core-0 envelope or the one fixed Core-1
 barrier sector.
 
 The exact owner-baseline campaign and reviewed implementation hashes are
-pinned below.  Its fixed proof campaign is live only for the reviewed owner
-artifacts; the general paired-firmware executor remains independently
+pinned below.  In this source revision both the read-only preflight gate and
+the proof-mutation gate are false: the CLI, every live entry point and both
+USB backends refuse before any journal state is published or any device is
+opened.  The general paired-firmware executor remains independently
 hard-locked.
 """
 
@@ -75,8 +77,8 @@ EXPECTED_IMPLEMENTATION_HASHES: dict[str, str] = {
         "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
 }
 EXPECTED_POLICY_SHA256 = (
-    "2f2e46ae5f9460c0f37100f111fe528e6649dd806475938e09351ed0b5db510c")
-EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "ef17000a9941409fb0c463e92b4cbb6317523ead3b831492f6b96224a41249be"
+    "db2bcecd0342f0f4ba62a43246714996c7b6d7b51906a5c1e9e7b5c418009b4a")
+EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "7b326419d7e59a6b6fa8e89c28ba0098c8be030556b512477554c8fc16bf0378"
 
 PREFLIGHT_STARTED = "preflight_started"
 BOUNDARY_VERIFIED = "boundary_verified"
@@ -203,6 +205,8 @@ def policy_descriptor() -> dict[str, object]:
         ],
         "one_operation_per_cli_invocation": True,
         "durable_terminal_intent_before_backend_or_usb": True,
+        "live_authorization_checked_before_journal_publication_and_backend":
+            True,
         "two_exact_full_chip_reads_before_and_after": True,
         "strict_close_before_authorizing_publication": True,
         "reattach_not_found_or_busy_accepted_only_if_kernel_driver_is_active":
@@ -895,6 +899,7 @@ class FixedProofMutationBackend:
         if trace["offset"] != f"0x{self._operation.offset:08x}" or \
                 trace["action"] != self._operation.action:
             raise ExecutorError("operation descriptor is not canonical")
+        require_live_authorization(transaction)
         self._device = device_factory()
         self._phase = "opened"
 
@@ -944,8 +949,9 @@ class FixedProofMutationBackend:
 
 
 class FixedProofReadOnlyBackend:
-    def __init__(self, _transaction: Transaction, *,
+    def __init__(self, transaction: Transaction, *,
                  device_factory=FixedProofNoRecoveryReadOnlyDevice) -> None:
+        require_read_only_preflight_authorization(transaction)
         self._device = device_factory()
         self._closed = False
 
@@ -1043,6 +1049,7 @@ def live_preflight(transaction: Transaction, journal_path: Path, *,
                    progress: bool = True,
                    journal_fault: Callable[[str], None] | None = None
                    ) -> dict[str, object]:
+    require_read_only_preflight_authorization(transaction)
     with journal_lock(transaction, journal_path):
         started = preflight_started_journal(transaction)
         publish_initial(
@@ -1093,6 +1100,7 @@ def live_step(transaction: Transaction, journal_path: Path, *,
               progress: bool = True,
               journal_fault: Callable[[str], None] | None = None
               ) -> dict[str, object]:
+    require_live_authorization(transaction)
     with journal_lock(transaction, journal_path):
         source = load_journal(journal_path)
         index = _require_step_state(transaction, source)
@@ -1137,6 +1145,7 @@ def live_validate_reentry(transaction: Transaction, journal_path: Path, *,
                           progress: bool = True,
                           journal_fault: Callable[[str], None] | None = None
                           ) -> dict[str, object]:
+    require_live_authorization(transaction)
     with journal_lock(transaction, journal_path):
         source = load_journal(journal_path)
         validate_journal(transaction, source)
@@ -1187,6 +1196,7 @@ def live_finalize(transaction: Transaction, journal_path: Path, *,
                   journal_fault: Callable[[str], None] | None = None,
                   clear_fn: Callable[[Path], None] = clear_journal
                   ) -> dict[str, object]:
+    require_live_authorization(transaction)
     with journal_lock(transaction, journal_path):
         source = load_journal(journal_path)
         validate_journal(transaction, source)

@@ -164,14 +164,15 @@
         "verifier": "9b19d393cf64c66168e08de2f3d4fe352a85a2fd69545e374dee0fa015dea338",
         "writer": "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5"
       },
-      "policy_sha256": "2f2e46ae5f9460c0f37100f111fe528e6649dd806475938e09351ed0b5db510c",
-      "executor_descriptor_sha256": "ef17000a9941409fb0c463e92b4cbb6317523ead3b831492f6b96224a41249be",
-      "executor_source_sha256": "396a60bfa11b007d97328bcf62dc08a6c9e31a5f99ee3a84ab8b3dc8ae332992",
+      "policy_sha256": "db2bcecd0342f0f4ba62a43246714996c7b6d7b51906a5c1e9e7b5c418009b4a",
+      "executor_descriptor_sha256": "7b326419d7e59a6b6fa8e89c28ba0098c8be030556b512477554c8fc16bf0378",
+      "executor_source_sha256": "07e28785119c91a409272ed554b059205259772e55fceef9ff7285dccf56d344",
+      "live_authorization_checked_inside_backends_and_live_entry_points": true,
       "generic_firmware_executor_mutation_enabled": false,
       "flash_approved": false
     },
     "offline_validation": {
-      "focused_campaign_executor_and_read_reliability_tests_passed": 50,
+      "focused_campaign_executor_and_read_reliability_tests_passed": 54,
       "exact_campaign_operation_count": 168,
       "install_operation_count": 32,
       "restore_operation_count": 136,
