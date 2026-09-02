@@ -311,7 +311,7 @@ default after writing; add `-N` to verify only the written region.
 | `kb7-updater-executor.py` | Two-read live preflight, durable journal binding and image-derived reconciliation | **read-only CLI; mutation hard-disabled; not an installer** |
 | `kb7-updater-scratch-executor.py` | One-operation-per-process replay of the fixed 22-command V1.22 scratch plan, mandatory boundary-9 host termination, and local-only state inspection | **destructive; dry-run by default; current v3 passed once at the fixed plan** |
 | `kb7-loader-reentry-campaign.py` | Derive and reverify a fixed proof-Core0 install plus exact-stock restore campaign with a temporary Core1 checksum barrier | **offline only; private artifacts; does not authorize execution** |
-| `kb7-loader-reentry-executor.py` | Fixed proof campaign executor with terminal intents, exact full-chip reads, re-entry gate and local inspection | **USB preflight and mutation hard-disabled in the CLI, live entry points and both USB backends on this branch; read-only preflight passed 2026-09-03 on the separate preflight-only branch** |
+| `kb7-loader-reentry-executor.py` | Fixed proof campaign executor with terminal intents, exact full-chip reads, re-entry gate and local inspection | **read-only preflight enabled for the exact reviewed campaign (this revision only); mutation hard-disabled in the CLI, live entry points and both USB backends** |
 | `../../docs/LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md` | Exact offline safety model, private campaign generation, stop rules and later hardware outline | documentation only |
 | `../../docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-TEST-PLAN-2026-08-23.md` | Exact v3 durable-command-complete/pre-WIP self-termination sequence and stop rules | documentation only |
 | `../../docs/USB-UPDATER-SCRATCH-HOST-TERMINATION-VALIDATION-2026-08-23.md` | Observed v3 host-termination, reconciliation, restoration and boot result | documentation only |
@@ -516,8 +516,9 @@ campaign ID are pinned. The two private baselines independently reproduce 168
 operations, proof full-image SHA-256
 `58780441a9a5d6208aa2056c778e73b480e837d8b9f61c6b0be5629079307da9`,
 one barrier sector at `0x00022000`, and exact stock restoration. On this
-branch both the read-only preflight and proof-mutation gates are false; the
-separate preflight-only branch enables the read-only preflight alone. A
+preflight-only branch the read-only preflight gate is true for the exact
+reviewed campaign and the proof-mutation gate is false; the hardware-validation
+branch keeps both false. A
 2026-08-31 preflight exposed independently SPI-confirmed two-byte physical
 corruption; after exact SPI restoration, a separate full USB capture exposed
 widespread command-aligned acquisition corruption, traced on 2026-09-02 to the

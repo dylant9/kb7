@@ -74,12 +74,12 @@ interface close/rebind in that session, while a clean completion requires a
 strictly checked release and kernel-driver ownership handoff.
 
 The fixed read-reliability gate has since run on hardware twice; see the
-[resolution](#resolution-2026-09-02) below. Both
-`LIVE_READ_ONLY_PREFLIGHT_ENABLED` and `LIVE_PROOF_CAMPAIGN_ENABLED` remain
-false in this source revision.
-The loader-reentry executor refuses in its CLI, in every live entry point and
-inside both USB backends before any journal state is published or any device
-is opened; the general paired-firmware executor remains locked, and
+[resolution](#resolution-2026-09-02) below. In this preflight-only revision
+`LIVE_READ_ONLY_PREFLIGHT_ENABLED` is true for the exact reviewed campaign and
+`LIVE_PROOF_CAMPAIGN_ENABLED` remains false.
+The loader-reentry executor refuses mutation in its CLI, in every live entry
+point and inside both USB backends before any journal state is published or
+any device is opened; the general paired-firmware executor remains locked, and
 `flash_approved=false`.
 
 A gate pass does not authorize proof mutation. It permits review of a new
