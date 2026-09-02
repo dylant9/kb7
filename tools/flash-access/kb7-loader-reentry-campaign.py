@@ -53,9 +53,9 @@ EXPECTED_BASELINE_SHA256 = (
     "2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f")
 EXPECTED_PROOF_RAW = {
     "entry": "0x00000175",
-    "raw_length": 1228,
+    "raw_length": 1224,
     "raw_sha256": (
-        "dde05f5274952a30afb0d315ab21628da8ab0361b17aab9906f84216d364656c"),
+        "b4ac207328a5f738ce0ddd4e0ea2fc82f9afa5bfe5b8f613de42106a3a3886e1"),
 }
 PROOF_PAIR_DOMAIN = b"KB7 fixed loader-reentry proof Core0 v1\0"
 PROOF_IMAGE_NAME = "proof-core0-sector-image.bin"

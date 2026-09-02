@@ -67,7 +67,20 @@ void kb7_fault_capture(uint32_t cause, const uint32_t *stack) {
     kb7_dsb();
     record->magic = KB7_FAULT_MAGIC;
     kb7_dsb();
+#if KB7_BUILD_LOADER_REENTRY_PROOF
+    /*
+     * The proof profile never re-enters the loader from a fault handler.  A
+     * fault raised during the relocation itself would otherwise start a
+     * second relocation inside HardFault and lock up with both watchdogs
+     * disabled.  Parking keeps the fault record intact and makes the
+     * deliberate call from main the proof's only loader entry.
+     */
+    for (;;) {
+        kb7_wfi();
+    }
+#else
     kb7_enter_loader();
+#endif
 }
 
 void kb7_enter_loader(void) {

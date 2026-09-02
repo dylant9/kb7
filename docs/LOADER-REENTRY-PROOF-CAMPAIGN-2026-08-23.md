@@ -171,6 +171,16 @@ exact revised preflight. The 2026-08-31 incidents supersede that authorization:
 both preflight and mutation are locked, no caller-selected firmware install
 exists, and the general paired-firmware executor remains locked.
 
+## Regenerated identity (2026-09-02)
+
+The proof profile now parks on any fault instead of re-entering the loader
+from the fault handler (independent-review note N9), so the proof image is
+`b4ac207328a5f738ce0ddd4e0ea2fc82f9afa5bfe5b8f613de42106a3a3886e1` (1224 bytes, entry unchanged). The two owner baselines
+rederive the 168-operation campaign ID
+`113897c215c88a1aea2e483601a968b88e2686fad2df5c6752cb66276d9f43e2` with proof full-image SHA-256
+`0e115dfd9b454dae6ac77cfe2ef05fac123b65e8a86a2866266edb5d380ab1fb`. The identities recorded above are the 2026-08-23
+values. Authorization is unchanged by this regeneration.
+
 ## Bounded hardware run — paused
 
 The following sequence is retained as the future stop-gated outline. It is not

@@ -514,7 +514,7 @@ reads before restore is authorized.
 The supporting sources, policy, normalized executor source and exact owner
 campaign ID are pinned. The two private baselines independently reproduce 168
 operations, proof full-image SHA-256
-`d08e8e32af512abf0d2a73248f88d08a5520348af64ad699a67194ee3db40bac`,
+`0e115dfd9b454dae6ac77cfe2ef05fac123b65e8a86a2866266edb5d380ab1fb`,
 one barrier sector at `0x00022000`, and exact stock restoration. Both the
 read-only preflight and proof-mutation gates are now false. A 2026-08-31
 preflight exposed independently SPI-confirmed two-byte physical corruption;

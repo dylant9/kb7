@@ -176,7 +176,7 @@ def main() -> int:
                         "kb7-updater-executor.py").read_text(encoding="utf-8")
     for marker in (
             'EXPECTED_BASELINE_SHA256 = (',
-            '"dde05f5274952a30afb0d315ab21628da8ab0361b17aab9906f84216d364656c"',
+            '"b4ac207328a5f738ce0ddd4e0ea2fc82f9afa5bfe5b8f613de42106a3a3886e1"',
             '"campaign_self_authorizes_execution": False',
             '"requires_separate_executor_authorization": True',
             'phase="install_poison_core0"',
@@ -195,9 +195,9 @@ def main() -> int:
             "LIVE_READ_ONLY_PREFLIGHT_ENABLED = False",
             "LIVE_PROOF_CAMPAIGN_ENABLED = False",
             'EXPECTED_CAMPAIGN_ID = (',
-            '"3fa076a69bb04ab2ef11c9369d80976e293d1d57a52ddeb63f9d8d71b004d82f"',
+            '"113897c215c88a1aea2e483601a968b88e2686fad2df5c6752cb66276d9f43e2"',
             'EXPECTED_POLICY_SHA256 = (',
-            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "7b326419d7e59a6b6fa8e89c28ba0098',
+            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "c8aa5cf437beff0e8584c4e4cf5d38fa',
             '"durable_terminal_intent_before_backend_or_usb": True',
             '"live_authorization_checked_before_journal_publication_and_backend"',
             'require_live_authorization(transaction)\n'
