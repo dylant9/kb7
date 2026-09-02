@@ -112,6 +112,30 @@ class PublicTreeTests(unittest.TestCase):
                 1,
             )
 
+    def test_destructive_tool_state_and_temp_journal_names_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for name in (
+                    ".kb7-isp-write2-state.json",
+                    "kb7-isp-write2-state.json",
+                    ".kb7-isp-write2-state.ab12cd",
+                    ".kb7-isp-erase-granularity-state.json",
+                    "kb7-isp-erase-granularity-state-20260823.json",
+                    ".kb7-isp-scratch-restart-state.tmp1",
+                    ".kb7-updater-journal.x1y2z3",
+                    ".kb7-loader-reentry-journal.q9w8e7"):
+                (root / name).write_text("{}\n")
+            (root / "renamed-write2.json").write_text(
+                '{"schema":"kb7-isp-write2-state-v3"}\n')
+            (root / "renamed-granularity.json").write_text(
+                '{"schema":"kb7-isp-erase-granularity-state-v1"}\n')
+            result = MODULE.inspect(root)
+            self.assertFalse(result["passed"])
+            self.assertEqual(sum("prohibited artifact filename" in failure
+                                 for failure in result["failures"]), 8)
+            self.assertEqual(sum("owner-local updater journal" in failure
+                                 for failure in result["failures"]), 2)
+
     def test_loader_reentry_private_campaign_format_is_rejected_when_renamed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

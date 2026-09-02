@@ -42,12 +42,21 @@ DENIED_NAMES = {
     "kb7-loader-reentry-proof-journal.json",
     ".kb7-isp-scratch-restart-state.json",
     "scratch-restart-state.json",
+    ".kb7-isp-write2-state.json",
+    "kb7-isp-write2-state.json",
+    ".kb7-isp-erase-granularity-state.json",
+    "kb7-isp-erase-granularity-state.json",
 }
 DENIED_NAME_PATTERNS = {
     "*updater-authentication*.json",
     "*updater-auth*.json",
     "*updater-scratch-journal*",
     "*loader-reentry-proof-journal*",
+    "*loader-reentry-journal*",
+    ".kb7-updater-journal.*",
+    "*isp-write2-state*",
+    "*isp-erase-granularity-state*",
+    "*scratch-restart-state*",
 }
 DENIED_JSON_SCHEMAS = {
     "kb7-isp-scratch-restart-state-v1",
@@ -56,6 +65,10 @@ DENIED_JSON_SCHEMAS = {
     "kb7-usb-updater-scratch-journal-v2",
     "kb7-usb-updater-scratch-journal-v3",
     "kb7-loader-reentry-proof-journal-v1",
+    "kb7-isp-write2-state-v1",
+    "kb7-isp-write2-state-v2",
+    "kb7-isp-write2-state-v3",
+    "kb7-isp-erase-granularity-state-v1",
 }
 DENIED_JSON_RESULT_SCHEMAS = {
     "kb7-fixed-isp-read-reliability-v1",
