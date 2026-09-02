@@ -59,5 +59,22 @@ region below it remains byte-exact against the modelled boundary images. See
 the policy descriptor and `hardware/kb7-stock-loader-reentry.json`.
 
 Authorization is unchanged: both proof gates are false on the
-hardware-validation branch. A later preflight under the live-region policy is
-a separate run with its own journal.
+hardware-validation branch.
+
+## Pass under the live-region policy (2026-09-03)
+
+After the live-region policy, the F1 proof-startup change with its campaign
+regeneration (campaign `1ce62e95ee2c6c84b5abb8996f7964bacae661869152ead20f5c7138b2b0b508`)
+and a second independent review (CLEAN WITH NON-BLOCKING NOTES), the rebuilt
+preflight-only branch (executor source
+`12dd876ac6964b8c3ef4675ed69664a205d663ea65961a560a2ecc8acb2b2db5`) ran the
+read-only preflight again under the same physical conditions. Exit 0: two
+identical full reads, byte-exact below `0x0156b000` against the baseline,
+observed full image still `35968ec55f16c64fcdca72a6c39edb9b563e5e466657dce67827dc63149566fa`,
+live region recorded as
+`04b21e7889e26171b3d2b338554672faa3f86a40e550d566a89f2eafa67d70b4`, loader
+fingerprint `99e75493ef2f627b072560ef7ee45f3c01648eca715ce03a4001727eace9e7c6`,
+device path 3-2.2 at USB address 24, strict close with kernel-driver
+reattachment, journal `boundary_verified` at index 0, and normal `10f5:5038`
+operation after a power-cycle. That journal is bound to that executor source;
+any later revision runs its own preflight.

@@ -225,7 +225,7 @@ def main() -> int:
             'EXPECTED_CAMPAIGN_ID = (',
             '"1ce62e95ee2c6c84b5abb8996f7964bacae661869152ead20f5c7138b2b0b508"',
             'EXPECTED_POLICY_SHA256 = (',
-            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "77595e1ab48287f1a092f2450f8f4d36',
+            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "0d5a8ad6127d2b953d0ad8acb1178a9c',
             '"durable_terminal_intent_before_backend_or_usb": True',
             '"live_authorization_checked_before_journal_publication_and_backend"',
             '"modelled_region_exact_against_boundary_images": True',
@@ -233,7 +233,12 @@ def main() -> int:
             '"stable_within_each_operation": True',
             '"stable_across_proof_boot": True',
             'if live_region(post) != live_region(pre):',
-            '!= source["live_region_sha256"]:',
+            'if index > 0 and _planner.sha256(live_region(pre)) != \\\n'
+            '                    source["live_region_sha256"]:',
+            'if _planner.sha256(live_region(observed)) != source["live_region_sha256"]:',
+            '"accepted_and_recorded_at_boundary_zero": True',
+            '"stable_between_recorded_boundaries_above_zero": True',
+            '"stable_between_complete_boundary_and_finalize": True',
             'require_live_authorization(transaction)\n'
             '        self._device = device_factory()',
             'require_read_only_preflight_authorization(transaction)\n'
@@ -250,7 +255,8 @@ def main() -> int:
         if marker not in executor_source:
             failures.append(f"fixed loader-reentry executor guard is missing: {marker}")
     for forbidden in ("--offset", "--payload", "--cdb", "--force",
-                      "--retry", "--operation-index", "--device"):
+                      "--retry", "--operation-index", "--device",
+                      "globals()", "vars()[", "setattr(sys.modules"):
         if forbidden in executor_source:
             failures.append(
                 f"fixed loader-reentry executor exposes raw authority: {forbidden}")

@@ -10,9 +10,11 @@ barrier sector.
 
 Every live read is compared byte-exact against the modelled boundary image
 below the post-image live region.  The live region (stock settings storage
-after the manifest-declared image end) is recorded in the journal and must be
-stable within each operation and across the proof boot, but it is not required
-to equal the reviewed baseline because the stock firmware rewrites it.
+after the manifest-declared image end) is recorded in the journal at boundary
+zero and must then stay exactly as recorded at every later boundary, within
+each operation, across the proof boot and at finalization, but it is not
+required to equal the reviewed baseline because the stock firmware rewrites it
+while the keyboard runs stock.
 
 The exact owner-baseline campaign and reviewed implementation hashes are
 pinned below.  In this source revision both the read-only preflight gate and
@@ -92,8 +94,8 @@ EXPECTED_IMPLEMENTATION_HASHES: dict[str, str] = {
         "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
 }
 EXPECTED_POLICY_SHA256 = (
-    "31dabd15ec1bcb3bfc3d9b82cd5de287b43cf43754460ef4dd5edb88abcb51d7")
-EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "77595e1ab48287f1a092f2450f8f4d36698bba8f7b9e4ea7feac949779eff730"
+    "2f9f78e387e39b42fedfd2efa16999cb95abd21db8ed13b4f0988278cefa0dd4")
+EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "0d5a8ad6127d2b953d0ad8acb1178a9ccdc46362f38f71b6797db99f38f17c13"
 
 PREFLIGHT_STARTED = "preflight_started"
 BOUNDARY_VERIFIED = "boundary_verified"
@@ -232,6 +234,9 @@ def policy_descriptor() -> dict[str, object]:
             "recorded_in_journal": True,
             "stable_within_each_operation": True,
             "stable_across_proof_boot": True,
+            "accepted_and_recorded_at_boundary_zero": True,
+            "stable_between_recorded_boundaries_above_zero": True,
+            "stable_between_complete_boundary_and_finalize": True,
         },
         "strict_close_before_authorizing_publication": True,
         "reattach_not_found_or_busy_accepted_only_if_kernel_driver_is_active":
@@ -1183,6 +1188,11 @@ def live_step(transaction: Transaction, journal_path: Path, *,
             pre = _two_reads(backend, progress=progress)
             expected_pre = expected_boundary_image(transaction, index)
             _require_image(transaction, expected_pre, pre, "operation preimage")
+            if index > 0 and _planner.sha256(live_region(pre)) != \
+                    source["live_region_sha256"]:
+                raise RecoveryRequired(
+                    "live region differs from the recorded boundary; something "
+                    "wrote flash between sessions")
             backend.execute()
             post = _two_reads(backend, progress=progress)
             expected_post = expected_boundary_image(transaction, index + 1)
@@ -1289,6 +1299,10 @@ def live_finalize(transaction: Transaction, journal_path: Path, *,
             observed = _two_reads(backend, progress=progress)
             _require_image(transaction, transaction.campaign.baseline, observed,
                            "final exact baseline")
+            if _planner.sha256(live_region(observed)) != source["live_region_sha256"]:
+                raise RecoveryRequired(
+                    "live region differs from the recorded complete boundary; "
+                    "something wrote flash between sessions")
             backend.close()
         except BaseException as error:
             if isinstance(error, RecoveryRequired):

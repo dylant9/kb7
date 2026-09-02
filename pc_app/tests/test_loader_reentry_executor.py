@@ -1137,22 +1137,67 @@ class LoaderReentryExecutorTests(_ExecutorFixture):
                     self.assertEqual(result["live_region_sha256"],
                                      source["live_region_sha256"])
 
-    def test_finalize_accepts_live_region_drift_below_exact_baseline(self) -> None:
+    def test_finalize_requires_the_recorded_live_region(self) -> None:
         final = len(self.transaction.operations)
         image = self.drifted(self.baseline)
-        source = EXECUTOR.boundary_journal(
-            self.transaction, self.identity(address=11, initial_address=10),
-            final, status=EXECUTOR.COMPLETE)
-        EXECUTOR.write_journal_atomic(self.journal, source, require_absent=True)
-        state = FakeState(image, address=11)
-        result = EXECUTOR.live_finalize(
-            self.transaction, self.journal,
-            backend_factory=lambda transaction: FakeReadBackend(transaction, state),
-            progress=False)
-        self.assertTrue(result["state_cleared"])
-        self.assertEqual(result["live_region_sha256"],
-                         PLANNER.sha256(EXECUTOR.live_region(image)))
-        self.assertFalse(self.journal.exists())
+        for scenario in ("recorded", "unrecorded"):
+            with self.subTest(scenario=scenario):
+                path = self.case / f"finalize-live-{scenario}.json"
+                source = EXECUTOR.boundary_journal(
+                    self.transaction, self.identity(address=11, initial_address=10),
+                    final, status=EXECUTOR.COMPLETE,
+                    observed=image if scenario == "recorded" else None)
+                EXECUTOR.write_journal_atomic(path, source, require_absent=True)
+                state = FakeState(image, address=11)
+                if scenario == "recorded":
+                    result = EXECUTOR.live_finalize(
+                        self.transaction, path,
+                        backend_factory=lambda transaction: FakeReadBackend(
+                            transaction, state), progress=False)
+                    self.assertTrue(result["state_cleared"])
+                    self.assertEqual(result["live_region_sha256"],
+                                     PLANNER.sha256(EXECUTOR.live_region(image)))
+                    self.assertFalse(path.exists())
+                else:
+                    with self.assertRaises(EXECUTOR.RecoveryRequired) as caught:
+                        EXECUTOR.live_finalize(
+                            self.transaction, path,
+                            backend_factory=lambda transaction: FakeReadBackend(
+                                transaction, state), progress=False)
+                    self.assertIn("recorded complete boundary",
+                                  str(caught.exception.__cause__ or caught.exception))
+                    self.assertEqual(EXECUTOR.load_journal(path)["status"],
+                                     EXECUTOR.FINALIZE_STARTED)
+
+    def test_step_above_boundary_zero_requires_the_recorded_live_region(self) -> None:
+        boundary_one = EXECUTOR.expected_boundary_image(self.transaction, 1)
+        image = self.drifted(boundary_one)
+        for scenario in ("recorded", "unrecorded"):
+            with self.subTest(scenario=scenario):
+                path = self.case / f"step-live-{scenario}.json"
+                source = EXECUTOR.boundary_journal(
+                    self.transaction, self.identity(initial_address=10), 1,
+                    observed=image if scenario == "recorded" else None)
+                EXECUTOR.write_journal_atomic(path, source, require_absent=True)
+                state = FakeState(image)
+                factory = lambda transaction, index: FakeMutationBackend(
+                    transaction, index, state)
+                if scenario == "recorded":
+                    result = EXECUTOR.live_step(
+                        self.transaction, path, backend_factory=factory,
+                        progress=False)
+                    self.assertEqual(result["boundary_index"], 2)
+                    self.assertEqual(result["live_region_sha256"],
+                                     source["live_region_sha256"])
+                else:
+                    with self.assertRaises(EXECUTOR.RecoveryRequired) as caught:
+                        EXECUTOR.live_step(
+                            self.transaction, path, backend_factory=factory,
+                            progress=False)
+                    self.assertIn("recorded boundary", str(caught.exception.__cause__))
+                    self.assertEqual(state.execute_count, 0)
+                    self.assertEqual(EXECUTOR.load_journal(path)["status"],
+                                     EXECUTOR.INTENT)
 
 
 class LoaderReentryLockTests(_ExecutorFixture):

@@ -59,10 +59,12 @@ image generation is disabled.
   baseline and normal `10f5:5038` operation. A later full USB capture exposed
   a distinct command-aligned acquisition failure, including zero-filled and
   half-address pages. The legacy full-chip verifier returned status 0 despite
-  failed CRCs, so it is not current pass/fail authority. Both proof preflight
-  and proof mutation are now locked pending a fixed baseline-aware short-read
-  sweep. The general paired-firmware executor remains locked and
-  `flash_approved=false`. See the
+  failed CRCs, so it is not current pass/fail authority. The fixed
+  baseline-aware short-read sweep passed on 2026-09-02 once the NOR lead stubs
+  were removed, and the read-only preflight passed on 2026-09-03 under the
+  post-image live-region policy on the separate preflight-only branch. Proof
+  mutation remains locked here. The general paired-firmware executor remains
+  locked and `flash_approved=false`. See the
   [fixed proof campaign](docs/LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md) and
   [read-reliability incident](docs/USB-ISP-READ-RELIABILITY-INCIDENT-2026-08-31.md).
 - The flash-access tooling adds proven external SPI recovery workflows,

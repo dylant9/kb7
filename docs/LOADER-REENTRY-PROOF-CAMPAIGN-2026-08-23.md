@@ -11,9 +11,12 @@ offline. Historical preflights include one exact boundary-zero pass. A later
 independently confirmed. The owner restored and independently read back the
 exact baseline over SPI, after which the board returned to working
 `10f5:5038`. A separate post-restore full USB capture then exposed widespread
-command-aligned acquisition corruption. Both proof preflight and mutation are
-relocked pending the new fixed short-chunk read-reliability gate. See the
-[incident record](USB-ISP-READ-RELIABILITY-INCIDENT-2026-08-31.md).
+command-aligned acquisition corruption, since traced to the NOR lead stubs.
+The fixed short-chunk read-reliability gate passed on 2026-09-02 and the
+read-only preflight passed on 2026-09-03 under the post-image live-region
+policy; proof mutation remains locked on the hardware-validation branch. See
+the [incident record](USB-ISP-READ-RELIABILITY-INCIDENT-2026-08-31.md) and the
+[preflight record](LOADER-REENTRY-PREFLIGHT-2026-09-02.md).
 
 The exact proof Core-0 image produced by `make -C replacement_fw recovery-proof`
 has entry `0x00000175`, length 1,228 bytes and SHA-256
@@ -32,7 +35,8 @@ sequence and a reverse sequence that restores the exact 32-MiB baseline.
 executor for only that rederived campaign. It does not unlock or call the
 general paired-firmware executor.
 
-The fixed executor currently has:
+At the 2026-08-23 review the fixed executor had (see the dated addenda below
+for the regenerated identities):
 
 - `LIVE_READ_ONLY_PREFLIGHT_ENABLED = False`;
 - `LIVE_PROOF_CAMPAIGN_ENABLED = False`;

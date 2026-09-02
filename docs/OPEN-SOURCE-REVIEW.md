@@ -41,15 +41,16 @@ that the contributor does not possess.
   needed to reproduce the protocol; no stock instruction bytes, raw binary,
   disassembly or decompiler output is included.
 - Independently authored fixed proof-campaign and owner-campaign-bound executor
-  source, currently locked pending the read-reliability gate.
+  source, mutation-locked; the read-reliability gate passed on 2026-09-02.
   The builder derives a checksum-valid clean-room Core 0 plus exact stock Core 1
   and an exact-stock reverse sequence; the executor exposes no raw flash fields
   and pins the independently rederived owner campaign identity. Later evidence
   separates a SPI-confirmed two-byte physical corruption from a post-restore
-  command-aligned USB acquisition failure. Both proof preflight and mutation
-  are now locked. The public machine record includes only hashes, operation
-  counts, fixed geometry, bounded authorization flags and the hardware-unrun
-  proof boundary. Private campaign descriptors, sector images,
+  command-aligned USB acquisition failure, since traced to NOR lead stubs.
+  Proof mutation remains locked; the read-only preflight is enabled only on
+  the separate preflight-only branch. The public machine record includes only
+  hashes, operation counts, fixed geometry, bounded authorization flags and
+  the proof boundary, which remains unexecuted on hardware. Private campaign descriptors, sector images,
   baselines and journals remain excluded. See the
   [fixed proof campaign](LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md) and
   [read-reliability incident](USB-ISP-READ-RELIABILITY-INCIDENT-2026-08-31.md).

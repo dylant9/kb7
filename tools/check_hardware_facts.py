@@ -946,11 +946,11 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
                 "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
         } and
         authorization["policy_sha256"] ==
-        "31dabd15ec1bcb3bfc3d9b82cd5de287b43cf43754460ef4dd5edb88abcb51d7" and
+        "2f9f78e387e39b42fedfd2efa16999cb95abd21db8ed13b4f0988278cefa0dd4" and
         authorization["executor_descriptor_sha256"] ==
-        "77595e1ab48287f1a092f2450f8f4d36698bba8f7b9e4ea7feac949779eff730" and
+        "0d5a8ad6127d2b953d0ad8acb1178a9ccdc46362f38f71b6797db99f38f17c13" and
         authorization["executor_source_sha256"] ==
-        "808af98b355e618379028cec90770e01ebc23a0d4d22edea8e84465e5e41ba23" and
+        "9a7b30a8a47f6063a9a83353f1eede3c35cae80b095a8bda15fac463447a0440" and
         authorization[
             "live_authorization_checked_inside_backends_and_live_entry_points"]
         is True and
@@ -960,13 +960,16 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
         authorization["live_region_recorded_in_journal"] is True and
         authorization["live_region_stable_within_each_operation"] is True and
         authorization["live_region_stable_across_proof_boot"] is True and
+        authorization["live_region_accepted_and_recorded_at_boundary_zero"] is True and
+        authorization["live_region_stable_between_recorded_boundaries_above_zero"] is True and
+        authorization["live_region_stable_between_complete_boundary_and_finalize"] is True and
         authorization["modelled_region_exact_against_boundary_images"] is True and
         authorization["generic_firmware_executor_mutation_enabled"] is False and
         authorization["flash_approved"] is False,
         "fixed proof campaign authorization changed")
     offline = campaign["offline_validation"]
     require(offline[
-                "focused_campaign_executor_and_read_reliability_tests_passed"] == 61 and
+                "focused_campaign_executor_and_read_reliability_tests_passed"] == 62 and
             offline["exact_campaign_operation_count"] == 168 and
             offline["install_operation_count"] == 32 and
             offline["restore_operation_count"] == 136 and
@@ -991,7 +994,28 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
                 "private_artifact_publication_guards",
             )), "fixed proof offline validation changed")
     require(campaign["hardware_validation"] == {
-        "read_only_preflight_attempt_count": 3,
+        "read_only_preflight_attempt_count": 5,
+        "read_only_preflight_2026_09_02_exit_status": 6,
+        "read_only_preflight_2026_09_02_two_reads_identical": True,
+        "read_only_preflight_2026_09_02_difference_bytes": 434,
+        "read_only_preflight_2026_09_02_difference_range": ["0x01a0d6e6", "0x01a0d898"],
+        "read_only_preflight_2026_09_02_difference_in_live_region_only": True,
+        "read_only_preflight_2026_09_02_observed_sha256":
+            "35968ec55f16c64fcdca72a6c39edb9b563e5e466657dce67827dc63149566fa",
+        "live_region_preflight_2026_09_03_exit_status": 0,
+        "live_region_preflight_2026_09_03_boundary_index": 0,
+        "live_region_preflight_2026_09_03_observed_full_sha256":
+            "35968ec55f16c64fcdca72a6c39edb9b563e5e466657dce67827dc63149566fa",
+        "live_region_preflight_2026_09_03_live_region_sha256":
+            "04b21e7889e26171b3d2b338554672faa3f86a40e550d566a89f2eafa67d70b4",
+        "live_region_preflight_2026_09_03_executor_source_sha256":
+            "12dd876ac6964b8c3ef4675ed69664a205d663ea65961a560a2ecc8acb2b2db5",
+        "live_region_preflight_2026_09_03_campaign_id":
+            "1ce62e95ee2c6c84b5abb8996f7964bacae661869152ead20f5c7138b2b0b508",
+        "live_region_preflight_2026_09_03_device_path": "3-2.2",
+        "live_region_preflight_2026_09_03_usb_address": 24,
+        "live_region_preflight_2026_09_03_strict_close_passed": True,
+        "live_region_preflight_2026_09_03_normal_5038_boot_confirmed": True,
         "read_only_preflight_attempted": True,
         "read_only_preflight_reached_boundary_zero": True,
         "read_only_preflight_reported_two_complete_full_chip_reads": True,
