@@ -745,8 +745,9 @@ def validate_stock_flash(stock: dict[str, object]) -> None:
 def validate_loader_reentry(evidence: dict[str, object]) -> None:
     require(evidence["schema"] ==
             "kb7.hardware.stock-loader-reentry-static-analysis" and
-            evidence["schema_version"] == 6 and
+            evidence["schema_version"] == 7 and
             evidence["analyzed_on"] == "2026-08-23" and
+            evidence["relocation_decoded_on"] == "2026-09-02" and
             evidence["evidence_class"] == "firmware_recovery",
             "unexpected stock loader-reentry evidence identity")
 
@@ -760,13 +761,20 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
 
     relocation = evidence["stock_relocation"]
     require(relocation == {
+        "facts_basis":
+            "decoded_and_interpreted_thumb2_instructions_plus_pinned_digest",
         "source_start": "0x60001000",
         "destination_start": "0x00000000",
         "copy_bytes": 0x10000,
+        "word_bytes": 4,
+        "self_location_guard_bound": "0x00010000",
         "executes_outside_pram": True,
         "interrupts_disabled": True,
+        "interrupt_mask": "PRIMASK",
         "aircr_address": "0xe000ed0c",
         "aircr_expression": "(AIRCR & 0x00000700) | 0x05fa0004",
+        "reset_write_is_last_store": True,
+        "non_returning": True,
         "trampoline_bytes": 88,
         "trampoline_sha256":
             "570dc848c53aad3d18ae090580c2dd0687f7273c22693b4860e18dbf99a46315",

@@ -34,9 +34,17 @@ V1.33 uses loader SHA-256
 
 The read-only verifier in `tools/verify_loader_reentry.py` binds the complete
 owner-local loader and Core-1 inputs to their reviewed sizes and hashes, then
-checks the request, relocation, reset and loader-consumer instruction
-semantics. It opens no device and writes no file. Raw stock binaries and
-disassembly remain outside this repository.
+checks the request, marker-poll, wrapper and loader-consumer instructions at
+their pinned offsets. Since 2026-09-02 it also decodes and interprets the
+88-byte relocation routine itself instead of trusting its digest: the copy
+source, destination, length and word size, the PRIMASK interrupt disable
+before the first store, the AIRCR read-modify-write expression, the routine's
+own-address guard against the copy bound, the reset write being the last
+store and the endless loop after it are all derived from the decoded
+instructions and compared with the reviewed values above. The 88-byte digest
+and the three literal cells remain additional pins. It opens no device and
+writes no file. Raw stock binaries and disassembly remain outside this
+repository.
 
 ## Replacement-firmware proof profile
 

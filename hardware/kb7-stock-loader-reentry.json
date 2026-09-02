@@ -1,7 +1,8 @@
 {
   "schema": "kb7.hardware.stock-loader-reentry-static-analysis",
-  "schema_version": 6,
+  "schema_version": 7,
   "analyzed_on": "2026-08-23",
+  "relocation_decoded_on": "2026-09-02",
   "evidence_class": "firmware_recovery",
   "mailbox": {
     "address": "0x20000ffc",
@@ -10,13 +11,19 @@
     "loader_verifies_clear": true
   },
   "stock_relocation": {
+    "facts_basis": "decoded_and_interpreted_thumb2_instructions_plus_pinned_digest",
     "source_start": "0x60001000",
     "destination_start": "0x00000000",
     "copy_bytes": 65536,
+    "word_bytes": 4,
+    "self_location_guard_bound": "0x00010000",
     "executes_outside_pram": true,
     "interrupts_disabled": true,
+    "interrupt_mask": "PRIMASK",
     "aircr_address": "0xe000ed0c",
     "aircr_expression": "(AIRCR & 0x00000700) | 0x05fa0004",
+    "reset_write_is_last_store": true,
+    "non_returning": true,
     "trampoline_bytes": 88,
     "trampoline_sha256": "570dc848c53aad3d18ae090580c2dd0687f7273c22693b4860e18dbf99a46315",
     "identical_in_all_analyzed_releases": true

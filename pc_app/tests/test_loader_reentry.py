@@ -95,6 +95,148 @@ def encode_conditional_branch(
           ((displacement >> 1) & 0xFF))
 
 
+def encode_modified_immediate(value: int) -> tuple[int, int, int]:
+    """Return ``(i, imm3, imm8)`` for a Thumb-2 modified immediate."""
+
+    value &= 0xFFFFFFFF
+    if value <= 0xFF:
+        imm12 = value
+    elif value == (value & 0xFF) * 0x00010001:
+        imm12 = 0x100 | (value & 0xFF)
+    elif value == ((value >> 8) & 0xFF) * 0x01000100:
+        imm12 = 0x200 | ((value >> 8) & 0xFF)
+    elif value == (value & 0xFF) * 0x01010101:
+        imm12 = 0x300 | (value & 0xFF)
+    else:
+        for rotation in range(8, 32):
+            rotated = ((value << rotation) | (value >> (32 - rotation))) & 0xFFFFFFFF
+            if rotated <= 0xFF and rotated & 0x80:
+                imm12 = (rotation << 7) | (rotated & 0x7F)
+                break
+        else:
+            raise AssertionError(f"{value:#x} is not a Thumb-2 modified immediate")
+    return imm12 >> 11, (imm12 >> 8) & 7, imm12 & 0xFF
+
+
+def encode_data_processing_immediate(
+    data: bytearray,
+    instruction_offset: int,
+    operation: int,
+    rd: int,
+    rn: int,
+    value: int,
+    *,
+    set_flags: bool = False,
+) -> None:
+    """Thumb-2 data processing with a modified immediate.
+
+    ``operation`` is the four-bit opcode (AND 0, ORR/MOV 2, ADD 8, SUB/CMP
+    13); CMP is SUB with ``rd`` 15 and ``set_flags``; MOV is ORR with ``rn``
+    15.
+    """
+
+    i, imm3, imm8 = encode_modified_immediate(value)
+    put16(
+        data,
+        instruction_offset,
+        0xF000 | (i << 10) | (operation << 5) | (int(set_flags) << 4) | rn,
+    )
+    put16(data, instruction_offset + 2, (imm3 << 12) | (rd << 8) | imm8)
+
+
+def encode_word_transfer_post_indexed(
+    data: bytearray, instruction_offset: int, rt: int, rn: int, delta: int, *, load: bool
+) -> None:
+    """Thumb-2 word LDR/STR (immediate) T4 with post-indexed writeback."""
+
+    assert delta != 0 and -255 <= delta <= 255
+    put16(data, instruction_offset, 0xF840 | (int(load) << 4) | rn)
+    put16(
+        data,
+        instruction_offset + 2,
+        (rt << 12) | 0x0800 | (int(delta > 0) << 9) | 0x0100 | abs(delta),
+    )
+
+
+def encode_unconditional_branch(
+    data: bytearray, instruction_offset: int, target: int
+) -> None:
+    displacement = target - (instruction_offset + 4)
+    assert displacement % 2 == 0 and -2048 <= displacement <= 2046
+    put16(data, instruction_offset, 0xE000 | ((displacement >> 1) & 0x7FF))
+
+
+def encode_barrier(data: bytearray, instruction_offset: int, option: int) -> None:
+    """DSB (4), DMB (5) or ISB (6) with the SY option."""
+
+    put16(data, instruction_offset, 0xF3BF)
+    put16(data, instruction_offset + 2, 0x8F0F | (option << 4))
+
+
+def synthetic_relocation_routine(
+    *,
+    copy_bytes: int = VERIFIER.LOADER_COPY_BYTES,
+    guard_bound: int | None = None,
+    prigroup_mask: int | None = VERIFIER.AIRCR_PRIGROUP_MASK,
+    disable_interrupts: bool = True,
+    park: bool = True,
+) -> bytes:
+    """Independently authored 88-byte routine with the stock semantics.
+
+    It is deliberately not the stock encoding: a CPSID instead of an MSR, a
+    count-down loop over post-indexed wide loads and stores, a wide ORR for
+    SYSRESETREQ and explicit barriers.  Only the semantics the verifier must
+    derive match: a self-location guard against the copy bound that returns
+    one when inside the destination window, an interrupt disable before the
+    first store, a contiguous word copy of ``copy_bytes`` from the +0x4C
+    literal to PRAM zero, an AIRCR read-modify-write that keeps only PRIGROUP
+    and sets VECTKEY plus SYSRESETREQ as the last store, then an endless
+    loop.  The keyword arguments produce the negative fixtures.
+    """
+
+    routine = bytearray(VERIFIER.TRAMPOLINE_BYTES)
+    bound = copy_bytes if guard_bound is None else guard_bound
+    put16(routine, 0x00, 0x4600 | (15 << 3) | 3)                     # mov r3, pc
+    encode_data_processing_immediate(routine, 0x02, 0b1101, 15, 3, bound,
+                                     set_flags=True)                 # cmp.w r3, #bound
+    encode_conditional_branch(routine, 0x06, 2, 0x0C, 0)             # bhs body
+    put16(routine, 0x08, 0x2001)                                     # movs r0, #1
+    put16(routine, 0x0A, 0x4770)                                     # bx lr
+    put16(routine, 0x0C, 0xB672 if disable_interrupts else 0xBF00)   # cpsid i
+    encode_ldr_literal(routine, 0x0E, 1, 0x4C)                       # ldr r1, =source
+    put16(routine, 0x10, 0x2000)                                     # movs r0, #0
+    encode_data_processing_immediate(routine, 0x12, 0b0010, 2, 15, copy_bytes)
+    encode_word_transfer_post_indexed(routine, 0x16, 4, 1, 4, load=True)
+    encode_word_transfer_post_indexed(routine, 0x1A, 4, 0, 4, load=False)
+    put16(routine, 0x1E, 0x3A04)                                     # subs r2, #4
+    encode_conditional_branch(routine, 0x20, 1, 0x16, 0)             # bne loop
+    encode_ldr_literal(routine, 0x22, 5, 0x50)                       # ldr r5, =AIRCR
+    put16(routine, 0x24, 0x6800 | (5 << 3) | 6)                      # ldr r6, [r5]
+    if prigroup_mask is None:
+        put16(routine, 0x26, 0xBF00)
+        put16(routine, 0x28, 0xBF00)
+    else:
+        encode_data_processing_immediate(routine, 0x26, 0b0000, 6, 6, prigroup_mask)
+    encode_ldr_literal(routine, 0x2A, 7, 0x54)                       # ldr r7, =key
+    put16(routine, 0x2C, 0x4300 | (7 << 3) | 6)                      # orrs r6, r7
+    encode_data_processing_immediate(routine, 0x2E, 0b0010, 6, 6,
+                                     VERIFIER.AIRCR_SYSRESETREQ)     # orr.w r6, r6, #4
+    encode_barrier(routine, 0x32, 4)                                 # dsb sy
+    put16(routine, 0x36, 0x6000 | (5 << 3) | 6)                      # str r6, [r5]
+    encode_barrier(routine, 0x38, 4)                                 # dsb sy
+    encode_barrier(routine, 0x3C, 6)                                 # isb sy
+    if park:
+        encode_unconditional_branch(routine, 0x40, 0x40)             # b .
+    else:
+        put16(routine, 0x40, 0x4770)                                 # bx lr
+    for padding in (0x42, 0x44, 0x46, 0x48, 0x4A):
+        put16(routine, padding, 0xBF00)                              # nop
+    put32(routine, 0x4C, VERIFIER.LOADER_FLASH_SOURCE)
+    put32(routine, 0x50, VERIFIER.AIRCR_ADDRESS)
+    put32(routine, 0x54, VERIFIER.AIRCR_KEY_BASE)
+    return bytes(routine)
+
+
 def synthetic_pair() -> tuple[object, bytes, bytes]:
     template = VERIFIER.PROFILES["V1.22"]
     core1 = bytearray(template.core1_size)
@@ -204,14 +346,11 @@ def synthetic_pair() -> tuple[object, bytes, bytes]:
     )
 
     trampoline = template.trampoline_offset
-    # The fixture uses a deterministic non-vendor body.  The verifier maps its
-    # digest to the same semantic schema without embedding the stock routine.
-    core1[trampoline:trampoline + VERIFIER.TRAMPOLINE_BYTES] = bytes(
-        (index * 73 + 19) & 0xFF for index in range(VERIFIER.TRAMPOLINE_BYTES)
+    # The fixture carries an independently authored routine with the stock
+    # semantics so the verifier's decoder and interpreter are exercised.
+    core1[trampoline:trampoline + VERIFIER.TRAMPOLINE_BYTES] = (
+        synthetic_relocation_routine()
     )
-    put32(core1, trampoline + 0x4C, VERIFIER.LOADER_FLASH_SOURCE)
-    put32(core1, trampoline + 0x50, VERIFIER.AIRCR_ADDRESS)
-    put32(core1, trampoline + 0x54, VERIFIER.AIRCR_KEY_BASE)
 
     put32(loader, 0, 0x180148B8)
     put32(loader, 4, 0x000002C9)
@@ -470,6 +609,199 @@ class LoaderReentryEvidenceTests(unittest.TestCase):
         self.assertFalse(semantic["passed"])
         self.assertIn("0x00004806", semantic["error"])
 
+
+def pair_with_routine(routine: bytes) -> tuple[object, bytes, bytes]:
+    """Return the synthetic pair with ``routine`` in place of the fixture's."""
+
+    profile, core1, loader = synthetic_pair()
+    assert len(routine) == VERIFIER.TRAMPOLINE_BYTES
+    mutated = bytearray(core1)
+    start = profile.trampoline_offset
+    mutated[start:start + len(routine)] = routine
+    mutated_bytes = bytes(mutated)
+    profile = replace(
+        profile,
+        core1_sha256=hashlib.sha256(mutated_bytes).hexdigest(),
+        trampoline_sha256=hashlib.sha256(routine).hexdigest(),
+    )
+    return profile, mutated_bytes, loader
+
+
+def trampoline_check(report: dict) -> dict:
+    return next(item for item in report["checks"]
+                if item["name"] == "core1_88_byte_loader_trampoline")
+
+
+class RelocationRoutineDecodingTests(unittest.TestCase):
+    def test_synthetic_routine_is_not_the_stock_routine(self) -> None:
+        routine = synthetic_relocation_routine()
+        self.assertEqual(len(routine), VERIFIER.TRAMPOLINE_BYTES)
+        self.assertNotEqual(hashlib.sha256(routine).hexdigest(),
+                            VERIFIER.COMMON_TRAMPOLINE_SHA256)
+
+    def test_modified_immediate_encoder_round_trips(self) -> None:
+        for value in (0x00, 0x7F, 0xFF, 0x00AB00AB, 0xCD00CD00, 0x12121212,
+                      0x700, 0x8000, 0x10000, 0x3FC, 0x80000000, 0xFF000000,
+                      0x000001FE):
+            with self.subTest(value=hex(value)):
+                i, imm3, imm8 = encode_modified_immediate(value)
+                self.assertEqual(VERIFIER.thumb_expand_imm(i, imm3, imm8), value)
+
+    def test_decoder_recognises_the_wide_forms_used_by_the_fixture(self) -> None:
+        data = bytearray(64)
+        encode_data_processing_immediate(data, 0, 0b1101, 15, 3, 0x10000,
+                                         set_flags=True)
+        self.assertEqual(VERIFIER.decode_thumb_instruction(data, 0),
+                         ("cmp_imm", 4, 3, 0x10000))
+        encode_data_processing_immediate(data, 4, 0b0010, 2, 15, 0x8000)
+        self.assertEqual(VERIFIER.decode_thumb_instruction(data, 4),
+                         ("mov_imm", 4, 2, 0x8000, False))
+        encode_data_processing_immediate(data, 8, 0b0000, 6, 6, 0x700)
+        self.assertEqual(VERIFIER.decode_thumb_instruction(data, 8),
+                         ("and_imm", 4, 6, 6, 0x700, False))
+        encode_data_processing_immediate(data, 12, 0b0010, 6, 6, 4)
+        self.assertEqual(VERIFIER.decode_thumb_instruction(data, 12),
+                         ("orr_imm", 4, 6, 6, 4, False))
+        encode_word_transfer_post_indexed(data, 16, 4, 1, 4, load=True)
+        self.assertEqual(VERIFIER.decode_thumb_instruction(data, 16),
+                         ("ldr_imm", 4, 4, 1, 0, 4))
+        encode_word_transfer_post_indexed(data, 20, 4, 0, -8, load=False)
+        self.assertEqual(VERIFIER.decode_thumb_instruction(data, 20),
+                         ("str_imm", 4, 4, 0, 0, -8))
+        encode_barrier(data, 24, 4)
+        self.assertEqual(VERIFIER.decode_thumb_instruction(data, 24),
+                         ("barrier", 4, "dsb"))
+        encode_barrier(data, 28, 6)
+        self.assertEqual(VERIFIER.decode_thumb_instruction(data, 28),
+                         ("barrier", 4, "isb"))
+        put16(data, 32, 0xB672)
+        self.assertEqual(VERIFIER.decode_thumb_instruction(data, 32),
+                         ("cps", 2, True, True, False))
+        put16(data, 34, 0x4600 | (15 << 3) | 3)
+        self.assertEqual(VERIFIER.decode_thumb_instruction(data, 34),
+                         ("mov_reg", 2, 3, 15))
+        encode_unconditional_branch(data, 36, 36)
+        self.assertEqual(VERIFIER.decode_thumb_instruction(data, 36), ("b", 2, 36))
+        encode_conditional_branch(data, 38, 1, 20, 0)
+        self.assertEqual(VERIFIER.decode_thumb_instruction(data, 38),
+                         ("bcond", 2, 1, 20))
+        put16(data, 40, 0x3A04)
+        self.assertEqual(VERIFIER.decode_thumb_instruction(data, 40),
+                         ("sub_imm", 2, 2, 2, 4, True))
+        self.assertEqual(VERIFIER.decode_thumb_instruction(bytes(4), 0)[0],
+                         "unknown")
+
+    def test_trampoline_facts_are_derived_from_decoded_instructions(self) -> None:
+        profile, core1, loader = synthetic_pair()
+        report = VERIFIER.verify_images(profile, core1, loader)
+        self.assertTrue(trampoline_check(report)["passed"])
+        facts = report["facts"]["trampoline"]
+        self.assertIn("decoded", facts["semantic_basis"])
+        self.assertEqual(facts["source_start"], "0x60001000")
+        self.assertEqual(facts["destination_start"], "0x00000000")
+        self.assertEqual(facts["copy_bytes"], 0x10000)
+        self.assertEqual(facts["word_bytes"], 4)
+        self.assertEqual(facts["copy_order"], "ascending")
+        self.assertEqual(facts["self_location_guard_bound"], "0x00010000")
+        self.assertTrue(facts["refuses_to_run_inside_destination_window"])
+        self.assertEqual(facts["inside_window_return_value"], "0x00000001")
+        self.assertTrue(facts["interrupts_disabled"])
+        self.assertEqual(facts["interrupt_mask"], "PRIMASK")
+        self.assertEqual(facts["aircr_address"], "0xe000ed0c")
+        self.assertEqual(facts["aircr_prigroup_mask"], "0x00000700")
+        self.assertEqual(facts["aircr_write"], "(AIRCR & 0x00000700) | 0x05fa0004")
+        self.assertTrue(facts["reset_write_is_last_store"])
+        self.assertTrue(facts["non_returning"])
+        self.assertEqual(facts["terminal_behaviour"], "branch_to_self")
+        self.assertEqual(facts["interpreted_steps"], 4 * 0x4000 + 18)
+
+    def test_relocation_facts_match_machine_readable_record(self) -> None:
+        record = json.loads(
+            (ROOT / "hardware" / "kb7-stock-loader-reentry.json").read_text(
+                encoding="utf-8"
+            )
+        )["stock_relocation"]
+        profile, core1, loader = synthetic_pair()
+        facts = VERIFIER.verify_images(profile, core1, loader)["facts"]["trampoline"]
+        self.assertEqual(record["facts_basis"],
+                         "decoded_and_interpreted_thumb2_instructions_plus_pinned_digest")
+        for key in ("source_start", "destination_start", "copy_bytes", "word_bytes",
+                    "self_location_guard_bound", "executes_outside_pram",
+                    "interrupts_disabled", "interrupt_mask", "aircr_address",
+                    "reset_write_is_last_store", "non_returning"):
+            with self.subTest(key=key):
+                self.assertEqual(record[key], facts[key])
+        self.assertEqual(record["aircr_expression"], facts["aircr_write"])
+        self.assertEqual(record["trampoline_bytes"], facts["bytes"])
+
+    def test_undecodable_body_with_correct_literals_is_rejected(self) -> None:
+        routine = bytearray(
+            (index * 73 + 19) & 0xFF for index in range(VERIFIER.TRAMPOLINE_BYTES)
+        )
+        put32(routine, 0x4C, VERIFIER.LOADER_FLASH_SOURCE)
+        put32(routine, 0x50, VERIFIER.AIRCR_ADDRESS)
+        put32(routine, 0x54, VERIFIER.AIRCR_KEY_BASE)
+        profile, core1, loader = pair_with_routine(bytes(routine))
+        report = VERIFIER.verify_images(profile, core1, loader)
+        check = trampoline_check(report)
+        self.assertFalse(report["passed"])
+        self.assertFalse(check["passed"])
+        self.assertNotIn("trampoline", report["facts"])
+
+    def test_wrong_copy_length_is_rejected(self) -> None:
+        profile, core1, loader = pair_with_routine(
+            synthetic_relocation_routine(copy_bytes=0x8000)
+        )
+        check = trampoline_check(VERIFIER.verify_images(profile, core1, loader))
+        self.assertFalse(check["passed"])
+        self.assertIn("copies 0x00008000 bytes", check["error"])
+
+    def test_missing_aircr_mask_is_rejected(self) -> None:
+        profile, core1, loader = pair_with_routine(
+            synthetic_relocation_routine(prigroup_mask=None)
+        )
+        check = trampoline_check(VERIFIER.verify_images(profile, core1, loader))
+        self.assertFalse(check["passed"])
+        self.assertIn("preserves AIRCR bits 0xfa05fffb", check["error"])
+
+    def test_wider_aircr_mask_is_rejected(self) -> None:
+        profile, core1, loader = pair_with_routine(
+            synthetic_relocation_routine(prigroup_mask=0xFF00)
+        )
+        check = trampoline_check(VERIFIER.verify_images(profile, core1, loader))
+        self.assertFalse(check["passed"])
+        self.assertIn("preserves AIRCR bits 0x0000ff00", check["error"])
+
+    def test_returning_routine_is_rejected(self) -> None:
+        profile, core1, loader = pair_with_routine(
+            synthetic_relocation_routine(park=False)
+        )
+        check = trampoline_check(VERIFIER.verify_images(profile, core1, loader))
+        self.assertFalse(check["passed"])
+        self.assertIn("does not park", check["error"])
+
+    def test_missing_interrupt_disable_is_rejected(self) -> None:
+        profile, core1, loader = pair_with_routine(
+            synthetic_relocation_routine(disable_interrupts=False)
+        )
+        check = trampoline_check(VERIFIER.verify_images(profile, core1, loader))
+        self.assertFalse(check["passed"])
+        self.assertIn("never disables interrupts", check["error"])
+
+    def test_guard_bound_mismatch_is_rejected(self) -> None:
+        profile, core1, loader = pair_with_routine(
+            synthetic_relocation_routine(guard_bound=0x8000)
+        )
+        check = trampoline_check(VERIFIER.verify_images(profile, core1, loader))
+        self.assertFalse(check["passed"])
+        self.assertIn("guard bound 0x00008000 differs", check["error"])
+
+    def test_digest_pin_still_applies_to_a_semantically_valid_routine(self) -> None:
+        profile, core1, loader = pair_with_routine(synthetic_relocation_routine())
+        profile = replace(profile, trampoline_sha256="0" * 64)
+        check = trampoline_check(VERIFIER.verify_images(profile, core1, loader))
+        self.assertFalse(check["passed"])
+        self.assertIn("unexpected 88-byte trampoline hash", check["error"])
 
 if __name__ == "__main__":
     unittest.main()
