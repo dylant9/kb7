@@ -110,7 +110,7 @@
     "flash_approved": false
   },
   "fixed_install_restore_campaign": {
-    "status": "read_only_preflight_authorized_proof_mutation_locked",
+    "status": "fixed_proof_campaign_authorized_for_exact_reviewed_campaign",
     "campaign_tool": "tools/flash-access/kb7-loader-reentry-campaign.py",
     "executor_tool": "tools/flash-access/kb7-loader-reentry-executor.py",
     "campaign_format": "KB7 V1.22 fixed loader-reentry proof campaign v1",
@@ -154,11 +154,11 @@
     },
     "authorization": {
       "live_read_only_preflight_enabled": true,
-      "live_proof_campaign_enabled": false,
+      "live_proof_campaign_enabled": true,
       "read_only_preflight_diagnostic_authorized": true,
-      "fixed_proof_hardware_test_authorized": false,
-      "execution_authorized": false,
-      "authorization_scope": "read-only full-chip preflight authorized for the exact reviewed campaign after the 2026-09-02 read-reliability gate pass; proof mutation remains hard-disabled",
+      "fixed_proof_hardware_test_authorized": true,
+      "execution_authorized": true,
+      "authorization_scope": "fixed proof install and exact-stock restore campaign authorized for the exact reviewed campaign after the 2026-09-03 live-region preflight pass; general firmware mutation remains hard-disabled",
       "usb_read_reliability_gate": "fixed baseline-aware 512/1024/2048/4096-byte sweep passed 400/400 on 2026-09-02 after NOR lead stubs were removed",
       "expected_campaign_id": "1ce62e95ee2c6c84b5abb8996f7964bacae661869152ead20f5c7138b2b0b508",
       "owner_campaign_generated": true,
@@ -171,9 +171,9 @@
         "verifier": "9b19d393cf64c66168e08de2f3d4fe352a85a2fd69545e374dee0fa015dea338",
         "writer": "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5"
       },
-      "policy_sha256": "11587216a222a730ed915e9e698ab8c45880c4bda2d83ff8cebbdd988862bb54",
-      "executor_descriptor_sha256": "5e599f200fe8dc9de4b398e116ee76db2c7ebbe50eabb034af32c486bed79d6b",
-      "executor_source_sha256": "f2052027304243d6bf0583e7862f1644736a6e0182fb66cac2d1c76fd084a4f1",
+      "policy_sha256": "c336f62c097234aff074bb8da2dcc25fdf6604413df977511f63bb52e0388bde",
+      "executor_descriptor_sha256": "7247661fa9f3aeddac2a6c99320cde95411c176733f6513d017ec37b4dc625a0",
+      "executor_source_sha256": "64af8a974519af13044a28e61902c59f6cad03173208f3d01babad4b505055f1",
       "live_authorization_checked_inside_backends_and_live_entry_points": true,
       "live_region_start": "0x0156b000",
       "live_region_end": "0x02000000",

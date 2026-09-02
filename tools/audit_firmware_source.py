@@ -15,7 +15,7 @@ from pathlib import Path
 # substring test would accept a second, later assignment.
 EXPECTED_LOADER_PROOF_GATES = {
     "LIVE_READ_ONLY_PREFLIGHT_ENABLED": True,
-    "LIVE_PROOF_CAMPAIGN_ENABLED": False,
+    "LIVE_PROOF_CAMPAIGN_ENABLED": True,
 }
 
 
@@ -225,7 +225,7 @@ def main() -> int:
             'EXPECTED_CAMPAIGN_ID = (',
             '"1ce62e95ee2c6c84b5abb8996f7964bacae661869152ead20f5c7138b2b0b508"',
             'EXPECTED_POLICY_SHA256 = (',
-            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "5e599f200fe8dc9de4b398e116ee76db',
+            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "7247661fa9f3aeddac2a6c99320cde95',
             '"durable_terminal_intent_before_backend_or_usb": True',
             '"live_authorization_checked_before_journal_publication_and_backend"',
             '"modelled_region_exact_against_boundary_images": True',
@@ -251,7 +251,8 @@ def main() -> int:
             '"reattach_not_found_or_busy_accepted_only_if_kernel_driver_is_active"',
             '"read_only_preflight_transport_or_close_anomaly"',
             '"read_only_preflight_diagnostic_authorized": True',
-            '"fixed_proof_hardware_test_authorized": False',
+            '"fixed_proof_hardware_test_authorized": True',
+            '"generic_executor_live_mutation_enabled": False',
             '"read_only_preflight_image_verification_anomaly"',
             '"post_intent_transport_or_verification_anomaly"'):
         if marker not in executor_source:

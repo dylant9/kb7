@@ -862,7 +862,7 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
     campaign = evidence["fixed_install_restore_campaign"]
     require(
         campaign["status"] ==
-        "read_only_preflight_authorized_proof_mutation_locked" and
+        "fixed_proof_campaign_authorized_for_exact_reviewed_campaign" and
         campaign["campaign_tool"] ==
         "tools/flash-access/kb7-loader-reentry-campaign.py" and
         campaign["executor_tool"] ==
@@ -921,14 +921,14 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
     authorization = campaign["authorization"]
     require(
         authorization["live_read_only_preflight_enabled"] is True and
-        authorization["live_proof_campaign_enabled"] is False and
+        authorization["live_proof_campaign_enabled"] is True and
         authorization["read_only_preflight_diagnostic_authorized"] is True and
-        authorization["fixed_proof_hardware_test_authorized"] is False and
-        authorization["execution_authorized"] is False and
+        authorization["fixed_proof_hardware_test_authorized"] is True and
+        authorization["execution_authorized"] is True and
         authorization["authorization_scope"] ==
-        "read-only full-chip preflight authorized for the exact reviewed "
-        "campaign after the 2026-09-02 read-reliability gate pass; proof "
-        "mutation remains hard-disabled" and
+        "fixed proof install and exact-stock restore campaign authorized for "
+        "the exact reviewed campaign after the 2026-09-03 live-region "
+        "preflight pass; general firmware mutation remains hard-disabled" and
         authorization["usb_read_reliability_gate"] ==
         "fixed baseline-aware 512/1024/2048/4096-byte sweep passed 400/400 "
         "on 2026-09-02 after NOR lead stubs were removed" and
@@ -949,11 +949,11 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
                 "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
         } and
         authorization["policy_sha256"] ==
-        "11587216a222a730ed915e9e698ab8c45880c4bda2d83ff8cebbdd988862bb54" and
+        "c336f62c097234aff074bb8da2dcc25fdf6604413df977511f63bb52e0388bde" and
         authorization["executor_descriptor_sha256"] ==
-        "5e599f200fe8dc9de4b398e116ee76db2c7ebbe50eabb034af32c486bed79d6b" and
+        "7247661fa9f3aeddac2a6c99320cde95411c176733f6513d017ec37b4dc625a0" and
         authorization["executor_source_sha256"] ==
-        "f2052027304243d6bf0583e7862f1644736a6e0182fb66cac2d1c76fd084a4f1" and
+        "64af8a974519af13044a28e61902c59f6cad03173208f3d01babad4b505055f1" and
         authorization[
             "live_authorization_checked_inside_backends_and_live_entry_points"]
         is True and

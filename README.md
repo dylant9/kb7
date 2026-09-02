@@ -267,12 +267,13 @@ bundle` deliberately fails: no installable package can be produced by that
 target. The fixed loader-reentry campaign builder can balance this exact proof
 ELF against two exact owner baselines, but emits only private,
 execution-unapproved sector payloads and model metadata. Its separate executor
-pins the exact reviewed owner campaign ID. This branch is the separate
-preflight-only revision: after the fixed short-chunk read-reliability gate
-passed on 2026-09-02 once the NOR lead stubs were removed, it enables the
-read-only full-chip preflight for that campaign and nothing else. Proof
-mutation stays hard-disabled in the CLI, the live entry points and both USB
-backends.
+pins the exact reviewed owner campaign ID. This branch is the mutation-enabled
+revision: after the read-only preflight passed on 2026-09-03 under the
+post-image live-region policy, it enables the fixed proof install and
+exact-stock restore campaign for that campaign identity and nothing else.
+Any other campaign, any pin drift and the general paired-firmware executor
+stay refused in the CLI, the live entry points and both USB backends, and
+`flash_approved=false`.
 
 ## Public-repository boundary
 

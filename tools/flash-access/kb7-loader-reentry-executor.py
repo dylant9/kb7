@@ -17,11 +17,11 @@ required to equal the reviewed baseline because the stock firmware rewrites it
 while the keyboard runs stock.
 
 The exact owner-baseline campaign and reviewed implementation hashes are
-pinned below.  In this source revision the read-only preflight gate is true
-for the exact reviewed campaign and the proof-mutation gate is false: the
-CLI, every live entry point and both USB backends still refuse mutation
-before any journal state is published or any device is opened.  The general
-paired-firmware executor remains independently hard-locked.
+pinned below.  In this source revision both the read-only preflight gate and
+the proof-mutation gate are true, for the exact reviewed campaign identity
+only: any other campaign, any pin drift and the general paired-firmware
+executor stay refused in the CLI, every live entry point and both USB
+backends before any journal state is published or any device is opened.
 """
 
 from __future__ import annotations
@@ -80,7 +80,7 @@ LIVE_REGION_START = -(-(_planner.REGION2_START + _planner.REGION2_LENGTH) //
                       _planner.SECTOR_BYTES) * _planner.SECTOR_BYTES
 LIVE_REGION_END = _planner.FLASH_BYTES
 LIVE_READ_ONLY_PREFLIGHT_ENABLED = True
-LIVE_PROOF_CAMPAIGN_ENABLED = False
+LIVE_PROOF_CAMPAIGN_ENABLED = True
 EXPECTED_CAMPAIGN_ID = (
     "1ce62e95ee2c6c84b5abb8996f7964bacae661869152ead20f5c7138b2b0b508")
 EXPECTED_IMPLEMENTATION_HASHES: dict[str, str] = {
@@ -94,8 +94,8 @@ EXPECTED_IMPLEMENTATION_HASHES: dict[str, str] = {
         "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
 }
 EXPECTED_POLICY_SHA256 = (
-    "11587216a222a730ed915e9e698ab8c45880c4bda2d83ff8cebbdd988862bb54")
-EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "5e599f200fe8dc9de4b398e116ee76db2c7ebbe50eabb034af32c486bed79d6b"
+    "c336f62c097234aff074bb8da2dcc25fdf6604413df977511f63bb52e0388bde")
+EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "7247661fa9f3aeddac2a6c99320cde95411c176733f6513d017ec37b4dc625a0"
 
 PREFLIGHT_STARTED = "preflight_started"
 BOUNDARY_VERIFIED = "boundary_verified"
@@ -257,12 +257,12 @@ def policy_descriptor() -> dict[str, object]:
         },
         "finalization": "exact full baseline then clear state",
         "read_only_preflight_diagnostic_authorized": True,
-        "fixed_proof_hardware_test_authorized": False,
+        "fixed_proof_hardware_test_authorized": True,
         "authorized_campaign_id": EXPECTED_CAMPAIGN_ID,
         "authorization_scope": (
-            "read-only full-chip preflight authorized for the exact reviewed "
-            "campaign after the 2026-09-02 read-reliability gate pass; proof "
-            "mutation remains hard-disabled"),
+            "fixed proof install and exact-stock restore campaign authorized for "
+            "the exact reviewed campaign after the 2026-09-03 live-region "
+            "preflight pass; general firmware mutation remains hard-disabled"),
         "usb_read_reliability_gate": (
             "fixed baseline-aware 512/1024/2048/4096-byte sweep passed 400/400 "
             "on 2026-09-02 after NOR lead stubs were removed"),

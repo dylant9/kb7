@@ -117,10 +117,10 @@ No external scripts, fonts, images, packages, or vendored libraries are bundled.
   still cannot emit a bundle, and the paired-firmware executor remains
   mutation-locked. The separate fixed proof executor pins the independently
   rederived private campaign ID. On the hardware-validation branch both its
-  read-only preflight and mutation gates are false; this preflight-only branch
-  enables only the read-only preflight, with mutation still refused in the CLI,
-  the live entry points and both USB backends. It does not authorize a general
-  device run or host recovery opcode.
+  read-only preflight and mutation gates are false; the preflight-only branch
+  enables only the read-only preflight; this mutation-enabled branch enables the
+  fixed proof campaign for the exact reviewed campaign identity only. It does
+  not authorize a general device run or host recovery opcode.
 
 ## Excluded and retained only outside the public repository
 
