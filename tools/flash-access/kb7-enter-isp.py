@@ -7,7 +7,9 @@ interface. This is the documented vendor path -- it is a VOLATILE mode change,
 not a firmware write, and a power-cycle returns the keyboard to normal.
 
 Only needed if you want to force ISP mode. If the keyboard has already dropped
-to ISP on its own, skip this and run kb7-isp-verify.py directly.
+to ISP on its own, skip this. The current read-only gate is
+kb7-isp-repeat.py; kb7-isp-verify.py is a historical diagnostic whose exit
+status is not pass/fail authority.
 
 Usage:  sudo python3 kb7-enter-isp.py
 """

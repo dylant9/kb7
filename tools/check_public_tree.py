@@ -65,6 +65,7 @@ DENIED_JSON_SCHEMAS = {
     "kb7-usb-updater-scratch-journal-v2",
     "kb7-usb-updater-scratch-journal-v3",
     "kb7-loader-reentry-proof-journal-v1",
+    "kb7-loader-reentry-proof-journal-v2",
     "kb7-isp-write2-state-v1",
     "kb7-isp-write2-state-v2",
     "kb7-isp-write2-state-v3",

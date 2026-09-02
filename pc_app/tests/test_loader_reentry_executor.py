@@ -1013,6 +1013,147 @@ class LoaderReentryExecutorTests(_ExecutorFixture):
                     self.transaction, device_factory=Device)
         self.assertEqual(closed, ["close"])
 
+    # ---- post-image live region ------------------------------------------
+
+    def drifted(self, image: bytes) -> bytes:
+        """Return ``image`` with stock-settings-style changes in the live region."""
+        changed = bytearray(image)
+        start = EXECUTOR.LIVE_REGION_START
+        changed[start + 0x1000:start + 0x1010] = b"\x01" * 16
+        changed[-0x2000] ^= 0x5a
+        return bytes(changed)
+
+    def test_live_region_is_the_sector_aligned_post_image_tail(self) -> None:
+        end = PLANNER.REGION2_START + PLANNER.REGION2_LENGTH
+        self.assertEqual(EXECUTOR.LIVE_REGION_START, 0x0156b000)
+        self.assertGreaterEqual(EXECUTOR.LIVE_REGION_START, end)
+        self.assertLess(EXECUTOR.LIVE_REGION_START - end, PLANNER.SECTOR_BYTES)
+        self.assertEqual(EXECUTOR.LIVE_REGION_START % PLANNER.SECTOR_BYTES, 0)
+        self.assertEqual(EXECUTOR.LIVE_REGION_END, PLANNER.FLASH_BYTES)
+        for operation in self.transaction.operations:
+            self.assertLess(operation.offset + operation.length,
+                            EXECUTOR.LIVE_REGION_START)
+        policy = EXECUTOR.policy_descriptor()["live_region"]
+        self.assertEqual(policy["start"], "0x0156b000")
+        self.assertIs(policy["exact_against_baseline"], False)
+        self.assertIs(policy["stable_within_each_operation"], True)
+        self.assertIs(policy["stable_across_proof_boot"], True)
+
+    def test_preflight_records_live_region_drift_and_keeps_modelled_hash(self) -> None:
+        image = self.drifted(self.baseline)
+        state = FakeState(image)
+        result = EXECUTOR.live_preflight(
+            self.transaction, self.journal,
+            backend_factory=lambda transaction: FakeReadBackend(transaction, state),
+            progress=False)
+        self.assertEqual(result["status"], EXECUTOR.BOUNDARY_VERIFIED)
+        self.assertEqual(result["live_region_sha256"],
+                         PLANNER.sha256(EXECUTOR.live_region(image)))
+        self.assertEqual(result["observed_full_sha256"], PLANNER.sha256(image))
+        self.assertEqual(result["last_observed_sha256"], PLANNER.sha256(
+            EXECUTOR.expected_boundary_image(self.transaction, 0)))
+        visible = EXECUTOR.load_journal(self.journal)
+        EXECUTOR.validate_journal(self.transaction, visible)
+        self.assertEqual(
+            EXECUTOR.inspect_state(self.transaction, self.journal)[
+                "live_region_sha256"], result["live_region_sha256"])
+
+    def test_preflight_still_stops_on_a_modelled_region_mismatch(self) -> None:
+        image = bytearray(self.drifted(self.baseline))
+        image[EXECUTOR.LIVE_REGION_START - 1] ^= 1
+        state = FakeState(bytes(image))
+        with self.assertRaises(EXECUTOR.ReadOnlyPreflightVerificationStopped) as caught:
+            EXECUTOR.live_preflight(
+                self.transaction, self.journal,
+                backend_factory=lambda transaction: FakeReadBackend(
+                    transaction, state), progress=False)
+        self.assertEqual(caught.exception.phase, "exact_baseline_verification")
+        self.assertIn("below the live region", str(caught.exception.root_cause))
+
+    def test_step_requires_the_live_region_stable_across_the_operation(self) -> None:
+        self.write_boundary(0)
+        image = self.drifted(self.baseline)
+        state = FakeState(image)
+
+        class DriftingMutationBackend(FakeMutationBackend):
+            def execute(self) -> None:
+                super().execute()
+                self.state.image[EXECUTOR.LIVE_REGION_START + 0x3000] ^= 0xff
+
+        with self.assertRaises(EXECUTOR.RecoveryRequired) as caught:
+            EXECUTOR.live_step(
+                self.transaction, self.journal,
+                backend_factory=lambda transaction, index: DriftingMutationBackend(
+                    transaction, index, state), progress=False)
+        self.assertIsInstance(caught.exception.__cause__, EXECUTOR.RecoveryRequired)
+        self.assertIn("live region changed", str(caught.exception.__cause__))
+        self.assertEqual(EXECUTOR.load_journal(self.journal)["status"],
+                         EXECUTOR.INTENT)
+
+    def test_step_accepts_a_stable_drifted_live_region_and_records_it(self) -> None:
+        self.write_boundary(0)
+        image = self.drifted(self.baseline)
+        state = FakeState(image)
+        result = EXECUTOR.live_step(
+            self.transaction, self.journal,
+            backend_factory=lambda transaction, index: FakeMutationBackend(
+                transaction, index, state), progress=False)
+        self.assertEqual(result["boundary_index"], 1)
+        self.assertEqual(result["live_region_sha256"],
+                         PLANNER.sha256(EXECUTOR.live_region(image)))
+        self.assertEqual(result["last_observed_sha256"], PLANNER.sha256(
+            EXECUTOR.expected_boundary_image(self.transaction, 1)))
+        self.assertEqual(EXECUTOR.modelled_prefix(bytes(state.image)),
+                         EXECUTOR.modelled_prefix(
+                             EXECUTOR.expected_boundary_image(self.transaction, 1)))
+
+    def test_reentry_rejects_a_live_region_change_across_the_proof_boot(self) -> None:
+        install = self.transaction.install_count
+        proof = self.drifted(self.transaction.campaign.proof_image)
+        for scenario in ("unchanged", "changed"):
+            with self.subTest(scenario=scenario):
+                path = self.case / f"reentry-live-{scenario}.json"
+                source = EXECUTOR.boundary_journal(
+                    self.transaction, self.identity(initial_address=10), install,
+                    status=EXECUTOR.PROOF_INSTALLED, observed=proof)
+                EXECUTOR.write_journal_atomic(path, source, require_absent=True)
+                image = bytearray(proof)
+                if scenario == "changed":
+                    image[-0x1000] ^= 0x0f
+                state = FakeState(bytes(image), address=11)
+                if scenario == "changed":
+                    with self.assertRaisesRegex(EXECUTOR.RecoveryRequired,
+                                                "across the proof boot"):
+                        EXECUTOR.live_validate_reentry(
+                            self.transaction, path,
+                            backend_factory=lambda transaction: FakeReadBackend(
+                                transaction, state), progress=False)
+                else:
+                    result = EXECUTOR.live_validate_reentry(
+                        self.transaction, path,
+                        backend_factory=lambda transaction: FakeReadBackend(
+                            transaction, state), progress=False)
+                    self.assertEqual(result["status"], EXECUTOR.RESTORE_READY)
+                    self.assertEqual(result["live_region_sha256"],
+                                     source["live_region_sha256"])
+
+    def test_finalize_accepts_live_region_drift_below_exact_baseline(self) -> None:
+        final = len(self.transaction.operations)
+        image = self.drifted(self.baseline)
+        source = EXECUTOR.boundary_journal(
+            self.transaction, self.identity(address=11, initial_address=10),
+            final, status=EXECUTOR.COMPLETE)
+        EXECUTOR.write_journal_atomic(self.journal, source, require_absent=True)
+        state = FakeState(image, address=11)
+        result = EXECUTOR.live_finalize(
+            self.transaction, self.journal,
+            backend_factory=lambda transaction: FakeReadBackend(transaction, state),
+            progress=False)
+        self.assertTrue(result["state_cleared"])
+        self.assertEqual(result["live_region_sha256"],
+                         PLANNER.sha256(EXECUTOR.live_region(image)))
+        self.assertFalse(self.journal.exists())
+
 
 class LoaderReentryLockTests(_ExecutorFixture):
     """Production constants: both gates false, owner campaign pin in force."""

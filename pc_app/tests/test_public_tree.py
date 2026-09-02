@@ -97,6 +97,8 @@ class PublicTreeTests(unittest.TestCase):
                 "{}\n")
             (root / "renamed-state.json").write_text(
                 '{"schema":"kb7-loader-reentry-proof-journal-v1"}\n')
+            (root / "renamed-state-v2.json").write_text(
+                '{"schema":"kb7-loader-reentry-proof-journal-v2"}\n')
 
             result = MODULE.inspect(root)
 
@@ -109,7 +111,7 @@ class PublicTreeTests(unittest.TestCase):
             self.assertEqual(
                 sum("owner-local updater journal" in failure
                     for failure in result["failures"]),
-                1,
+                2,
             )
 
     def test_destructive_tool_state_and_temp_journal_names_are_rejected(self) -> None:

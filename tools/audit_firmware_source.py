@@ -3,10 +3,34 @@
 
 from __future__ import annotations
 
+import ast
+
 import re
 import sys
 from pathlib import Path
 
+
+
+# The loader-proof gates must each be exactly one constant assignment; a
+# substring test would accept a second, later assignment.
+EXPECTED_LOADER_PROOF_GATES = {
+    "LIVE_READ_ONLY_PREFLIGHT_ENABLED": False,
+    "LIVE_PROOF_CAMPAIGN_ENABLED": False,
+}
+
+
+def _single_constant_assignment(source: str, name: str) -> object:
+    values = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+            targets = (node.targets if isinstance(node, ast.Assign)
+                       else [node.target])
+            if any(isinstance(target, ast.Name) and target.id == name
+                   for target in targets):
+                values.append(node.value)
+    if len(values) != 1 or not isinstance(values[0], ast.Constant):
+        return None
+    return values[0].value
 
 def main() -> int:
     root = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
@@ -191,15 +215,25 @@ def main() -> int:
     if any(marker in campaign_source.lower() for marker in (
             "import usb", "from usb", "libusb", "--commit", "--device")):
         failures.append("offline loader-reentry campaign gained a live device surface")
+    for gate, expected in EXPECTED_LOADER_PROOF_GATES.items():
+        observed = _single_constant_assignment(executor_source, gate)
+        if observed is not expected:
+            failures.append(
+                f"fixed loader-reentry executor gate {gate} is not a single "
+                f"{expected!r} assignment (observed {observed!r})")
     for marker in (
-            "LIVE_READ_ONLY_PREFLIGHT_ENABLED = False",
-            "LIVE_PROOF_CAMPAIGN_ENABLED = False",
             'EXPECTED_CAMPAIGN_ID = (',
             '"113897c215c88a1aea2e483601a968b88e2686fad2df5c6752cb66276d9f43e2"',
             'EXPECTED_POLICY_SHA256 = (',
-            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "c8aa5cf437beff0e8584c4e4cf5d38fa',
+            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "25691cd554bf75595e6ddcfcb4bd9cbf',
             '"durable_terminal_intent_before_backend_or_usb": True',
             '"live_authorization_checked_before_journal_publication_and_backend"',
+            '"modelled_region_exact_against_boundary_images": True',
+            '"exact_against_baseline": False',
+            '"stable_within_each_operation": True',
+            '"stable_across_proof_boot": True',
+            'if live_region(post) != live_region(pre):',
+            '!= source["live_region_sha256"]:',
             'require_live_authorization(transaction)\n'
             '        self._device = device_factory()',
             'require_read_only_preflight_authorization(transaction)\n'

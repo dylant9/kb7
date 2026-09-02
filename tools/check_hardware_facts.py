@@ -870,7 +870,7 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
         campaign["campaign_format"] ==
         "KB7 V1.22 fixed loader-reentry proof campaign v1" and
         campaign["journal_schema"] ==
-        "kb7-loader-reentry-proof-journal-v1" and
+        "kb7-loader-reentry-proof-journal-v2" and
         campaign["expected_baseline_sha256"] ==
         "2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f" and
         campaign["proof_core0_raw"] == {
@@ -946,20 +946,27 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
                 "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
         } and
         authorization["policy_sha256"] ==
-        "4cf27e47f343e985b173d373c893281e37dc1ffecc94eac019d72e993d9fbdbb" and
+        "550ced94770c82d5218b33821ad253c283f122ffc6f7aa8d9e8e750e215af0e1" and
         authorization["executor_descriptor_sha256"] ==
-        "c8aa5cf437beff0e8584c4e4cf5d38fa509ae47a72963262ad76baa6d2da0726" and
+        "25691cd554bf75595e6ddcfcb4bd9cbfc1bca0a9e0be5965a264ae12a60af0a2" and
         authorization["executor_source_sha256"] ==
-        "7cc601638c9117fbe58f13c7e1fe3b912252bea95a3c93f25b2a7b0693f927e6" and
+        "54acfc3795ca269f677e824735d23cb03370ed4261456b1588b8cb0b09dd6254" and
         authorization[
             "live_authorization_checked_inside_backends_and_live_entry_points"]
         is True and
+        authorization["live_region_start"] == "0x0156b000" and
+        authorization["live_region_end"] == "0x02000000" and
+        authorization["live_region_exact_against_baseline"] is False and
+        authorization["live_region_recorded_in_journal"] is True and
+        authorization["live_region_stable_within_each_operation"] is True and
+        authorization["live_region_stable_across_proof_boot"] is True and
+        authorization["modelled_region_exact_against_boundary_images"] is True and
         authorization["generic_firmware_executor_mutation_enabled"] is False and
         authorization["flash_approved"] is False,
         "fixed proof campaign authorization changed")
     offline = campaign["offline_validation"]
     require(offline[
-                "focused_campaign_executor_and_read_reliability_tests_passed"] == 54 and
+                "focused_campaign_executor_and_read_reliability_tests_passed"] == 61 and
             offline["exact_campaign_operation_count"] == 168 and
             offline["install_operation_count"] == 32 and
             offline["restore_operation_count"] == 136 and

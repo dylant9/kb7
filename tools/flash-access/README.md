@@ -302,7 +302,7 @@ default after writing; add `-N` to verify only the written region.
 |---|---|---|
 | `kb7-enter-isp.py` | Switch a running keyboard into ISP mode | volatile; asks before sending |
 | `kb7-isp-verify.py` | Historical full-chip read/CRC diagnostic through the SoC controller | **read-only, but not current pass/fail authority: legacy CRC failure exits 0** |
-| `kb7-isp-repeat.py` | Fixed baseline-aware sweep of five pinned ranges at 512/1024/2048/4096-byte command sizes | **read-only; dry-run default; failed 386/400 with 300 mm NOR lead stubs, passed 400/400 after removing them (2026-09-02)** |
+| `kb7-isp-repeat.py` | Fixed baseline-aware sweep of five pinned ranges at 512/1024/2048/4096-byte command sizes | **read-only; dry-run default; failed 14 of 400 reads with 300 mm NOR lead stubs, passed 400/400 after removing them (2026-09-02)** |
 | `kb7-isp-write2.py` | Two-stage marker-program/sector-erase validation experiment | **destructive; dry-run by default; not a firmware flasher** |
 | `kb7-isp-erase-granularity.py` | Fixed four-stage guarded test of the observable `F6 15` erase footprint | **destructive; dry-run by default; passed once at the fixed target** |
 | `kb7-isp-scratch-restart.py` | Fixed two-sector experiment with two deliberate no-readback/reconciliation checkpoints | **destructive; dry-run by default; passed once at the fixed plan** |
@@ -515,13 +515,16 @@ The supporting sources, policy, normalized executor source and exact owner
 campaign ID are pinned. The two private baselines independently reproduce 168
 operations, proof full-image SHA-256
 `0e115dfd9b454dae6ac77cfe2ef05fac123b65e8a86a2866266edb5d380ab1fb`,
-one barrier sector at `0x00022000`, and exact stock restoration. Both the
-read-only preflight and proof-mutation gates are now false. A 2026-08-31
-preflight exposed independently SPI-confirmed two-byte physical corruption;
-after exact SPI restoration, a separate full USB capture exposed widespread
-command-aligned acquisition corruption. The fixed short-chunk, baseline-aware
-read sweep is offline-tested but hardware-unrun. Raw authority and the general
-paired-firmware mutation path remain unavailable. See the
+one barrier sector at `0x00022000`, and exact stock restoration. On this
+branch both the read-only preflight and proof-mutation gates are false; the
+separate preflight-only branch enables the read-only preflight alone. A
+2026-08-31 preflight exposed independently SPI-confirmed two-byte physical
+corruption; after exact SPI restoration, a separate full USB capture exposed
+widespread command-aligned acquisition corruption, traced on 2026-09-02 to the
+NOR lead stubs and cleared by the fixed short-chunk sweep (400/400). Live reads
+are compared exactly below the post-image live region; the stock settings
+storage above it is recorded and stability-checked, never baseline-exact. Raw
+authority and the general paired-firmware mutation path remain unavailable. See the
 [read-reliability incident](../../docs/USB-ISP-READ-RELIABILITY-INCIDENT-2026-08-31.md).
 Passing the sweep would permit review of a read-only full preflight revision,
 not mutation; mutation needs a later exact full-preflight result and separate

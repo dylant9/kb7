@@ -8,6 +8,12 @@ execution option.  One committed ``step`` executes exactly one internally
 selected canonical operation in the Core-0 envelope or the one fixed Core-1
 barrier sector.
 
+Every live read is compared byte-exact against the modelled boundary image
+below the post-image live region.  The live region (stock settings storage
+after the manifest-declared image end) is recorded in the journal and must be
+stable within each operation and across the proof boot, but it is not required
+to equal the reviewed baseline because the stock firmware rewrites it.
+
 The exact owner-baseline campaign and reviewed implementation hashes are
 pinned below.  In this source revision both the read-only preflight gate and
 the proof-mutation gate are false: the CLI, every live entry point and both
@@ -61,7 +67,16 @@ _writer = _load_module(
 SafetyError = _writer.SafetyError
 PlanError = _planner.PlanError
 
-JOURNAL_SCHEMA = "kb7-loader-reentry-proof-journal-v1"
+JOURNAL_SCHEMA = "kb7-loader-reentry-proof-journal-v2"
+# Post-image live region.  Everything from the sector after the
+# manifest-declared image end to the end of the chip holds stock settings and
+# other storage that the stock firmware rewrites during normal use.  No
+# campaign operation touches it.  It is read, recorded and required to be
+# stable within every operation and across the proof boot, but it is never
+# required to equal the reviewed baseline; the modelled region below it is.
+LIVE_REGION_START = -(-(_planner.REGION2_START + _planner.REGION2_LENGTH) //
+                      _planner.SECTOR_BYTES) * _planner.SECTOR_BYTES
+LIVE_REGION_END = _planner.FLASH_BYTES
 LIVE_READ_ONLY_PREFLIGHT_ENABLED = False
 LIVE_PROOF_CAMPAIGN_ENABLED = False
 EXPECTED_CAMPAIGN_ID = (
@@ -77,8 +92,8 @@ EXPECTED_IMPLEMENTATION_HASHES: dict[str, str] = {
         "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
 }
 EXPECTED_POLICY_SHA256 = (
-    "4cf27e47f343e985b173d373c893281e37dc1ffecc94eac019d72e993d9fbdbb")
-EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "c8aa5cf437beff0e8584c4e4cf5d38fa509ae47a72963262ad76baa6d2da0726"
+    "550ced94770c82d5218b33821ad253c283f122ffc6f7aa8d9e8e750e215af0e1")
+EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "25691cd554bf75595e6ddcfcb4bd9cbfc1bca0a9e0be5965a264ae12a60af0a2"
 
 PREFLIGHT_STARTED = "preflight_started"
 BOUNDARY_VERIFIED = "boundary_verified"
@@ -95,7 +110,8 @@ JOURNAL_KEYS = {
     "executor_source_sha256",
     "install_operation_count", "boundary_index", "active_operation_index",
     "active_operation_sha256", "pre_full_sha256", "post_full_sha256",
-    "last_observed_sha256", "device_path", "usb_bus_number",
+    "last_observed_sha256", "observed_full_sha256", "live_region_sha256",
+    "device_path", "usb_bus_number",
     "initial_usb_address", "current_usb_address", "identify_hex",
     "descriptor_sha256", "loader_fingerprint_sha256",
     "loader_window_sha256", "manifest_sha256",
@@ -208,6 +224,15 @@ def policy_descriptor() -> dict[str, object]:
         "live_authorization_checked_before_journal_publication_and_backend":
             True,
         "two_exact_full_chip_reads_before_and_after": True,
+        "modelled_region_exact_against_boundary_images": True,
+        "live_region": {
+            "start": f"0x{LIVE_REGION_START:08x}",
+            "end": f"0x{LIVE_REGION_END:08x}",
+            "exact_against_baseline": False,
+            "recorded_in_journal": True,
+            "stable_within_each_operation": True,
+            "stable_across_proof_boot": True,
+        },
         "strict_close_before_authorizing_publication": True,
         "reattach_not_found_or_busy_accepted_only_if_kernel_driver_is_active":
             True,
@@ -314,6 +339,31 @@ def expected_boundary_image(transaction: Transaction, index: int) -> bytes:
     return bytes(image)
 
 
+def modelled_prefix(image: bytes) -> bytes:
+    """The part of an image that must equal the modelled boundary image."""
+    return image[:LIVE_REGION_START]
+
+
+def live_region(image: bytes) -> bytes:
+    """The post-image live region: recorded and stability-checked only."""
+    return image[LIVE_REGION_START:LIVE_REGION_END]
+
+
+def _require_exact_prefix(label: str, expected: bytes, observed: bytes) -> None:
+    if len(expected) != _planner.FLASH_BYTES or len(observed) != _planner.FLASH_BYTES:
+        raise SafetyError(
+            f"{label} requires two exact 32-MiB images; got "
+            f"{len(expected)} and {len(observed)} bytes")
+    if modelled_prefix(expected) != modelled_prefix(observed):
+        count, ranges = _writer.difference_summary(
+            modelled_prefix(expected), modelled_prefix(observed))
+        locations = ", ".join(f"0x{start:x}-0x{end:x}" for start, end in ranges)
+        raise SafetyError(
+            f"{label} mismatch below the live region 0x{LIVE_REGION_START:08x}: "
+            f"{count} differing bytes; first ranges: {locations or 'unavailable'}; "
+            f"expected {_planner.sha256(expected)}, got {_planner.sha256(observed)}")
+
+
 def _operation_sha256(transaction: Transaction, index: int) -> str:
     return _planner.canonical_sha256(transaction.descriptor["operations"][index])
 
@@ -398,7 +448,21 @@ def _bound_identity(raw: dict[str, object], image: bytes,
 
 
 def _journal_common(transaction: Transaction, identity: dict[str, object],
-                    boundary: int) -> dict[str, object]:
+                    boundary: int, *, observed: bytes | None = None
+                    ) -> dict[str, object]:
+    modelled = expected_boundary_image(transaction, boundary)
+    if observed is None:
+        # No live read behind this journal (unbound preflight marker or a
+        # locally derived state): record the modelled image and the baseline
+        # live region.
+        observed_full = _planner.sha256(modelled)
+        live = _planner.sha256(live_region(transaction.campaign.baseline))
+    else:
+        if modelled_prefix(observed) != modelled_prefix(modelled):
+            raise ExecutorError(
+                "observed image does not match the modelled boundary below the live region")
+        observed_full = _planner.sha256(observed)
+        live = _planner.sha256(live_region(observed))
     return {
         "schema": JOURNAL_SCHEMA,
         "status": BOUNDARY_VERIFIED,
@@ -414,16 +478,17 @@ def _journal_common(transaction: Transaction, identity: dict[str, object],
         "active_operation_sha256": None,
         "pre_full_sha256": None,
         "post_full_sha256": None,
-        "last_observed_sha256": _planner.sha256(
-            expected_boundary_image(transaction, boundary)),
+        "last_observed_sha256": _planner.sha256(modelled),
+        "observed_full_sha256": observed_full,
+        "live_region_sha256": live,
         **identity,
     }
 
 
 def boundary_journal(transaction: Transaction, identity: dict[str, object],
-                     boundary: int, *, status: str | None = None
-                     ) -> dict[str, object]:
-    journal = _journal_common(transaction, identity, boundary)
+                     boundary: int, *, status: str | None = None,
+                     observed: bytes | None = None) -> dict[str, object]:
+    journal = _journal_common(transaction, identity, boundary, observed=observed)
     if status is not None:
         journal["status"] = status
     return journal
@@ -482,7 +547,8 @@ def validate_journal(transaction: Transaction, journal: dict[str, object]) -> No
         raise ExecutorError("journal boundary is invalid")
     for key in ("baseline_sha256", "proof_full_sha256", "implementation_sha256",
                 "executor_source_sha256", "descriptor_sha256", "loader_fingerprint_sha256",
-                "loader_window_sha256", "manifest_sha256"):
+                "loader_window_sha256", "manifest_sha256", "observed_full_sha256",
+                "live_region_sha256"):
         value = journal.get(key)
         if not isinstance(value, str) or len(value) != 64:
             raise ExecutorError(f"journal {key} is malformed")
@@ -982,7 +1048,7 @@ def _two_reads(backend, *, progress: bool) -> bytes:
 
 def _require_image(transaction: Transaction, expected: bytes, observed: bytes,
                    label: str) -> None:
-    _writer.require_exact_image(label, expected, observed)
+    _require_exact_prefix(label, expected, observed)
     if len(observed) != _planner.FLASH_BYTES:
         raise RecoveryRequired(f"{label} is not an exact full-chip image")
     slices = {
@@ -1017,9 +1083,8 @@ def _next_stable_journal(transaction: Transaction, source: dict[str, object],
         status = COMPLETE
     else:
         status = BOUNDARY_VERIFIED
-    target = boundary_journal(transaction, identity, boundary, status=status)
-    target["last_observed_sha256"] = _planner.sha256(observed)
-    return target
+    return boundary_journal(
+        transaction, identity, boundary, status=status, observed=observed)
 
 
 def _require_step_state(transaction: Transaction,
@@ -1082,7 +1147,7 @@ def live_preflight(transaction: Transaction, journal_path: Path, *,
                 raise ReadOnlyPreflightVerificationStopped(
                     phase, error) from error
             raise ReadOnlyPreflightStopped(phase, error) from error
-        target = boundary_journal(transaction, identity, 0)
+        target = boundary_journal(transaction, identity, 0, observed=observed)
         outcome = publish_transition(
             transaction, journal_path, started, target, fault=journal_fault)
         if outcome == "source_retained_after_error":
@@ -1122,6 +1187,10 @@ def live_step(transaction: Transaction, journal_path: Path, *,
             post = _two_reads(backend, progress=progress)
             expected_post = expected_boundary_image(transaction, index + 1)
             _require_image(transaction, expected_post, post, "operation postimage")
+            if live_region(post) != live_region(pre):
+                raise RecoveryRequired(
+                    "live region changed during the operation; a misaddressed "
+                    "write is suspected")
             backend.close()
             backend = None
         except BaseException as error:
@@ -1168,6 +1237,10 @@ def live_validate_reentry(transaction: Transaction, journal_path: Path, *,
             observed = _two_reads(backend, progress=progress)
             _require_image(transaction, transaction.campaign.proof_image, observed,
                            "post-boot proof image")
+            if _planner.sha256(live_region(observed)) != source["live_region_sha256"]:
+                raise RecoveryRequired(
+                    "live region changed across the proof boot; the proof image "
+                    "or loader wrote flash")
             identity = _bound_identity(
                 raw_identity, observed,
                 initial_address=int(source["initial_usb_address"]))
@@ -1179,7 +1252,7 @@ def live_validate_reentry(transaction: Transaction, journal_path: Path, *,
                 "re-entry validation transport, image, or close failed; use SPI") from error
         target = boundary_journal(
             transaction, identity, transaction.install_count,
-            status=RESTORE_READY)
+            status=RESTORE_READY, observed=observed)
         outcome = publish_transition(
             transaction, journal_path, started, target, fault=journal_fault)
         if outcome == "source_retained_after_error":
@@ -1246,6 +1319,7 @@ def live_finalize(transaction: Transaction, journal_path: Path, *,
             "status": "state_cleared",
             "boundary_index": len(transaction.operations),
             "observed_sha256": _planner.sha256(observed),
+            "live_region_sha256": _planner.sha256(live_region(observed)),
             "state_cleared": True,
         }
 
@@ -1271,6 +1345,7 @@ def inspect_state(transaction: Transaction, journal_path: Path) -> dict[str, obj
     return {
         "journal_status": status,
         "boundary_index": journal["boundary_index"],
+        "live_region_sha256": journal["live_region_sha256"],
         "permitted_next": mapping[status],
         "usb_opened": False,
     }
@@ -1286,6 +1361,8 @@ def _print_plan(command: str, transaction: Transaction,
           f"{len(transaction.operations) - transaction.install_count} restore")
     print("mutable   : Core0 envelope + one fixed Core1 barrier sector")
     print("preserved : header, loader, manifest, all flash after Core1")
+    print(f"live      : 0x{LIVE_REGION_START:08x}-0x{LIVE_REGION_END:08x} "
+          "recorded and stability-checked, not baseline-exact")
     print("general fw: mutation hard-disabled")
     print("read preflight: hard-disabled" if
           not LIVE_READ_ONLY_PREFLIGHT_ENABLED else
