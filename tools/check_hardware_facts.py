@@ -1148,9 +1148,14 @@ def validate_loader_reentry(evidence: dict[str, object]) -> None:
         "loader_f6_05_read_is_xip_dma_with_untouched_address": True,
         "loader_f6_05_read_controller_base": "0x40022000",
         "gate_pass_allows_automatic_proof_mutation_authorization": False,
-        "gate_pass_next_review_scope": "read_only_full_preflight_only",
+        "gate_pass_next_review_scope":
+            "read_only_full_preflight_then_separate_mutation_review",
         "mutation_reauthorization_requires_separate_exact_full_preflight_and_review": True,
-        "proof_campaign_may_be_reauthorized": False,
+        "proof_campaign_may_be_reauthorized": True,
+        "proof_campaign_reauthorized_on": "2026-09-03",
+        "proof_campaign_reauthorized_branch": "loader-reentry-mutation-enabled",
+        "proof_campaign_reauthorized_after_preflight_live_region_sha256":
+            "04b21e7889e26171b3d2b338554672faa3f86a40e550d566a89f2eafa67d70b4",
     }, "USB read-reliability incident evidence changed")
 
     require(evidence["planner_immutability"] == {

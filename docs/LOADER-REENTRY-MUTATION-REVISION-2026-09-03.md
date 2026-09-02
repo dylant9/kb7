@@ -41,6 +41,35 @@ value recorded at the previous boundary.
 - A fresh journal path for this revision: journals from earlier revisions are
   refused because they bind a different executor source hash.
 
+## Operator notes from the final review
+
+- Expect an exit 3 as a plausible outcome, not a surprise. The campaign reads
+  the whole chip four times per operation, roughly 5.5 million `F6 05`
+  commands in all, and the read path's residual fault rate is only bounded
+  near one in ten thousand. Any single wrong read after an intent is terminal
+  and means the SPI restore below, then a restart from step 0 with a new
+  journal. Have the extension leads cut and the programmer on the bench before
+  starting.
+- Run every `--commit` detached from the terminal session (`setsid nohup …`),
+  never in a tool or shell that can be interrupted; a hang-up or Ctrl-C after
+  an intent is also an exit 3.
+- Before `validate-reentry`, check passively that the loader came up at a new
+  USB address: read `/sys/bus/usb/devices/3-2.2/idProduct` (`5037`) and
+  `/sys/bus/usb/devices/3-2.2/devnum`, and compare the latter with the
+  journal's `current_usb_address`. If they are equal, power-cycle again before
+  running the command; the executor treats an unchanged address as a stop and
+  consumes the journal.
+- usb-storage probes the loader between every step. Make automounting provably
+  off for the session, for example `systemctl mask --runtime udisks2` and an
+  empty `lsblk` mount column, not only a desktop setting.
+- The executor runs under sudo, so its journal is root-owned; run `inspect`
+  under sudo as well, or `chown` the journal after each session.
+- An exit 3 from `validate-reentry` or `finalize` comes from a read-only
+  phase: no write was possible, but the rule is the same because the campaign
+  state is terminal. A finalize mismatch confined to the live region after an
+  accidental stock boot is settings drift, not corruption; it still needs the
+  SPI path to re-establish a clean state for the campaign.
+
 ## Sequence
 
 1. Enter `10f5:5037` with the vendor HID mode-switch.
@@ -87,6 +116,8 @@ value recorded at the previous boundary.
 - A step that reports the live region changed between sessions or during an
   operation is an exit 3 with the same rule.
 - Never attach an unpowered programmer; never leave long leads on the bus.
+- The full-chip SPI restore that every exit 3 depends on is written out in
+  `tools/flash-access/README.md` under "Full-chip SPI restore".
 
 ## Proof boundary
 

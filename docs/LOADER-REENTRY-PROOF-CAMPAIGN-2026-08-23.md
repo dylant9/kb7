@@ -173,7 +173,12 @@ hash and all simulation invariants. Following the first read-only preflight
 incident, mutation was relocked and later conditionally reauthorized after an
 exact revised preflight. The 2026-08-31 incidents supersede that authorization:
 both preflight and mutation are locked, no caller-selected firmware install
-exists, and the general paired-firmware executor remains locked.
+exists, and the general paired-firmware executor remains locked. On
+2026-09-03, after the read-reliability gate and the live-region preflight
+passed, the separate mutation-enabled branch reauthorized the fixed campaign
+for the exact reviewed identity
+`1ce62e95ee2c6c84b5abb8996f7964bacae661869152ead20f5c7138b2b0b508`; see
+[LOADER-REENTRY-MUTATION-REVISION-2026-09-03.md](LOADER-REENTRY-MUTATION-REVISION-2026-09-03.md).
 
 ## Regenerated identity (2026-09-02)
 
@@ -191,14 +196,12 @@ and clears the NVIC and stops SysTick as the first work of its reset handler
 `b0b3b75ab06bd00b152f86446de623b9029ff3ab9d164f6f4387243d2556b272` (1260 bytes, entry unchanged) and the campaign ID
 `1ce62e95ee2c6c84b5abb8996f7964bacae661869152ead20f5c7138b2b0b508` with proof full-image SHA-256 `58780441a9a5d6208aa2056c778e73b480e837d8b9f61c6b0be5629079307da9`. Same 168 operations.
 
-## Bounded hardware run — paused
+## Bounded hardware run
 
-The following sequence is retained as the future stop-gated outline. It is not
-currently authorized. Before it can be reconsidered, the fixed baseline-aware
-512/1024/2048/4096-byte read sweep must pass on hardware. That pass may justify
-only a new reviewed source/policy pin for the full read-only preflight; proof
-mutation must remain false. Only after two exact 32-MiB preflight reads and
-strict close pass may a separate review consider reopening the fixed campaign:
+The following outline was written on 2026-08-23. Its preconditions were met
+on 2026-09-02 (read sweep) and 2026-09-03 (live-region preflight), and the
+mutation-enabled branch's runbook now governs the run; this outline is kept as
+the historical stop-gated sequence:
 
 1. keep the rehearsed full-chip external-SPI restore available, with the
    external programmer physically disconnected from the powered keyboard;

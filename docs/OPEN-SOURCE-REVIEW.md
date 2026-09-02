@@ -41,14 +41,15 @@ that the contributor does not possess.
   needed to reproduce the protocol; no stock instruction bytes, raw binary,
   disassembly or decompiler output is included.
 - Independently authored fixed proof-campaign and owner-campaign-bound executor
-  source, mutation-locked; the read-reliability gate passed on 2026-09-02.
+  source; the read-reliability gate passed on 2026-09-02 and this branch
+  authorizes the fixed proof campaign for the exact reviewed identity only.
   The builder derives a checksum-valid clean-room Core 0 plus exact stock Core 1
   and an exact-stock reverse sequence; the executor exposes no raw flash fields
   and pins the independently rederived owner campaign identity. Later evidence
   separates a SPI-confirmed two-byte physical corruption from a post-restore
   command-aligned USB acquisition failure, since traced to NOR lead stubs.
-  Proof mutation remains locked; the read-only preflight is enabled only on
-  the separate preflight-only branch. The public machine record includes only
+  The hardware-validation branch keeps both gates false; this branch enables
+  the bounded proof campaign for one reviewed campaign identity. The public machine record includes only
   hashes, operation counts, fixed geometry, bounded authorization flags and
   the proof boundary, which remains unexecuted on hardware. Private campaign descriptors, sector images,
   baselines and journals remain excluded. See the

@@ -296,6 +296,46 @@ installation command. Keep the SoC in reset, verify 3.3-V signalling, and retain
 two matching backups before writing. Flashrom verifies the **whole chip** by
 default after writing; add `-N` to verify only the written region.
 
+### Full-chip SPI restore
+
+This is the recovery every exit-3 rule depends on. It is the sequence rehearsed
+on 2026-08-23 and 2026-08-31, written down once so it is not reconstructed
+under pressure. The NOR leads are now ~20 mm pigtails; the programmer attaches
+through short extension leads soldered to them for the duration of the restore
+only.
+
+1. Power the keyboard off: unplug its USB. Do not touch the programmer yet.
+2. Solder the extension leads to the CS#, DO, DI, CLK and GND pigtails; attach
+   the SoC reset clip. Keep the extensions as short as the bench allows.
+3. Hold the SoC in reset through the RST line so it stays off the bus.
+4. Apply keyboard USB power first (it supplies the flash rail), then power the
+   programmer. Never leave the programmer wired to the bus while unpowered.
+5. Write the exact reviewed baseline, whole chip, with flashrom's default
+   whole-chip verify, then take an independent read and compare it:
+
+   ```sh
+   flashrom -p serprog:dev=/dev/ttyACM0:921600,spispeed=1M \
+     -c "MX25L25635F/MX25L25645G" -w <exact-baseline>.bin --progress
+   flashrom -p serprog:dev=/dev/ttyACM0:921600,spispeed=1M \
+     -c "MX25L25635F/MX25L25645G" -r <independent-read>.bin --progress
+   sha256sum <exact-baseline>.bin <independent-read>.bin
+   ```
+
+   The independent read must hash to
+   `2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f`, or, if
+   the stock firmware has since rewritten its settings store, must match the
+   baseline byte for byte below `0x0156b000` with the difference confined to
+   the post-image live region. Use `kb7-compare.sh` for the diff.
+6. Power the programmer off, then the keyboard, then remove the programmer and
+   the reset clip, desolder the extension leads back to ~20 mm pigtails and
+   insulate their ends. Long stubs left on the bus corrupt SoC reads.
+7. Cold boot on USB alone: require `10f5:5038` and normal keyboard operation.
+   The loader CRC-checks every region on boot, so a bad restore shows up as
+   `10f5:5037` instead.
+
+If the flash contents are unknown rather than a known campaign state, take the
+independent read first and keep it before writing anything.
+
 ### USB ISP path
 
 | Script | Purpose | Safety |

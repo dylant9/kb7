@@ -341,9 +341,12 @@
       "loader_f6_05_read_is_xip_dma_with_untouched_address": true,
       "loader_f6_05_read_controller_base": "0x40022000",
       "gate_pass_allows_automatic_proof_mutation_authorization": false,
-      "gate_pass_next_review_scope": "read_only_full_preflight_only",
+      "gate_pass_next_review_scope": "read_only_full_preflight_then_separate_mutation_review",
       "mutation_reauthorization_requires_separate_exact_full_preflight_and_review": true,
-      "proof_campaign_may_be_reauthorized": false
+      "proof_campaign_may_be_reauthorized": true,
+      "proof_campaign_reauthorized_on": "2026-09-03",
+      "proof_campaign_reauthorized_branch": "loader-reentry-mutation-enabled",
+      "proof_campaign_reauthorized_after_preflight_live_region_sha256": "04b21e7889e26171b3d2b338554672faa3f86a40e550d566a89f2eafa67d70b4"
     }
   },
   "planner_immutability": {
@@ -353,6 +356,6 @@
     "operation_count_over_all_three_regions": 0,
     "checked_at_every_modeled_operation_boundary": true
   },
-  "proof_boundary": "Static stock identity and instruction semantics plus an offline custom build/model remain valid. A later preflight found two physical Core1 bytes programmed to zero, and a post-restore full USB capture exposed command-aligned loader read corruption despite a subsequent normal boot. Both proof preflight and proof mutation are relocked pending exact short-chunk read-reliability evidence. No checksum-valid custom application has run on hardware, no preserved-loader entry from custom code has been observed, and no general paired-firmware USB write is authorized.",
+  "proof_boundary": "Static stock identity and instruction semantics plus an offline custom build/model remain valid. A later preflight found two physical Core1 bytes programmed to zero, and a post-restore full USB capture exposed command-aligned loader read corruption despite a subsequent normal boot. The read-reliability gate and the live-region preflight passed on 2026-09-02 and 2026-09-03; the fixed proof campaign is authorized on the mutation-enabled branch for one reviewed identity. No checksum-valid custom application has run on hardware, no preserved-loader entry from custom code has been observed, and no general paired-firmware USB write is authorized.",
   "raw_vendor_bytes_included": false
 }

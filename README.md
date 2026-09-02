@@ -62,9 +62,10 @@ image generation is disabled.
   failed CRCs, so it is not current pass/fail authority. The fixed
   baseline-aware short-read sweep passed on 2026-09-02 once the NOR lead stubs
   were removed, and the read-only preflight passed on 2026-09-03 under the
-  post-image live-region policy on the separate preflight-only branch. Proof
-  mutation remains locked here. The general paired-firmware executor remains
-  locked and `flash_approved=false`. See the
+  post-image live-region policy on the preflight-only branch. This
+  mutation-enabled branch authorizes the fixed proof campaign for that exact
+  campaign identity only. The general paired-firmware executor remains locked
+  and `flash_approved=false`. See the
   [fixed proof campaign](docs/LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md) and
   [read-reliability incident](docs/USB-ISP-READ-RELIABILITY-INCIDENT-2026-08-31.md).
 - The flash-access tooling adds proven external SPI recovery workflows,
