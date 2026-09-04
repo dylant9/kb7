@@ -219,6 +219,29 @@ def main() -> int:
     if any(marker in campaign_source.lower() for marker in (
             "import usb", "from usb", "libusb", "--commit", "--device")):
         failures.append("offline loader-reentry campaign gained a live device surface")
+    region1_campaign_source = (root / "tools" / "flash-access" /
+                               "kb7-region1-reentry-campaign.py").read_text(
+                                   encoding="utf-8")
+    for marker in (
+            'EXPECTED_BASELINE_SHA256 = (',
+            'REGION1_ENTRY = 0x1004A525',
+            '"e753380b3c0ce9fb28f69f4d9d066d0877cbd612dedd37149290556420d29356"',
+            '"campaign_self_authorizes_execution": False',
+            '"requires_separate_executor_authorization": True',
+            'phase="install_poison_core1"',
+            'phase="install_stage_core1_patch"',
+            'phase="install_commit"',
+            'phase="restore_poison_core1"',
+            'phase="restore_stage_core1_patch"',
+            'phase="restore_commit"',
+            '"region0_operations": 0',
+            'require(_planner.core_checksums(post)[0] == _planner.CORE0.manifest_checksum,',
+            'for cut, state in _prefix_states(pre_unit, post_unit, operation.action):'):
+        if marker not in region1_campaign_source:
+            failures.append(f"fixed region-1 campaign guard is missing: {marker}")
+    if any(marker in region1_campaign_source.lower() for marker in (
+            "import usb", "from usb", "libusb", "--commit", "--device")):
+        failures.append("offline region-1 campaign gained a live device surface")
     for gate, expected in EXPECTED_LOADER_PROOF_GATES.items():
         observed = _single_constant_assignment(executor_source, gate)
         if observed is not expected:
@@ -227,9 +250,12 @@ def main() -> int:
                 f"{expected!r} assignment (observed {observed!r})")
     for marker in (
             'EXPECTED_CAMPAIGN_ID = (',
-            '"1ce62e95ee2c6c84b5abb8996f7964bacae661869152ead20f5c7138b2b0b508"',
+            '"9a582f1cf35ccb219d5477299ece6caa1285fcbff448e7901fdcaaae83e5c267"',
             'EXPECTED_POLICY_SHA256 = (',
-            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "0d5a8ad6127d2b953d0ad8acb1178a9c',
+            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "24ad0392c0bf1c7949d131282cc2d9e6',
+            '"kb7_region1_reentry_campaign_for_executor"',
+            '"region0_operation_count": 0,',
+            '"core0_campaign_source_sha256": _source_sha256(',
             '"durable_terminal_intent_before_backend_or_usb": True',
             '"live_authorization_checked_before_journal_publication_and_backend"',
             '"modelled_region_exact_against_boundary_images": True',

@@ -1,6 +1,6 @@
 {
   "schema": "kb7.hardware.stock-loader-reentry-static-analysis",
-  "schema_version": 7,
+  "schema_version": 8,
   "analyzed_on": "2026-08-23",
   "relocation_decoded_on": "2026-09-02",
   "evidence_class": "firmware_recovery",
@@ -344,6 +344,96 @@
       "gate_pass_next_review_scope": "read_only_full_preflight_only",
       "mutation_reauthorization_requires_separate_exact_full_preflight_and_review": true,
       "proof_campaign_may_be_reauthorized": false
+    }
+  },
+  "fixed_region1_patch_campaign": {
+    "status": "offline_built_simulated_executor_bound_unreviewed",
+    "designed_on": "2026-09-05",
+    "supersedes_core0_campaign_as_first_hardware_step": true,
+    "campaign_tool": "tools/flash-access/kb7-region1-reentry-campaign.py",
+    "executor_tool": "tools/flash-access/kb7-loader-reentry-executor.py",
+    "campaign_format": "KB7 V1.22 fixed region-1 loader-reentry proof campaign v1",
+    "journal_schema": "kb7-loader-reentry-proof-journal-v2",
+    "expected_baseline_sha256": "2b1472f47e957c6d6cd9e47911f454fabf50c5d6988d90884b5d6193d61fe02f",
+    "proof_core1_raw": {
+      "entry": "0x1004a525",
+      "length": 404,
+      "sha256": "e753380b3c0ce9fb28f69f4d9d066d0877cbd612dedd37149290556420d29356",
+      "build_target": "region1-reentry-proof"
+    },
+    "stable_proof_target": {
+      "core0": "exact stock V1.22 Core0",
+      "core1": "exact stock V1.22 Core1 except one patched sector at the application entry",
+      "header_loader_manifest": "exact stock V1.22",
+      "proof_full_sha256": "f5ff8321e073f7453fc5e070717dbc2c3f01d94748ef752288aeb81f248fade4",
+      "core1_target_sha256": "472091e04425b49610f70b64d9327fb70ddfdc336b54e4f0a4c597e937bb6fc2",
+      "patch_sector_sha256": "e1695fbcb0100cc50c56701f2a0b1666a0ebd13c823ff3a941ee90a217faf296",
+      "patch_offset": "0x0004a524",
+      "patch_length": 404,
+      "fixup_offset": "0x0004a6b8",
+      "gate_offset": "0x0004a6bc",
+      "restore_gate_offset": "0x0004a000"
+    },
+    "mutation_domain": {
+      "core1_patch_sector": "0x0006b000",
+      "temporary_core1_poison_sector": "0x00022000",
+      "core0_operation_count": 0,
+      "header_loader_manifest_operation_count": 0,
+      "all_flash_after_core1_operation_count": 0
+    },
+    "safety_model": {
+      "core1_poisoned_before_any_erase": true,
+      "patch_sector_rebuilt_with_gate_erased": true,
+      "poison_sector_restored_exact_before_gate": true,
+      "every_byte_prefix_state_checksum_evaluated": true,
+      "region0_checksum_valid_at_every_boundary": true,
+      "final_gate_rank": 32,
+      "one_operation_per_cli_invocation": true,
+      "durable_terminal_intent_before_backend_or_usb": true,
+      "two_exact_full_chip_reads_before_and_after_each_mutation": true,
+      "strict_close_before_authorizing_publication": true,
+      "automatic_retry": false
+    },
+    "authorization": {
+      "live_read_only_preflight_enabled": false,
+      "live_proof_campaign_enabled": false,
+      "execution_authorized": false,
+      "independently_reviewed": false,
+      "authorization_scope": "region-1 patch campaign bound; offline only pending independent review",
+      "expected_campaign_id": "9a582f1cf35ccb219d5477299ece6caa1285fcbff448e7901fdcaaae83e5c267",
+      "implementation_source_sha256": {
+        "campaign": "7b4d83f3bc162fb7adbc679083f786d54aa2edd466a12db07426ced601a34b58",
+        "core0_campaign": "8d8153c95ca45c81cc5c0a06c463894d98f519a5b142348592e3472b8a7ef980",
+        "planner": "618bed76c236390c8203ef5395db2317dfce9cce620035bda05231fc05727d0a",
+        "verifier": "9b19d393cf64c66168e08de2f3d4fe352a85a2fd69545e374dee0fa015dea338",
+        "writer": "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5"
+      },
+      "policy_sha256": "7786dcee0662f85cb4a6a2c4b95adec88fef3b9de2959c5d75f0ffac1bd799e7",
+      "executor_descriptor_sha256": "24ad0392c0bf1c7949d131282cc2d9e6b67e8ffd588c55df4db6d98301e117a0",
+      "executor_source_sha256": "d2641d9c2a92c2ab99513553e8f1ef0aec4aedef5f90d88ca00754ca7a8319ae",
+      "live_region_policy_unchanged_from_core0_revision": true,
+      "generic_firmware_executor_mutation_enabled": false,
+      "flash_approved": false
+    },
+    "offline_validation": {
+      "exact_campaign_operation_count": 40,
+      "install_operation_count": 20,
+      "restore_operation_count": 20,
+      "program_operation_count": 36,
+      "erase_operation_count": 4,
+      "core0_operation_count": 0,
+      "preserved_boot_region_operation_count": 0,
+      "command_boundaries_checked": 41,
+      "modeled_byte_prefix_states_checked": 34856,
+      "distinct_prefix_states_evaluated": 32470,
+      "single_bit_poison_prefix_states_checked": 1026,
+      "sparse_gate_subset_proofs": 2,
+      "early_loader_valid_non_target_states": 0,
+      "install_then_restore_exact_full_baseline": true
+    },
+    "hardware_validation": {
+      "runs": 0,
+      "proof_boot_observed": false
     }
   },
   "planner_immutability": {

@@ -674,7 +674,7 @@ def _derive(baseline: bytes, proof_elf: Path, prefix: str, work: Path,
             "The custom proof path remains hardware-unrun.",
             "Physical torn-NOR, misaddressing, and disturb remain SPI-recovery cases.",
             "A new USB enumeration supports but cannot prove the cause of loader entry.",
-            "No executor revision consumes this campaign format yet.",
+            "Execution requires the separately gated fixed executor revision bound to this format.",
         ],
     }
     descriptor["campaign_id"] = _planner.canonical_sha256(descriptor)

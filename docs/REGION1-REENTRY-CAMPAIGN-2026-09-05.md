@@ -1,9 +1,9 @@
 # Region-1 loader-reentry proof campaign
 
 Design date: 2026-09-05
-Status: offline design, built and simulated against the exact V1.22 baseline;
-**not reviewed, not authorized for hardware, and no executor revision consumes
-it yet.**
+Status: offline design, built and simulated against the exact V1.22 baseline
+and bound to the fixed executor on this branch with both live gates false;
+**not reviewed and not authorized for hardware.**
 
 ## Purpose
 
@@ -76,7 +76,7 @@ Identities for the exact V1.22 baseline `2b1472f4…`:
 
 | Item | Value |
 |---|---|
-| campaign ID | `56aa08c7…` |
+| campaign ID | `9a582f1c…` |
 | proof full-chip image | `f5ff8321…` |
 | patched region 1 | `472091e0…`; only sector `0x4a000` differs from stock |
 | install fixup / gate | `0x4a6b8` / `0x4a6bc`, both rank 32; gate final word `00000000` |
@@ -112,13 +112,17 @@ loader-model errors remain external-SPI recovery cases.
 
 ## What is still missing before hardware
 
-- **Executor.** The fixed loader-reentry executor is bound to the Core-0
-  campaign module and identity. A revision must load this campaign format,
-  pin its identity, describe the two mutable sectors in its policy
-  descriptor, keep the same journal, barrier, live-region and gate rules,
-  and keep both live gates false on the validation branch. The proof-boot
-  expectation is identical: the loader self-enumerates `10f5:5037` at a new
-  USB address, then the restore direction returns exact stock.
+- **Executor revision (done, unreviewed).** On this branch the fixed
+  loader-reentry executor loads this campaign format instead of the Core-0
+  one, pins campaign `9a582f1c…`, hashes both campaign modules, describes
+  the two mutable sectors and the zero region-0 operations in its policy
+  descriptor, and keeps every journal, barrier, live-region and strict-close
+  rule unchanged. Both live gates stay false; the CLI, every live entry
+  point and both USB backends refuse before any journal state is published
+  or a device is opened. The proof-boot expectation is identical: the loader
+  self-enumerates `10f5:5037` at a new USB address, then the restore
+  direction returns exact stock. The Core-0-bound executor revisions remain
+  on their own branches.
 - **Independent review** of the proof image, the builder, the simulation
   argument above and the executor revision.
 - **Hardware facts and checker** entries for the region-1 proof identity

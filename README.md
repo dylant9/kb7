@@ -74,8 +74,9 @@ image generation is disabled.
   `region1-reentry-proof` sits at the stock application entry and re-enters
   the preserved loader, and a
   [40-operation single-sector patch campaign](docs/REGION1-REENTRY-CAMPAIGN-2026-09-05.md)
-  is built and simulated offline. No executor consumes it yet, it is
-  unreviewed, and it has not run on hardware.
+  is built and simulated offline, and the fixed executor on that branch is
+  bound to it with both live gates false. It is unreviewed and has not run
+  on hardware.
 - The flash-access tooling adds proven external SPI recovery workflows,
   read-only USB-ISP diagnostics and fixed, dry-run-default USB mutation
   experiments. On 2026-08-23 one guarded V1.22 cycle at offset `0x0008e000`

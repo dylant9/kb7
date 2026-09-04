@@ -18,8 +18,10 @@ ROOT = Path(__file__).resolve().parents[2]
 EXECUTOR_PATH = (
     ROOT / "tools" / "flash-access" / "kb7-loader-reentry-executor.py")
 CAMPAIGN_PATH = (
-    ROOT / "tools" / "flash-access" / "kb7-loader-reentry-campaign.py")
+    ROOT / "tools" / "flash-access" / "kb7-region1-reentry-campaign.py")
 PLAN_TEST_PATH = ROOT / "pc_app" / "tests" / "test_updater_plan.py"
+REGION1_TEST_PATH = (
+    ROOT / "pc_app" / "tests" / "test_region1_reentry_campaign.py")
 
 
 def load_module(name: str, path: Path):
@@ -33,6 +35,8 @@ def load_module(name: str, path: Path):
 
 EXECUTOR = load_module("kb7_loader_reentry_executor_tested", EXECUTOR_PATH)
 PLAN_TEST = load_module("kb7_updater_plan_fixture_for_executor", PLAN_TEST_PATH)
+REGION1_TEST = load_module(
+    "kb7_region1_reentry_campaign_fixture_for_executor", REGION1_TEST_PATH)
 PLANNER = EXECUTOR._planner
 
 
@@ -130,22 +134,22 @@ class _ExecutorFixture(unittest.TestCase):
         cls._temporary = tempfile.TemporaryDirectory(
             prefix="kb7-loader-reentry-executor-tests-")
         cls.root = Path(cls._temporary.name)
-        cls.baseline, cls.anchors = PLAN_TEST.synthetic_baseline()
+        cls.baseline, cls.anchors = \
+            REGION1_TEST.region1_with_populated_patch_sector()
         cls.baseline_a = cls.root / "baseline-a.bin"
         cls.baseline_b = cls.root / "baseline-b.bin"
         cls.baseline_a.write_bytes(cls.baseline)
         cls.baseline_b.write_bytes(cls.baseline)
-        cls.proof_elf = cls.root / "proof-core0.elf"
+        cls.proof_elf = cls.root / "proof-core1.elf"
         cls.proof_elf.write_bytes(b"synthetic proof ELF")
-        cls.raw = PLAN_TEST.replacement_raw(PLANNER.CORE0)
+        cls.raw = REGION1_TEST.synthetic_raw()
         cls.proof_identity = {
-            "entry": "0x00000301",
+            "entry": "0x1004a525",
             "raw_length": len(cls.raw),
             "raw_sha256": PLANNER.sha256(cls.raw),
         }
 
-        def extractor(_elf: Path, _spec: object, _prefix: str,
-                      destination: Path):
+        def extractor(_elf: Path, _prefix: str, destination: Path):
             destination.write_bytes(cls.raw)
             return cls.raw, {
                 **cls.proof_identity,
@@ -501,19 +505,21 @@ class LoaderReentryExecutorTests(_ExecutorFixture):
                 self.events.append(("close",))
 
         barrier = int(self.transaction.descriptor[
-            "install_core1_barrier"]["absolute_sector_offset"], 0)
+            "install_barrier"]["absolute_sector_offset"], 0)
+        patch = PLANNER.CORE1_START + EXECUTOR._campaign.PATCH_SECTOR
         for index, operation in enumerate(self.transaction.operations):
             device = Device()
             backend = EXECUTOR.FixedProofMutationBackend(
                 self.transaction, index, device_factory=lambda: device)
             backend.execute()
-            in_core0 = (PLANNER.CORE0_START <= operation.offset and
+            in_patch = (patch <= operation.offset and
                         operation.offset + operation.length <=
-                        PLANNER.CORE0_ENVELOPE_END)
+                        patch + PLANNER.SECTOR_BYTES)
             in_barrier = (barrier <= operation.offset and
                           operation.offset + operation.length <=
                           barrier + PLANNER.SECTOR_BYTES)
-            self.assertTrue(in_core0 or in_barrier)
+            self.assertTrue(in_patch or in_barrier)
+            self.assertGreaterEqual(operation.offset, PLANNER.CORE1_START)
             self.assertEqual(device.events[0], (
                 "cmd", (bytes([0xF6, EXECUTOR._writer.SUB_EX4B]) +
                         bytes(14)).hex(), 0))
@@ -1208,7 +1214,7 @@ class LoaderReentryLockTests(_ExecutorFixture):
         self.assertFalse(EXECUTOR.LIVE_PROOF_CAMPAIGN_ENABLED)
         self.assertEqual(
             EXECUTOR.EXPECTED_CAMPAIGN_ID,
-            "1ce62e95ee2c6c84b5abb8996f7964bacae661869152ead20f5c7138b2b0b508")
+            "9a582f1cf35ccb219d5477299ece6caa1285fcbff448e7901fdcaaae83e5c267")
         self.assertEqual(EXECUTOR.EXPECTED_IMPLEMENTATION_HASHES,
                          dict(EXECUTOR.IMPLEMENTATION_HASHES))
         self.assertEqual(EXECUTOR.EXPECTED_POLICY_SHA256,
@@ -1285,7 +1291,7 @@ class LoaderReentryLockTests(_ExecutorFixture):
             "preflight",
             "--baseline-a", str(self.baseline_a),
             "--baseline-b", str(self.baseline_b),
-            "--proof-core0-elf", str(self.proof_elf),
+            "--proof-core1-elf", str(self.proof_elf),
             "--campaign", str(self.campaign_dir),
             "--journal", str(self.journal),
         ]
@@ -1302,7 +1308,7 @@ class LoaderReentryLockTests(_ExecutorFixture):
             "preflight",
             "--baseline-a", str(self.baseline_a),
             "--baseline-b", str(self.baseline_b),
-            "--proof-core0-elf", str(self.proof_elf),
+            "--proof-core1-elf", str(self.proof_elf),
             "--campaign", str(self.campaign_dir),
             "--journal", str(self.journal),
             "--commit",
@@ -1333,7 +1339,7 @@ class LoaderReentryLockTests(_ExecutorFixture):
             "preflight",
             "--baseline-a", str(self.baseline_a),
             "--baseline-b", str(self.baseline_b),
-            "--proof-core0-elf", str(self.proof_elf),
+            "--proof-core1-elf", str(self.proof_elf),
             "--campaign", str(self.campaign_dir),
             "--journal", str(self.journal),
             "--commit",

@@ -2,11 +2,12 @@
 """Fixed loader-reentry proof installer/restorer; dry-run by default.
 
 This is intentionally separate from ``kb7-updater-executor.py``.  It accepts
-only a campaign independently rederived by ``kb7-loader-reentry-campaign.py``;
+only a campaign independently rederived by ``kb7-region1-reentry-campaign.py``;
 there is no offset, payload, CDB, operation-index, retry, or general firmware
 execution option.  One committed ``step`` executes exactly one internally
-selected canonical operation in the Core-0 envelope or the one fixed Core-1
-barrier sector.
+selected canonical operation in the region-1 patch sector or the one fixed
+region-1 poison sector.  Region 0, the header, the loader and the manifest are
+never written by this revision.
 
 Every live read is compared byte-exact against the modelled boundary image
 below the post-image live region.  The live region (stock settings storage
@@ -59,8 +60,8 @@ def _load_module(name: str, path: Path):
 
 
 _campaign = _load_module(
-    "kb7_loader_reentry_campaign_for_executor",
-    TOOL_DIRECTORY / "kb7-loader-reentry-campaign.py")
+    "kb7_region1_reentry_campaign_for_executor",
+    TOOL_DIRECTORY / "kb7-region1-reentry-campaign.py")
 _planner = _campaign._planner
 _writer = _load_module(
     "kb7_isp_writer_for_loader_reentry_executor",
@@ -82,20 +83,22 @@ LIVE_REGION_END = _planner.FLASH_BYTES
 LIVE_READ_ONLY_PREFLIGHT_ENABLED = False
 LIVE_PROOF_CAMPAIGN_ENABLED = False
 EXPECTED_CAMPAIGN_ID = (
-    "1ce62e95ee2c6c84b5abb8996f7964bacae661869152ead20f5c7138b2b0b508")
+    "9a582f1cf35ccb219d5477299ece6caa1285fcbff448e7901fdcaaae83e5c267")
 EXPECTED_IMPLEMENTATION_HASHES: dict[str, str] = {
     "campaign_source_sha256":
+        "7b4d83f3bc162fb7adbc679083f786d54aa2edd466a12db07426ced601a34b58",
+    "core0_campaign_source_sha256":
         "8d8153c95ca45c81cc5c0a06c463894d98f519a5b142348592e3472b8a7ef980",
     "planner_source_sha256":
         "618bed76c236390c8203ef5395db2317dfce9cce620035bda05231fc05727d0a",
-    "verifier_source_sha256":
-        "9b19d393cf64c66168e08de2f3d4fe352a85a2fd69545e374dee0fa015dea338",
     "writer_source_sha256":
         "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
+    "verifier_source_sha256":
+        "9b19d393cf64c66168e08de2f3d4fe352a85a2fd69545e374dee0fa015dea338",
 }
 EXPECTED_POLICY_SHA256 = (
-    "2f9f78e387e39b42fedfd2efa16999cb95abd21db8ed13b4f0988278cefa0dd4")
-EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "0d5a8ad6127d2b953d0ad8acb1178a9ccdc46362f38f71b6797db99f38f17c13"
+    "7786dcee0662f85cb4a6a2c4b95adec88fef3b9de2959c5d75f0ffac1bd799e7")
+EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "24ad0392c0bf1c7949d131282cc2d9e6b67e8ffd588c55df4db6d98301e117a0"
 
 PREFLIGHT_STARTED = "preflight_started"
 BOUNDARY_VERIFIED = "boundary_verified"
@@ -185,6 +188,8 @@ def _source_sha256(path: str | os.PathLike[str]) -> str:
 def implementation_hashes() -> dict[str, str]:
     return {
         "campaign_source_sha256": _source_sha256(_campaign.__file__),
+        "core0_campaign_source_sha256": _source_sha256(
+            _campaign._core0_campaign.__file__),
         "planner_source_sha256": _source_sha256(_planner.__file__),
         "writer_source_sha256": _source_sha256(_writer.__file__),
         "verifier_source_sha256": _source_sha256(_writer._verify.__file__),
@@ -216,11 +221,13 @@ IMPLEMENTATION_HASHES = MappingProxyType(implementation_hashes())
 def policy_descriptor() -> dict[str, object]:
     return {
         "schema": JOURNAL_SCHEMA,
-        "domain": "fixed V1.22 proof Core0 install and exact stock restore",
+        "domain": ("fixed V1.22 region-1 patch proof install and exact stock "
+                   "restore; region 0 untouched"),
         "mutation_ranges": [
-            "Core0 envelope [0x00011000,0x00021000)",
-            "one campaign-bound Core1 barrier sector",
+            "region-1 patch sector [0x0006b000,0x0006c000)",
+            "one campaign-bound region-1 poison sector",
         ],
+        "region0_operation_count": 0,
         "one_operation_per_cli_invocation": True,
         "durable_terminal_intent_before_backend_or_usb": True,
         "live_authorization_checked_before_journal_publication_and_backend":
@@ -260,9 +267,11 @@ def policy_descriptor() -> dict[str, object]:
         "fixed_proof_hardware_test_authorized": False,
         "authorized_campaign_id": EXPECTED_CAMPAIGN_ID,
         "authorization_scope": (
-            "paused pending exact short-chunk USB read-reliability evidence"),
+            "region-1 patch campaign bound; offline only pending independent "
+            "review"),
         "usb_read_reliability_gate": (
-            "fixed baseline-aware 512/1024/2048/4096-byte sweep required"),
+            "fixed baseline-aware 512/1024/2048/4096-byte sweep passed "
+            "2026-09-02"),
         "generic_executor_live_mutation_enabled": False,
     }
 
@@ -993,7 +1002,7 @@ class FixedProofMutationBackend:
             mode = _writer.set_address_mode_for_range(
                 self._device, operation.offset, operation.length)
             if mode != _writer.SUB_EX4B:
-                raise ExecutorError("Core-0 operation did not select F6 18")
+                raise ExecutorError("campaign operation did not select F6 18")
             if operation.action == "program":
                 cdb = _writer.cdb_program(operation.offset, _planner.BLOCK_BYTES)
                 if cdb.hex() != trace["cdb_hex"] or operation.payload is None or \
@@ -1373,8 +1382,8 @@ def _print_plan(command: str, transaction: Transaction,
     print(f"proof     : sha256 {_planner.sha256(transaction.campaign.proof_image)}")
     print(f"operations: {transaction.install_count} install + "
           f"{len(transaction.operations) - transaction.install_count} restore")
-    print("mutable   : Core0 envelope + one fixed Core1 barrier sector")
-    print("preserved : header, loader, manifest, all flash after Core1")
+    print("mutable   : region-1 patch sector + one fixed region-1 poison sector")
+    print("preserved : header, loader, manifest, region 0, all flash after region 1")
     print(f"live      : 0x{LIVE_REGION_START:08x}-0x{LIVE_REGION_END:08x} "
           "recorded and stability-checked, not baseline-exact")
     print("general fw: mutation hard-disabled")
@@ -1396,7 +1405,7 @@ def _parser() -> argparse.ArgumentParser:
         sub = commands.add_parser(name)
         sub.add_argument("--baseline-a", required=True, type=Path)
         sub.add_argument("--baseline-b", required=True, type=Path)
-        sub.add_argument("--proof-core0-elf", required=True, type=Path)
+        sub.add_argument("--proof-core1-elf", required=True, type=Path)
         sub.add_argument("--campaign", required=True, type=Path)
         sub.add_argument("--journal", required=True, type=Path)
         if name != "inspect":
@@ -1410,7 +1419,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         transaction = load_transaction(
             args.campaign, args.baseline_a, args.baseline_b,
-            args.proof_core0_elf)
+            args.proof_core1_elf)
         journal = None
         if args.command != "preflight" and args.journal.exists():
             journal = load_journal(args.journal)
