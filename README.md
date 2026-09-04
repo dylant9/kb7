@@ -67,6 +67,15 @@ image generation is disabled.
   locked and `flash_approved=false`. See the
   [fixed proof campaign](docs/LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md) and
   [read-reliability incident](docs/USB-ISP-READ-RELIABILITY-INCIDENT-2026-08-31.md).
+- On 2026-09-05 the first hardware step changed to a region-1-only image
+  with stock Core 0 kept in place. The
+  [stock Core 0 to region-1 boot contract](docs/STOCK-CORE0-REGION1-CONTRACT-2026-09-05.md)
+  is decoded and pinned by a read-only verifier, a 404-byte
+  `region1-reentry-proof` sits at the stock application entry and re-enters
+  the preserved loader, and a
+  [40-operation single-sector patch campaign](docs/REGION1-REENTRY-CAMPAIGN-2026-09-05.md)
+  is built and simulated offline. No executor consumes it yet, it is
+  unreviewed, and it has not run on hardware.
 - The flash-access tooling adds proven external SPI recovery workflows,
   read-only USB-ISP diagnostics and fixed, dry-run-default USB mutation
   experiments. On 2026-08-23 one guarded V1.22 cycle at offset `0x0008e000`
@@ -175,6 +184,9 @@ records the exact static result and its still-unrun hardware gate. The
 [fixed proof campaign and runbook](docs/LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md)
 records the owner-bound, independently reverified offline installer/restorer
 and its separate live-enable lock. The
+[region-1 boot contract](docs/STOCK-CORE0-REGION1-CONTRACT-2026-09-05.md) and
+[region-1 patch campaign](docs/REGION1-REENTRY-CAMPAIGN-2026-09-05.md) record
+the 2026-09-05 pivot that keeps stock Core 0 installed. The
 [bounded USB-ISP validation record](docs/USB-ISP-WRITE-VALIDATION-2026-08-23.md),
 [guarded erase-footprint result](docs/USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md),
 [flash-access guide](tools/flash-access/README.md), and

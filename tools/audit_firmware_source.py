@@ -177,12 +177,16 @@ def main() -> int:
                       if "OBJCOPY" in line and "-O binary" in line]
     if binary_exports != [
             "$(OBJCOPY) -O binary build/core0.elf "
-            "build/loader-reentry-proof-core0.bin; \\"]:
+            "build/loader-reentry-proof-core0.bin; \\",
+            "$(OBJCOPY) -O binary $$elf build/region1-reentry-proof.bin; \\"]:
         failures.append("firmware Makefile has an unreviewed core-image export")
     if "-mcpu=cortex-m3" not in makefile or "-mcpu=cortex-m4" in makefile:
         failures.append("firmware compiler target is not Cortex-M3")
     for marker in ("CORE0_ASM := drivers/recovery_trampoline.S",
                    "recovery-proof:",
+                   "region1-reentry-proof:",
+                   "REGION1_PROOF_ASM := drivers/recovery_trampoline.S",
+                   "test \"$$entry\" = 0x1004a525",
                    "kb7_loader_trampoline_blob_start",
                    "kb7_loader_trampoline_start",
                    "a8c82aa423cc089a563fed7bf2f319f39b2945addf065b47849c04c4d7c793eb",

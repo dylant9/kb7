@@ -16,6 +16,7 @@ firmware-check:
 	$(MAKE) -C replacement_fw audit-profile
 	$(MAKE) -C replacement_fw integration-check
 	$(MAKE) -C replacement_fw recovery-proof
+	$(MAKE) -C replacement_fw region1-reentry-proof
 	$(MAKE) -C replacement_fw clean
 
 hardware-check:
