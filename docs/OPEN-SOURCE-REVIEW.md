@@ -41,14 +41,16 @@ that the contributor does not possess.
   needed to reproduce the protocol; no stock instruction bytes, raw binary,
   disassembly or decompiler output is included.
 - Independently authored fixed proof-campaign and owner-campaign-bound executor
-  source, mutation-locked; the read-reliability gate passed on 2026-09-02.
+  source; the read-reliability gate passed on 2026-09-02, and on this branch
+  the executor is bound to the reviewed region-1 patch campaign with both
+  gates enabled for that identity only.
   The builder derives a checksum-valid clean-room Core 0 plus exact stock Core 1
   and an exact-stock reverse sequence; the executor exposes no raw flash fields
   and pins the independently rederived owner campaign identity. Later evidence
   separates a SPI-confirmed two-byte physical corruption from a post-restore
   command-aligned USB acquisition failure, since traced to NOR lead stubs.
-  Proof mutation remains locked; the read-only preflight is enabled only on
-  the separate preflight-only branch. The public machine record includes only
+  The Core-0 campaign identity remains locked; the region-1 campaign's
+  gates are enabled on this branch only. The public machine record includes only
   hashes, operation counts, fixed geometry, bounded authorization flags and
   the proof boundary, which remains unexecuted on hardware. Private campaign descriptors, sector images,
   baselines and journals remain excluded. See the
@@ -116,9 +118,10 @@ No external scripts, fonts, images, packages, or vendored libraries are bundled.
   installable image. Its ELF is only planner-compatible; the ordinary Makefile
   still cannot emit a bundle, and the paired-firmware executor remains
   mutation-locked. The separate fixed proof executor pins the independently
-  rederived private campaign ID and is locked: both its read-only preflight and
-  mutation gates are false in the CLI, the live entry points and both USB
-  backends. It does not authorize a general device run or host recovery opcode.
+  rederived private region-1 campaign ID; on this branch both its gates are
+  true for that identity only, and any other identity is refused in the CLI,
+  the live entry points and both USB backends. It does not authorize a
+  general device run or host recovery opcode.
 
 ## Excluded and retained only outside the public repository
 

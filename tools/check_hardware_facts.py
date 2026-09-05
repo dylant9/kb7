@@ -1280,7 +1280,7 @@ def validate_region1_campaign(evidence: dict[str, object]) -> None:
         "runs": 1,
         "read_only_preflight_2026_09_05_revision": "region1-reentry-preflight-only",
         "read_only_preflight_2026_09_05_executor_source_sha256":
-            "ba487415d24a0af4cdbf05116ba3592a890a3f1005eaabae34d503aee3477632",
+            "f59ca0b0dd2786ea739f0a7dcf56eae88917725400ce94a0d07f229422492916",
         "read_only_preflight_2026_09_05_exit_status": 0,
         "read_only_preflight_2026_09_05_journal_status": "boundary_verified",
         "read_only_preflight_2026_09_05_boundary_index": 0,

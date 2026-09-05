@@ -147,23 +147,23 @@ because the loader checks manifest regions, not the header. A read fault
 during the region-1 copy is exactly what trips the first-word check, so
 short SPI lead stubs matter for this boot as much as for the reads.
 
-## What is still missing before hardware
+## Status on this branch
 
-- **Executor revision (done, unreviewed).** On this branch the fixed
-  loader-reentry executor loads this campaign format instead of the Core-0
-  one, pins campaign `9a582f1c…`, hashes both campaign modules, describes
-  the two mutable sectors and the zero region-0 operations in its policy
-  descriptor, and keeps every journal, barrier, live-region and strict-close
-  rule unchanged. Both live gates stay false; the CLI, every live entry
-  point and both USB backends refuse before any journal state is published
-  or a device is opened. The proof-boot expectation is identical: the loader
-  self-enumerates `10f5:5037` at a new USB address, then the restore
+- **Executor.** The fixed loader-reentry executor loads this campaign
+  format instead of the Core-0 one, pins campaign `9a582f1c…`, hashes both
+  campaign modules, describes the two mutable sectors and the zero region-0
+  operations in its policy descriptor, and keeps every journal, barrier,
+  live-region and strict-close rule unchanged. On this branch both live
+  gates are true for that identity only. The proof-boot expectation: the
+  loader self-enumerates `10f5:5037` at a new USB address, then the restore
   direction returns exact stock. The Core-0-bound executor revisions remain
   on their own branches.
-- **Independent review** of the proof image, the builder, the simulation
-  argument above and the executor revision.
-- **Hardware facts and checker** entries for the region-1 proof identity
-  and the campaign, mirroring the Core-0 records.
-- The read-reliability and live-region preflight results carry over
-  unchanged; a new preflight is still required because journals bind the
-  executor source hash.
+- **Reviews.** The offline revision was independently reviewed on
+  2026-09-05 (clean with non-blocking notes, closed), and the
+  mutation-enabled revision the same evening (clean with non-blocking
+  notes, closed in the commit after it).
+- **Hardware.** The read-only preflight passed on 2026-09-05
+  ([record](REGION1-REENTRY-PREFLIGHT-2026-09-05.md)). The campaign itself
+  has not run; the [runbook](REGION1-REENTRY-RUNBOOK-2026-09-05.md) governs
+  the session, which starts with a fresh preflight because journals bind
+  the executor source hash.

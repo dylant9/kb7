@@ -42,16 +42,30 @@ preflight; a journal from one revision is refused by the next.
   `tools/flash-access/README.md`. Expect exit 3 as a plausible outcome; the
   campaign issues about 160 full-chip reads, and any single wrong read after
   an intent ends it.
-- Automount provably off for the session (`systemctl mask --runtime
-  udisks2`, empty `lsblk` mount column). usb-storage probes the loader
-  between steps.
+- Automount provably off for the session: `systemctl mask --runtime --now
+  udisks2`, then require `systemctl is-active udisks2` to print `inactive`
+  and `lsblk`/`mount` to show no `10f5` device before the first `--commit`.
+  A mask alone does not stop a running instance. usb-storage still probes
+  the loader between steps; after entering the loader read
+  `/sys/bus/usb/devices/3-2.2/power/control` and set it to `on` if it reads
+  `auto`, since the loader is a new device and gets the default policy.
 - Temporary sudo drop-in for the session, removed afterwards. The
   executor's journal is root-owned; run `inspect` under sudo too.
 - Every `--commit` run as a transient root service (`sudo systemd-run
   --unit … --collect --property=WorkingDirectory=… --setenv=PYTHONDONTWRITEBYTECODE=1
-  /bin/sh -c '… > log 2>&1; echo exit=$? >> log'`) and its log polled;
-  background shells were killed mid-run in earlier sessions, and a hang-up
-  after an intent is an exit 3.
+  /bin/sh -c '/usr/bin/python3 … > log 2>&1; echo exit=$? >> log'`) and its
+  log polled; background shells were killed mid-run in earlier sessions,
+  and a hang-up after an intent is an exit 3. Name the interpreter by
+  absolute path: the service resolves `/usr/bin/python3` (3.14 on this
+  host) while the offline checks ran under 3.13; every pin and the campaign
+  identity recompute identically under both, and the first journal of the
+  session must show `executor_source_sha256` equal to this revision's
+  executor source and `implementation_sha256` `bbb87032…`. `systemctl stop`
+  or a collected failure SIGTERMs the whole unit, so the `exit=` line is
+  never written and the journal stays at its last published state, which
+  after an intent is `intent` (`inspect` reports `external_spi_only`); the
+  redirected log file is the only record because `--collect` discards the
+  unit's journal entry.
 
 ## Sequence
 
@@ -68,9 +82,26 @@ All commands take `--baseline-a`, `--baseline-b` (the two exact captures),
    first.
 3. `step --commit`, one process per operation, twenty times. The driver
    loop must run `inspect` between steps and stop on anything but
-   `boundary_verified`. Operations 1 to 9 rebuild the patch sector under
-   the poison and the erased gate; 10 to 19 restore the poison sector; 20
-   programs the gate. After step 20 the journal reads `proof_installed`.
+   `boundary_verified`. Operation indices are 0-based, as in the campaign
+   descriptor: operation 0 is the poison program; 1 erases the patch sector
+   and 2 to 9 program it under the poison and the erased gate; 10 erases
+   the poison sector and 11 to 18 program it back to stock; 19 programs the
+   gate. After the twentieth step the journal reads `proof_installed`.
+
+   Operations 0 and 19 (and 20 and 39 in the restore direction) are the
+   first `F6 06` programs this unit has ever received onto a 512-byte block
+   that already holds data: the payload equals the block's current bytes
+   with a few bits cleared, and the model treats the program as a bitwise
+   AND. Every validated program so far targeted erased bytes. The campaign
+   is ordered so that this assumption is tested at the cheapest point:
+   operation 0 touches only the poison sector `0x22000`. If the loader's
+   program path does anything other than a plain page program, the post-read
+   fails or the command errors, and the campaign ends with exit 3 before the
+   patch sector has been touched, with the loader, header, manifest and
+   region 0 untouched. An exit 3 at step 0 whose mismatch is confined to
+   sector `0x22000` is therefore this cause, not a read fault. Record the
+   observed behaviour of the first programmed-block program as a result of
+   the run either way.
 4. Power-cycle. Stock region 0 boots, copies the patched region 1 into
    DRAM, calls the proof at `0x1004a525`; the proof masks interrupts,
    takes VTOR, writes the loader marker and relocates the preserved loader
@@ -81,9 +112,9 @@ All commands take `--baseline-a`, `--baseline-b` (the two exact captures),
 5. `validate-reentry --commit`: two full-chip reads must equal the exact
    proof image below the live region, with the live region as recorded.
    Journal `restore_ready`.
-6. `step --commit` twenty more times: poison, rebuild the patch sector to
-   stock with the restore gate erased, restore the poison sector, program
-   the restore gate. Journal `complete`.
+6. `step --commit` twenty more times (operations 20 to 39): poison,
+   rebuild the patch sector to stock with the restore gate erased, restore
+   the poison sector, program the restore gate. Journal `complete`.
 7. `finalize --commit`: two reads equal the exact baseline below the live
    region; the journal is cleared.
 8. Verifier capture with `kb7-isp-verify.py`; then cold boot and require
@@ -97,6 +128,7 @@ All commands take `--baseline-a`, `--baseline-b` (the two exact captures),
 | 4 | state inspection required | run `inspect` locally; no USB action |
 | 5 | read-only preflight stopped on transport | no mutation happened; power-cycle before a new journal |
 | 6 | read-only preflight readback did not establish the baseline | verify by external SPI; write only if the independent read differs |
+| 6 from `step` | a leftover `preflight_started` journal | not an SPI case: follow the original preflight output, move the journal aside, start a new preflight |
 | 3 | external SPI recovery required | no further USB command in this powered session; full-chip SPI restore, then restart from step 0 with a new journal |
 
 An exit 3 from `validate-reentry` or `finalize` comes from a read-only

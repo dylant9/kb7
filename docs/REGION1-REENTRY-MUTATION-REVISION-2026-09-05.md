@@ -56,6 +56,12 @@ Points specific to this revision:
 - Before `validate-reentry`, read `/sys/bus/usb/devices/3-2.2/idProduct`
   (`5037`) and `devnum` passively and compare `devnum` with the journal's
   `current_usb_address`; if equal, power-cycle again first.
+- Operation 0 is the first `F6 06` onto an already-programmed block this
+  unit has received; the runbook explains why an exit 3 there, confined to
+  sector `0x22000`, is that assumption failing safely rather than a read
+  fault. Name `/usr/bin/python3` in the service command line and confirm
+  the first journal's `executor_source_sha256` is this revision's executor
+  source before continuing.
 
 ## Proof boundary
 

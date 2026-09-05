@@ -62,9 +62,10 @@ image generation is disabled.
   failed CRCs, so it is not current pass/fail authority. The fixed
   baseline-aware short-read sweep passed on 2026-09-02 once the NOR lead stubs
   were removed, and the read-only preflight passed on 2026-09-03 under the
-  post-image live-region policy on the separate preflight-only branch. Proof
-  mutation remains locked here. The general paired-firmware executor remains
-  locked and `flash_approved=false`. See the
+  post-image live-region policy on the separate preflight-only branch. The
+  Core-0 campaign identity stays locked on this branch; the executor here is
+  bound to the region-1 campaign instead (next bullet). The general
+  paired-firmware executor remains locked and `flash_approved=false`. See the
   [fixed proof campaign](docs/LOADER-REENTRY-PROOF-CAMPAIGN-2026-08-23.md) and
   [read-reliability incident](docs/USB-ISP-READ-RELIABILITY-INCIDENT-2026-08-31.md).
 - On 2026-09-05 the first hardware step changed to a region-1-only image
@@ -287,11 +288,13 @@ bundle` deliberately fails: no installable package can be produced by that
 target. The fixed loader-reentry campaign builder can balance this exact proof
 ELF against two exact owner baselines, but emits only private,
 execution-unapproved sector payloads and model metadata. Its separate executor
-pins the exact reviewed owner campaign ID, but both its USB preflight and
-mutation paths are hard-disabled in the CLI, the live entry points and both
-USB backends. The fixed short-chunk read-reliability gate passed on
-2026-09-02 once the NOR lead stubs were removed; re-enabling even the
-read-only preflight remains a separate reviewed revision.
+pins the exact reviewed owner campaign ID. On this branch that executor is
+bound to the reviewed region-1 patch campaign and is the mutation-enabled
+revision for it: the read-only preflight and the fixed 40-operation install
+and exact-stock restore are enabled for that campaign identity only, after
+its 2026-09-05 review and preflight pass. Any other campaign, any pin drift
+and the general paired-firmware executor stay refused in the CLI, the live
+entry points and both USB backends, and `flash_approved=false`.
 
 ## Public-repository boundary
 

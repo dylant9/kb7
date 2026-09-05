@@ -330,8 +330,10 @@ PROFILES: dict[str, Region0Profile] = {
         ),
         # MOV.W/ORR modified immediates equal to the single bit 0x10000000:
         # shift operands in arithmetic helpers and register values passed to
-        # peripheral-setup helpers.  None is loaded as a pointer.
-        loader_closure_aperture_bit_immediates=(0x1246, 0x7C6A, 0x7CE2, 0x7DB6, 0x7F56),
+        # peripheral-setup helpers (0x7838 is an ORR).  None is loaded as a
+        # pointer.
+        loader_closure_aperture_bit_immediates=(
+            0x1246, 0x7838, 0x7C6A, 0x7CE2, 0x7DB6, 0x7F56),
         loader_app_pointer_store_call_offset=0x596C,
         loader_app_pointer_store_offset=0x5A68,
         loader_launch_call_offset=0x5978,
@@ -824,6 +826,14 @@ def _constants_in_ranges(
                     immediates[offset] = decoded[3]  # MOV.W modified immediate
             elif decoded[0] == "movt" and decoded[2] in pending:
                 pointers.add((decoded[3] << 16) | pending.pop(decoded[2]))
+            elif decoded[0] in ("and_imm", "bic_imm", "orr_imm", "eor_imm",
+                                "add_imm", "sub_imm") and size == 4:
+                # Modified-immediate data processing (ORR/ADD/... #imm) can
+                # materialize an address just as MOV.W can; ADD/SUB with a
+                # plain 12-bit immediate is included harmlessly.
+                immediates[offset] = decoded[4]
+            elif decoded[0] == "tst_imm" and size == 4:
+                immediates[offset] = decoded[3]
             offset += size
         _require(offset == end, f"range ending at {hex32(end)} splits an instruction")
     return pointers, immediates

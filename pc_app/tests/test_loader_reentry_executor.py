@@ -1207,7 +1207,7 @@ class LoaderReentryExecutorTests(_ExecutorFixture):
 
 
 class LoaderReentryLockTests(_ExecutorFixture):
-    """Production constants: both gates false, owner campaign pin in force."""
+    """Production constants: gates as pinned for this revision, owner campaign pin in force."""
 
     def test_exact_reviewed_campaign_authorized_for_preflight_and_proof_mutation(
             self) -> None:
@@ -1372,7 +1372,7 @@ class LoaderReentryLockTests(_ExecutorFixture):
         self.assertIn("write only if", text)
         self.assertNotIn("EXTERNAL SPI RECOVERY REQUIRED", text)
 
-    def test_backends_refuse_to_open_a_device_while_relocked(self) -> None:
+    def test_backends_refuse_to_open_a_device_without_reviewed_authorization(self) -> None:
         opened: list[str] = []
 
         def factory():
@@ -1402,7 +1402,7 @@ class LoaderReentryLockTests(_ExecutorFixture):
                     self.transaction, 0, device_factory=factory)
         self.assertEqual(opened, [])
 
-    def test_live_entry_points_refuse_before_journal_publication_while_relocked(
+    def test_live_entry_points_refuse_before_journal_publication_without_reviewed_authorization(
             self) -> None:
         constructed: list[str] = []
 
