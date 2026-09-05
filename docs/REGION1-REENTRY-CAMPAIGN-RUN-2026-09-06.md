@@ -73,3 +73,23 @@ re-enter the loader. That is a use of a region-0 service, so its closure
 (`0x6264`, `0x6028`, `0x70b0`, `0x614c`, `0x7560`, `0x72e8`) must be pinned
 and shown to stay inside region 0, and the proof image, campaign identity
 and every pin change with it. The unit must be restored to stock first.
+
+## Addendum: what the loader itself does with the clock
+
+The loader's own boot path (closure from its reset vector `0x2c8`, 238
+ranges) never programs the PLL or the clock select. Its clock routine at
+`0x45a4` sets two enable bits in `SYS0+0`, waits for the ready bits in
+`SYS0+8`, runs a register script whose table at `0xb158` is empty, writes
+`0xffff` to `SYS1+0xc` (all clock gates and resets on) and then derives the
+flash-controller divider from a hard-coded 162 MHz (`0x45ea`: the smallest
+shift that brings 162 MHz under 40 MHz, written into `0x40022000` bits
+15:12). Region 0's switch to 198 MHz writes `SYS0+0xc` three times
+(`0x718c`, `0x71be`, `0x72ae`); the loader never writes that register. So
+the loader assumes the clock it inherits is 162 MHz, which holds after the
+mask ROM's cold boot and after the stock re-entry, and did not hold after
+the proof's reset. The loader's USB timing is derived from the same
+assumption, which is the most likely mechanism of the silent failure.
+
+Also checked and not a gap: the loader re-enables the USB PHY
+(`0x45000110`) and all `SYS1` gates itself, and read-modify-writes the pin
+routing register `SYS0+0x20` that region 0 zeroes at boot.
