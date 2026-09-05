@@ -25,6 +25,15 @@ The restore direction repeats the structure back to exact stock.  Every
 byte-prefix state of every operation is enumerated and its region-1 checksum
 computed; none may validate except the two exact targets.
 
+Unlike the Core-0 campaign, the poison is not an independent barrier for the
+sector being rebuilt: the poison sector and the patch sector are terms of the
+same region-1 checksum sum, so for a physical sector state outside the
+byte-prefix model the poison only changes which single 32-bit CRC value would
+validate.  The protection against such states is the exact enumeration under
+the model plus the 2**-32 coincidence bound per unmodeled state; the bounded
+consequence of that coincidence is a torn region 1 running under intact stock
+region 0, which hangs or faults, followed by the external SPI restore.
+
 No USB library is imported and no hardware execution is authorized here.
 """
 
@@ -77,6 +86,8 @@ REGION1_ENTRY = 0x1004A525
 PATCH_OFFSET = REGION1_ENTRY - REGION1_VMA - 1  # 0x4a524, region-1 relative
 PATCH_SECTOR = PATCH_OFFSET & ~(0x1000 - 1)      # 0x4a000
 PATCH_SECTOR_END = PATCH_SECTOR + 0x1000
+STOCK_MAIN_LENGTH = 0x2D4  # bytes of the stock main routine the patch may replace
+PATCH_WINDOW_END = PATCH_OFFSET + STOCK_MAIN_LENGTH
 EXPECTED_PROOF_RAW = {
     "entry": f"0x{REGION1_ENTRY:08x}",
     "raw_length": 404,
@@ -223,8 +234,9 @@ def build_patched_region(stock: bytes, raw: bytes) -> tuple[bytes, bytes, dict[s
     require(_planner.fwin_checksum(stock) == SPEC.manifest_checksum,
             "stock region 1 does not carry the manifest checksum")
     require(raw and len(raw) % 4 == 0 and
-            PATCH_OFFSET + len(raw) + 8 <= PATCH_SECTOR_END,
-            "proof code plus fixup and gate words do not fit the patch sector")
+            PATCH_OFFSET + len(raw) + 8 <= PATCH_WINDOW_END,
+            "proof code plus fixup and gate words do not fit inside the stock "
+            "main routine's window")
     fixup_offset = PATCH_OFFSET + len(raw)
     gate_offset = fixup_offset + 4
     region = bytearray(stock)
@@ -246,9 +258,9 @@ def build_patched_region(stock: bytes, raw: bytes) -> tuple[bytes, bytes, dict[s
                                        gate_offset - chunk_start)
     require(patch_rank == 32 and gate_rank == 32,
             "CRC correction/gate transform is not bijective")
-    require(target[:PATCH_SECTOR] == stock[:PATCH_SECTOR] and
-            target[PATCH_SECTOR_END:] == stock[PATCH_SECTOR_END:],
-            "patched region differs from stock outside the patch sector")
+    require(target[:PATCH_OFFSET] == stock[:PATCH_OFFSET] and
+            target[PATCH_WINDOW_END:] == stock[PATCH_WINDOW_END:],
+            "patched region differs from stock outside the stock main window")
     metadata = {
         "patch_offset": f"0x{PATCH_OFFSET:08x}",
         "patch_length": len(raw),

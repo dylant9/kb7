@@ -187,7 +187,9 @@ records the owner-bound, independently reverified offline installer/restorer
 and its separate live-enable lock. The
 [region-1 boot contract](docs/STOCK-CORE0-REGION1-CONTRACT-2026-09-05.md) and
 [region-1 patch campaign](docs/REGION1-REENTRY-CAMPAIGN-2026-09-05.md) record
-the 2026-09-05 pivot that keeps stock Core 0 installed. The
+the 2026-09-05 pivot that keeps stock Core 0 installed, and the
+[region-1 runbook](docs/REGION1-REENTRY-RUNBOOK-2026-09-05.md) the gated
+revisions and hardware sequence that must follow. The
 [bounded USB-ISP validation record](docs/USB-ISP-WRITE-VALIDATION-2026-08-23.md),
 [guarded erase-footprint result](docs/USB-ISP-ERASE-GRANULARITY-VALIDATION-2026-08-23.md),
 [flash-access guide](tools/flash-access/README.md), and

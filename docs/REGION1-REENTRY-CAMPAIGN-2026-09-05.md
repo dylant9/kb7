@@ -29,7 +29,9 @@ shows that stock region 0 needs exactly one thing from region 1: Thumb code
 at `0x1004a524`. Everything else it knows about region 1 is reached only
 through services the proof never calls. So the proof lives at that entry, in
 the sector `0x0004a000..0x0004b000` (region-1 offsets; flash
-`0x0006b000..0x0006c000`), inside the 724-byte window the stock main occupied.
+`0x0006b000..0x0006c000`), inside the 724-byte window the stock main
+occupied; the builder refuses any proof whose code, fixup and gate words
+would extend past that window.
 The loader's only region-1 check is the manifest checksum, so the sector is
 CRC-balanced to the unchanged checksum `0xc8ed2815` and the manifest stays
 byte-identical.
@@ -96,19 +98,54 @@ Identities for the exact V1.22 baseline `2b1472f4…`:
 4. **Gate last.** The sparse gate program is the only operation that makes
    region 1 valid, and it produces the exact target.
 
-Because there is no second region whose checksum can serve as an
-independent, exactly-known barrier (region 0 is never touched and is always
-valid), the simulator does not argue by "opposite-core invalid". Instead it
-enumerates every distinct byte-prefix outcome of every operation, 32,470
-states across 34,856 modeled cuts, and evaluates the region-1 checksum of
-each: none is loader-valid except the exact pre-image at the two stable
-endpoints and the exact post-image of the two gate operations. Region 0 keeps
-its checksum at every boundary, and the immutable ranges hash-match after
-every operation.
+**The independent barrier of the Core-0 campaign is lost here, and that
+should be said plainly.** In the Core-0 campaign the other region's checksum
+was the barrier: with Core 1 poisoned, no Core-0 content whatsoever could
+boot, whatever physical state a Core-0 sector was in. In this campaign the
+patch sector and the poison sector are terms of the same region-1 checksum
+sum. For a physical state of the patch sector that lies outside the
+byte-prefix model (a torn erase or program that is not a prefix), validity
+requires the sector's 64-KiB chunk CRC to equal one specific 32-bit value;
+the poison only changes which value. The poison therefore still guarantees
+that region 1 is invalid before the first erase and that the poison-sector
+restore happens under an erased gate, but it adds nothing against unmodeled
+states beyond what the enumeration gives.
+
+What remains is exact under the model: the simulator enumerates every
+distinct byte-prefix outcome of every operation, 32,470 states across 34,856
+modeled cuts, and evaluates the region-1 checksum of each. None is
+loader-valid except the exact pre-image at the two stable endpoints and the
+exact post-image of the two gate operations. Region 0 keeps its checksum at
+every boundary, and the immutable ranges hash-match after every operation.
+Outside the model the residual is a 2^-32-class coincidence per distinct
+physical state of the patch sector during the nine dense operations of each
+direction. Its consequence is bounded: intact stock region 0 would run a
+torn region 1, which hangs or faults; the recovery is the external SPI
+restore, the same class as every other unmodeled outcome.
+
+A later revision could restore an independent barrier with a single-bit
+poison in region 2 (manifest entry 2, whose CRC failure was observed on the
+device on 2026-08-22 to send the loader to ISP mode). That needs planner and
+executor envelope changes and its own review; it is not part of this
+campaign.
 
 Proof boundary: command boundaries, exact payloads and modeled byte-prefix
 states. Misaddressing, disturb, torn erases outside the model and
 loader-model errors remain external-SPI recovery cases.
+
+One stock hazard is live on the proof boot that the Core-0 proof never
+carried: stock region 0's own failure handling. A hardware-init failure
+(clock, PLL, the region-1 copy's first-word check, DRAM training) or a
+HardFault before the proof takes over records the failure through the
+mask-ROM persistent-record service targeting header offsets
+`0x800..0xbff`, then parks. On this unit that area has no erased slot, so
+the stock code writes nothing after the ROM call, and the ROM's own
+behaviour is not decoded. Any header change would fail the executor's
+byte-exact comparison below the live region and end the campaign with exit
+3 and an SPI restore; it would not by itself change how the unit boots,
+because the loader checks manifest regions, not the header. A read fault
+during the region-1 copy is exactly what trips the first-word check, so
+short SPI lead stubs matter for this boot as much as for the reads.
 
 ## What is still missing before hardware
 

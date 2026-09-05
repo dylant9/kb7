@@ -6,8 +6,11 @@ Inputs: the owner-local byte-exact V1.22 flash capture (full-chip SHA-256
 `d779faf9…`), region 1 (`core1`, 438632 bytes, SHA-256 `b2869bc6…`) and the
 loader (61440 bytes, SHA-256 `9cc33333…`).
 Verifier: `tools/verify_region1_contract.py` re-derives every fact below from
-those images and passed on 2026-09-05. Raw stock bytes stay outside this
-repository.
+those images and passed on 2026-09-05; the independent review of the same
+day (CLEAN WITH NON-BLOCKING NOTES) re-derived the load-bearing facts with
+its own disassembly, and its notes are folded in below. Raw stock bytes stay
+outside this repository, apart from three 6- to 10-byte opening sequences of
+the Arm C-library scatter-loading handlers pinned by the verifier.
 
 ## Why this document exists
 
@@ -40,10 +43,18 @@ the boot path.
 
 All offsets are region-0 file offsets, which equal PRAM addresses.
 
-1. **Loader.** The loader validates every manifest region checksum, copies
-   region 0 into PRAM and resets into it. Its application-launch path
-   materializes no region-1 address; the only region-1 dependency is the
-   manifest checksum over the 0x6b168-byte image.
+1. **Loader.** The loader validates every manifest region checksum (eight
+   entries, chunked CRC over each region, and an initial-stack window check
+   on region 0), stores the region-0 address in the reserved vector-table
+   word at `VTOR + 0x1c`, then calls a 0x50-byte helper that the loader
+   copied to SRAM `0x18010000` (descriptor at loader `0xb5e4`, source
+   `0xb740`). The helper sets PRIMASK, copies `0x10000` bytes from
+   `0x60011000` into PRAM 0, issues `DSB`, writes
+   `(AIRCR & 0x700) | 0x05fa0000 + 4` and loops. **Region 0 therefore starts
+   from a system reset**: NVIC enables, pending bits, SysTick, VTOR and
+   PRIMASK are at their reset values. The launch path materializes no
+   region-1 address; its only region-1 dependency is the manifest checksum
+   over the 0x6b168-byte image.
 2. **Reset handler `0x2f4`.** Reads VTOR, loads SP from the vector table's
    first word (`0x1803f5c0`), calls hardware initialization at `0x6190`
    through a literal, then jumps to the scatter loader at `0x140`.
@@ -59,19 +70,31 @@ All offsets are region-0 file offsets, which equal PRAM addresses.
       the top of DRAM, the cache clock bit 11 in `0x4500010c` is set, the
       cache controller at `0x4002f000` gets offset `0x30722000` and control
       value 2, and the first aperture word `[0x10000000]` is compared with the
-      first flash word `[0x60021000]`; failure code 4.
+      first flash word `[0x60021000]`; failure code 4. The SFC is left in
+      mode `0x8` (bits 7:4), the state in which region 0 then performs its
+      own XIP reads and in which the proof later reads the loader.
    6. `0x7018`: write 0 to `0x45000020`.
-   7. `0x6e68`: NVIC and system-handler priorities from a table, then
-      `MSR PRIMASK, r0` with `r0 == 0`. **Interrupts are globally enabled
-      from here on.** No NVIC set-enable register and no SysTick register is
-      touched anywhere on the path.
+   7. `0x6e68`: NVIC priorities from the table at `0xd54c` (43 entries, all
+      IRQs 6 to 56; the routine can also set system-handler priorities but
+      the table contains none), then `MSR PRIMASK, r0` with `r0 == 0`.
+      **Interrupts are globally enabled from here on**, but nothing is
+      enabled: no NVIC set-enable register and no SysTick register is
+      touched anywhere on the path, and the NVIC arrived at reset state.
    Before these calls the handler feeds and disables both watchdogs at
    `0x40008000`/`0x40009000`.
    A failure code other than 6 is recorded through `0x9a74`, which stores the
    code at `0x18023808`, copies 0x34 bytes from mailbox `0x20000f00` and
-   calls the persistent-record routine `0x8a8c` (the caller of mask-ROM
-   `0x08001491`); every failure then parks in an endless loop. This path is
-   not reachable from region 1.
+   calls the persistent-record routine `0x8a8c`: it calls mask-ROM
+   `0x08001491` with mode 3, then scans header offsets `0x800..0xbff` in
+   0x80-byte slots for an erased first word and, if one exists, writes a
+   record there. Every failure then parks in an endless loop. The region-0
+   HardFault handler (`0x23a5`) prints through a region-1 veneer and takes
+   the same record path. On this unit no slot is erased (slot 0 holds a
+   boot descriptor, slots 1 to 7 are zero), so the stock code writes nothing
+   after the ROM call; the ROM call's own behaviour is not decoded. This
+   path is not reachable from region 1, but it is live during the boot of
+   any region-1 image; a header change would fail the campaign's byte-exact
+   comparison and end it with exit 3.
 4. **Scatter loader `0x140`.** Walks the table at `0xd75c..0xd79c`:
 
    | Source | Destination | Length | Handler |
@@ -101,10 +124,10 @@ All offsets are region-0 file offsets, which equal PRAM addresses.
 | Mode | Thread, privileged, Thumb, MSP |
 | SP | `0x1803f5c0` (nothing pushed by `0x2d4`); usable window `0x1803d5c0..0x1803f5c0` |
 | LR | `0x2e3` |
-| VTOR | whatever the loader left; the vector table at PRAM 0 is region 0's |
+| VTOR | 0 from the system reset; the vector table at PRAM 0 is region 0's |
 | PRIMASK | 0 (enabled) |
-| NVIC enables | not written by region 0; inherited from the loader |
-| SysTick | not configured |
+| NVIC enables | none; the NVIC is at reset state from the loader's system reset and region 0 sets priorities only |
+| SysTick | not configured; at reset state |
 | Watchdogs | fed and disabled |
 | Clocks, PLL, DRAM | configured and trained |
 | Region-1 image | copied to DRAM `0x30722000..0x30800000` and served through `0x10000000..0x100de000`; executes from DRAM, not flash |
@@ -120,9 +143,10 @@ All offsets are region-0 file offsets, which equal PRAM addresses.
 ## What region 0 expects from region 1
 
 Only one thing on the boot path: **Thumb code at `0x1004a524`**, plus the
-manifest checksum that the loader checks. The reset-path closure (45 code
-ranges, 4836 bytes, hash-pinned in the verifier) loads no region-1 address
-and materializes none. Region 0 reads region 1 only as an opaque copy.
+manifest checksum that the loader checks. The reset-path closure (63 code
+ranges, 5430 bytes, derived by `tools/derive_boot_closure.py` and
+hash-pinned in the verifier) loads no region-1 address and materializes
+none. Region 0 reads region 1 only as an opaque copy.
 
 Everything else region 0 knows about region 1 matters only if that region-0
 code runs after the entry:
@@ -187,11 +211,28 @@ needed for the first campaign.
    region 1 that wants the stock USB stack must first map the callbacks in
    the previous section.
 
+## How the closures were derived
+
+`tools/derive_boot_closure.py` performs recursive descent over the raw
+image with capstone, decoding at every branch target rather than trusting a
+linear sweep. It follows every call, unconditional and conditional branch,
+`CBZ`/`CBNZ`, register branches whose value came from a literal pool or a
+`MOVW`/`MOVT` pair, and every case of a `TBB`/`TBH` sized from its guard
+(`0x615e`: five clock-source cases; `0xb4da`: eight failure codes;
+`0xd416`: four soft-float cases). The scatter handlers are seeded from the
+table at `0xd75c` because their dispatch at `0x172` is a data-driven `BX`.
+Branch tables and alignment padding are not code and are excluded. The
+region-0 closure has 63 ranges and 5430 bytes; the loader launch closure
+from `0x5934` has 220 ranges and 19778 bytes. Four indirect sites remain
+unresolved by the tool and are resolved by reading, recorded in the
+verifier's profile: `0x172` (the seeded dispatch), `0x707a` (`BLX r5`, mask
+ROM `0x0800603d` from the literal at `0x7026`), `0x8a94` (`BLX r6`, mask ROM
+`0x08001491`) and `0xd414` (a computed multi-return). The verifier also
+checks that no `BL`, `B.W`, conditional or short branch and no literal word
+in region 0 refers to the handoff veneer other than the one `BL` at `0x2de`.
+
 ## Proof boundary
 
-Static identity and instruction semantics of the stock reset path only. The
-reachable-code ranges were derived with a disassembler and are pinned by
-hash; the six indirect branches inside them (`0x172` scatter dispatch,
-`0x615e`/`0xb4da`/`0xd416` table switches, `0x707a` the ROM clock call,
-`0xd414`) were resolved by hand. Nothing here proves that custom region-1
-code executes on hardware; that is what the first region-1 campaign is for.
+Static identity and instruction semantics of the stock reset path only.
+Nothing here proves that custom region-1 code executes on hardware; that is
+what the first region-1 campaign is for.

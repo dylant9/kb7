@@ -152,9 +152,16 @@ def synthetic_core0() -> bytearray:
     for index, target in enumerate(STOCK.hardware_init_calls):
         encode_bl(image, base + 0x2A + index * 4, target)
     put16(image, base + 0x2A + len(STOCK.hardware_init_calls) * 4, 0xBD10)
-    # Priority setup tail with the PRIMASK release.
+    # Priority setup tail with the PRIMASK release and its IRQ table.
     base = STOCK.primask_release_offset
+    encode_ldr_literal(image, base - 14, 0, base + 10)
+    put32(image, base + 10, STOCK.priority_table_offset)
     put_bytes(image, base - 8, "401c0028e4d100bf80f3108800bf30bd")
+    for index in range(STOCK.priority_table_entries):
+        put32(image, STOCK.priority_table_offset + index * 4,
+              (index + 6) | (0x30 << 8))
+    put32(image, STOCK.priority_table_offset + STOCK.priority_table_entries * 4,
+          0xFFFFFFFF)
     # Region-1 copy and aperture programming.
     base = STOCK.region1_copy_offset
     put16(image, base, 0xB510)
@@ -204,7 +211,37 @@ def synthetic_core1() -> bytearray:
 
 
 def synthetic_loader() -> bytearray:
-    return bytearray(STOCK.loader_size)
+    image = bytearray(STOCK.loader_size)
+    # Application-pointer store: ldr r1, =VTOR; ldr r1, [r1]; str r0, [r1, #0x1c]; bx lr.
+    store = STOCK.loader_app_pointer_store_offset
+    encode_bl(image, STOCK.loader_app_pointer_store_call_offset, store)
+    encode_ldr_literal(image, store, 1, store + 8)
+    put_bytes(image, store + 2, "0968c8617047")
+    put32(image, store + 8, VERIFIER.VTOR)
+    # Launch veneer into the SRAM helper.
+    veneer = STOCK.loader_launch_veneer_offset
+    encode_bl(image, STOCK.loader_launch_call_offset, veneer)
+    encode_movw_movt(image, veneer, 12, STOCK.loader_helper_sram | 1)
+    put16(image, veneer + 8, 0x4760)
+    # Helper copy descriptor and the helper itself (unchecked slots differ
+    # from stock so the fixture is not a stock byte string).
+    descriptor = STOCK.loader_helper_descriptor_offset
+    put32(image, descriptor, STOCK.loader_helper_offset)
+    put32(image, descriptor + 4, STOCK.loader_helper_sram)
+    put32(image, descriptor + 8, STOCK.loader_helper_bytes)
+    helper = STOCK.loader_helper_offset
+    put_bytes(image, helper, "0346" "1d46" "0e46" "0124" "84f31088" "c046")
+    put_bytes(image, helper + 0xE, "9208" "0020" "04e0" "56f82040" "45f82040"
+              "401c" "9042" "f8d3" "c046" "bff34f8f")
+    encode_ldr_literal(image, helper + 0x28, 4, helper + 0x48)
+    put_bytes(image, helper + 0x2A, "2468" "04f4e064")
+    encode_ldr_literal(image, helper + 0x30, 7, helper + 0x4C)
+    put_bytes(image, helper + 0x32, "3c43" "241d")
+    encode_ldr_literal(image, helper + 0x36, 7, helper + 0x48)
+    put_bytes(image, helper + 0x38, "3c60" "bff34f8f" "c046" "c046" "c046" "fde7")
+    put32(image, helper + 0x48, 0xE000ED0C)
+    put32(image, helper + 0x4C, 0x05FA0000)
+    return image
 
 
 def synthetic_profile(core0: bytes, core1: bytes, loader: bytes):
@@ -282,6 +319,9 @@ class Region1ContractTests(unittest.TestCase):
         self.assertEqual(facts["region1_copy"]["copy_bytes"], "0x000de000")
         self.assertEqual(facts["region1_copy"]["cache_control_value"], 2)
         self.assertEqual(facts["primask_release"]["interrupts_enabled_at_handoff"], True)
+        self.assertEqual(facts["primask_release"]["system_handler_priorities_set"], 0)
+        self.assertEqual(facts["loader_launch"]["region0_starts_from_system_reset"], True)
+        self.assertEqual(facts["loader_launch"]["helper_sram"], "0x18010000")
         self.assertEqual(facts["reset_closure"]["region1_constants"], 0)
         self.assertEqual(facts["loader_closure"]["region1_constants"], 0)
         self.assertEqual([entry["handler"] for entry in facts["scatter"]["entries"]],
@@ -345,6 +385,31 @@ class Region1ContractTests(unittest.TestCase):
         core0[-1] ^= 1
         report = self.verify(bytes(core0))
         self.assertIn("core0_exact_identity", self.failed(report))
+
+    def test_loader_helper_without_primask_or_reset_is_rejected(self) -> None:
+        for offset, replacement in ((0x8, "00bf00bf"), (0x38, "0000")):
+            loader = bytearray(self.loader)
+            put_bytes(loader, STOCK.loader_helper_offset + offset, replacement)
+            profile = synthetic_profile(self.core0, self.core1, bytes(loader))
+            self.assertIn("loader_launch",
+                          self.failed(self.verify(loader=bytes(loader), profile=profile)))
+
+    def test_system_handler_priority_entry_is_rejected(self) -> None:
+        core0 = bytearray(self.core0)
+        put32(core0, STOCK.priority_table_offset, 0xFFFFFF00 | 0xF4)  # SVCall as -12
+        profile = synthetic_profile(bytes(core0), self.core1, self.loader)
+        self.assertIn("primask_release",
+                      self.failed(self.verify(bytes(core0), profile=profile)))
+
+    def test_branch_scan_sees_wide_and_short_branches_to_the_veneer(self) -> None:
+        core0 = bytearray(self.core0)
+        # A 16-bit B to the veneer placed in dead space is a second reference.
+        put16(core0, STOCK.handoff_veneer_offset - 0x100,
+              0xE000 | (((STOCK.handoff_veneer_offset -
+                          (STOCK.handoff_veneer_offset - 0x100 + 4)) // 2) & 0x7FF))
+        profile = synthetic_profile(bytes(core0), self.core1, self.loader)
+        self.assertIn("runtime_entry",
+                      self.failed(self.verify(bytes(core0), profile=profile)))
 
     def test_loader_region1_literal_is_rejected(self) -> None:
         loader = bytearray(self.loader)

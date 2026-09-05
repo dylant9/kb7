@@ -191,6 +191,14 @@ and clears the NVIC and stops SysTick as the first work of its reset handler
 `b0b3b75ab06bd00b152f86446de623b9029ff3ab9d164f6f4387243d2556b272` (1260 bytes, entry unchanged) and the campaign ID
 `1ce62e95ee2c6c84b5abb8996f7964bacae661869152ead20f5c7138b2b0b508` with proof full-image SHA-256 `58780441a9a5d6208aa2056c778e73b480e837d8b9f61c6b0be5629079307da9`. Same 168 operations.
 
+## Branch note (2026-09-05)
+
+On the `region1-reentry-offline` lineage the fixed executor is bound to the
+[region-1 patch campaign](REGION1-REENTRY-CAMPAIGN-2026-09-05.md) and its
+CLI flag is `--proof-core1-elf`; the `--proof-core0-elf` invocations below
+fail safely there with an argument error. They remain correct on the Core-0
+campaign branches, which are unchanged.
+
 ## Bounded hardware run — paused
 
 The following sequence is retained as the future stop-gated outline. It is not

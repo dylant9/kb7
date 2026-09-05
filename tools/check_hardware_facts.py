@@ -1235,7 +1235,7 @@ def validate_region1_campaign(evidence: dict[str, object]) -> None:
         "9a582f1cf35ccb219d5477299ece6caa1285fcbff448e7901fdcaaae83e5c267" and
         authorization["implementation_source_sha256"] == {
             "campaign":
-                "7b4d83f3bc162fb7adbc679083f786d54aa2edd466a12db07426ced601a34b58",
+                "a7b255cb207182717d2e91dfbdd9073db6462654ef0229654f3200e03a489ff8",
             "core0_campaign":
                 "8d8153c95ca45c81cc5c0a06c463894d98f519a5b142348592e3472b8a7ef980",
             "planner":
@@ -1248,9 +1248,9 @@ def validate_region1_campaign(evidence: dict[str, object]) -> None:
         authorization["policy_sha256"] ==
         "7786dcee0662f85cb4a6a2c4b95adec88fef3b9de2959c5d75f0ffac1bd799e7" and
         authorization["executor_descriptor_sha256"] ==
-        "24ad0392c0bf1c7949d131282cc2d9e6b67e8ffd588c55df4db6d98301e117a0" and
+        "fdf29869de2ebabe336053d8eabb6761be689523c8ef442116c252bea6418dad" and
         authorization["executor_source_sha256"] ==
-        "d2641d9c2a92c2ab99513553e8f1ef0aec4aedef5f90d88ca00754ca7a8319ae" and
+        "f131420fa0fe50564ada168c026cbd307c2a65f8060f14fc4cb5021d5a53372b" and
         authorization["live_region_policy_unchanged_from_core0_revision"] is True and
         authorization["generic_firmware_executor_mutation_enabled"] is False and
         authorization["flash_approved"] is False,

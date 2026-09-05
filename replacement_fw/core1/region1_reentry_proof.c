@@ -2,9 +2,12 @@
  * Region-1 loader-reentry proof.
  *
  * Stock region 0 boots the SoC, copies region 1 into OPI DRAM behind the
- * instruction-cache aperture and calls 0x1004a525 with SP = 0x1803f5c0,
- * PRIMASK clear and no interrupt enabled by region 0 itself (the loader's
- * residual NVIC state is unknown).  This image replaces the stock main at
+ * instruction-cache aperture and calls 0x1004a525 with SP = 0x1803f5c0 and
+ * PRIMASK clear.  The loader launches region 0 through a system reset, so
+ * NVIC enables, pending bits, SysTick and VTOR are at their reset values
+ * when region 0 starts, and region 0 sets only priorities.  The masking
+ * below is therefore belt and braces against a fault, not against an
+ * inherited enable.  This image replaces the stock main at
  * that entry and does one thing: it takes ownership of the exception state
  * and then deliberately re-enters the preserved USB loader through the
  * stock-equivalent relocation in drivers/recovery.c.

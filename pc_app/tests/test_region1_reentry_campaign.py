@@ -211,7 +211,7 @@ class Region1ReentryCampaignTests(unittest.TestCase):
         gate = int(metadata["gate_offset"], 0)
         self.assertEqual(fixup, CAMPAIGN.PATCH_OFFSET + len(self.raw))
         self.assertEqual(gate, fixup + 4)
-        self.assertLess(gate + 4, CAMPAIGN.PATCH_SECTOR_END)
+        self.assertLessEqual(gate + 4, CAMPAIGN.PATCH_WINDOW_END)
         self.assertEqual(metadata["fixup_rank"], 32)
         self.assertEqual(metadata["gate_rank"], 32)
         restore_gate = int(self.descriptor["restore_gate"]["offset"], 0)
@@ -245,6 +245,15 @@ class Region1ReentryCampaignTests(unittest.TestCase):
             CAMPAIGN.build_patched_region(stock, synthetic_raw(0xADC))
         with self.assertRaises(PLANNER.PlanError):
             CAMPAIGN.build_patched_region(stock, synthetic_raw(402))
+        # Fits the sector but not the stock main routine's 0x2d4-byte window.
+        with self.assertRaises(PLANNER.PlanError):
+            CAMPAIGN.build_patched_region(stock, synthetic_raw(0x2D0))
+        target, _staged, metadata = CAMPAIGN.build_patched_region(
+            stock, synthetic_raw(0x2CC))
+        self.assertLessEqual(int(metadata["gate_offset"], 0) + 4,
+                             CAMPAIGN.PATCH_WINDOW_END)
+        self.assertEqual(target[CAMPAIGN.PATCH_WINDOW_END:],
+                         stock[CAMPAIGN.PATCH_WINDOW_END:])
 
     def test_cli_is_offline_only_and_has_no_device_surface(self) -> None:
         source = CAMPAIGN_PATH.read_text(encoding="utf-8").lower()

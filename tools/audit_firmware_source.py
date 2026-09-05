@@ -252,7 +252,7 @@ def main() -> int:
             'EXPECTED_CAMPAIGN_ID = (',
             '"9a582f1cf35ccb219d5477299ece6caa1285fcbff448e7901fdcaaae83e5c267"',
             'EXPECTED_POLICY_SHA256 = (',
-            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "24ad0392c0bf1c7949d131282cc2d9e6',
+            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "fdf29869de2ebabe336053d8eabb6761',
             '"kb7_region1_reentry_campaign_for_executor"',
             '"region0_operation_count": 0,',
             '"core0_campaign_source_sha256": _source_sha256(',

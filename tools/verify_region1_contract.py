@@ -16,11 +16,16 @@ image relies on when the stock region 0 is kept unchanged:
 
 It decodes public Arm Thumb instruction forms at pinned offsets and reads the
 literal words they address.  The reachable-code ranges of the reset path were
-derived offline with a disassembler; this tool pins those ranges by hash and
-checks, inside them, the absence of every constant that would contradict the
-contract.  It never opens a device and never writes a file.  Raw stock bytes
-stay outside the repository; the report contains offsets, decoded values and
-hashes only.
+derived offline by tools/derive_boot_closure.py (recursive descent with
+capstone over the raw image, following every branch, call, table switch and
+literal-resolved register branch; branch tables and alignment padding are not
+code and are excluded); this tool pins those ranges by hash and checks, inside
+them, the absence of every constant that would contradict the contract.  The
+indirect branches the derivation could not resolve are listed in the profile
+with their resolution by reading.  It never opens a device and never writes a
+file.  The report contains offsets, decoded values and hashes only; the only
+stock bytes inside this file are three 6- to 10-byte opening sequences of the
+Arm C-library scatter-loading handlers, which are compiler-library code.
 """
 
 from __future__ import annotations
@@ -104,6 +109,8 @@ class Region0Profile:
     region1_copy_offset: int
     memcpy_offset: int
     primask_release_offset: int
+    priority_table_offset: int
+    priority_table_entries: int
     scatter_table_offset: int
     scatter_table_end: int
     scatter_entries: tuple[tuple[int, int, int, int], ...]
@@ -116,13 +123,25 @@ class Region0Profile:
     region1_vectors: tuple[tuple[int, int], ...]
     zero_vectors: frozenset[int]
     usb_irq_vector: tuple[int, int]
+    reset_closure_seeds: tuple[int, ...]
+    reset_closure_stop: int
     reset_closure_ranges: tuple[tuple[int, int], ...]
     reset_closure_sha256: str
+    reset_closure_unresolved: tuple[tuple[int, str], ...]
     reset_closure_sram_constants: tuple[int, ...]
     reset_closure_rom_calls: tuple[int, ...]
+    loader_closure_seeds: tuple[int, ...]
     loader_closure_ranges: tuple[tuple[int, int], ...]
     loader_closure_sha256: str
     loader_closure_aperture_bit_immediates: tuple[int, ...]
+    loader_app_pointer_store_call_offset: int
+    loader_app_pointer_store_offset: int
+    loader_launch_call_offset: int
+    loader_launch_veneer_offset: int
+    loader_helper_descriptor_offset: int
+    loader_helper_offset: int
+    loader_helper_bytes: int
+    loader_helper_sram: int
     thunk_count: int
     thunk_targets: tuple[int, ...]
     veneer_count: int
@@ -130,52 +149,80 @@ class Region0Profile:
 
 
 V122_RESET_CLOSURE = (
-    (0x140, 0x174), (0x2A8, 0x30A), (0x32C, 0x336), (0x846, 0x934),
-    (0x9C8, 0xA48), (0xA50, 0xA54), (0xA88, 0xAD8), (0xAE6, 0xAF0),
-    (0xF1C, 0xF20), (0x1794, 0x17EC), (0x17FC, 0x1800), (0x1968, 0x199A),
-    (0x19D4, 0x1A06), (0x60B8, 0x60E2), (0x614C, 0x6162), (0x617E, 0x61D8),
-    (0x6AB8, 0x6AF0), (0x6B8E, 0x6BBA), (0x6E68, 0x6EAE), (0x6EBC, 0x6F62),
-    (0x6F70, 0x6FF4), (0x7008, 0x7090), (0x70B0, 0x7128), (0x7138, 0x72D2),
-    (0x731C, 0x73BA), (0x73C4, 0x73F4), (0x7444, 0x7468), (0x8A8C, 0x8ABE),
-    (0x8AD8, 0x8EDC), (0x90AA, 0x90AC), (0x9106, 0x910A), (0x9A74, 0x9A90),
-    (0x9B38, 0x9B70), (0xB48C, 0xB4DE), (0xB502, 0xB504), (0xCFA4, 0xCFC6),
-    (0xCFD0, 0xCFF2), (0xD00A, 0xD188), (0xD1CC, 0xD218), (0xD222, 0xD27C),
-    (0xD284, 0xD384), (0xD392, 0xD39A), (0xD3AE, 0xD41A), (0xD43A, 0xD458),
-    (0xD466, 0xD542),
+    (0x140, 0x174), (0x17C, 0x1FA), (0x1FC, 0x218), (0x2A8, 0x30A),
+    (0x32C, 0x336), (0x846, 0x918), (0x9C8, 0xA1A), (0xA1C, 0xA48),
+    (0xA50, 0xA54), (0xA88, 0xAD8), (0xAE6, 0xAF0), (0xF1C, 0xF20),
+    (0x1794, 0x17EC), (0x17FC, 0x1800), (0x1968, 0x199A), (0x19D4, 0x1A06),
+    (0x60B8, 0x60E2), (0x60EC, 0x6142), (0x614C, 0x6162), (0x6168, 0x618C),
+    (0x6190, 0x61D8), (0x6AB8, 0x6AF0), (0x6B8E, 0x6BBA), (0x6E68, 0x6EAE),
+    (0x6EBC, 0x6F62), (0x6F70, 0x6FF4), (0x7008, 0x7022), (0x7024, 0x7090),
+    (0x70B0, 0x7128), (0x7138, 0x72D2), (0x731C, 0x731E), (0x7320, 0x73BA),
+    (0x73C4, 0x73F4), (0x7444, 0x7468), (0x8A8C, 0x8ABE), (0x8AD8, 0x8EDC),
+    (0x8EEC, 0x910A), (0x9A74, 0x9A90), (0x9B38, 0x9B70), (0xB48C, 0xB4C4),
+    (0xB4C8, 0xB4DE), (0xB4E6, 0xB504), (0xCFA4, 0xCFC6), (0xCFD0, 0xCFF2),
+    (0xCFFC, 0xD052), (0xD064, 0xD078), (0xD080, 0xD0A0), (0xD0A2, 0xD176),
+    (0xD1E4, 0xD218), (0xD222, 0xD238), (0xD244, 0xD27C), (0xD284, 0xD29E),
+    (0xD2A8, 0xD2AA), (0xD2AC, 0xD310), (0xD354, 0xD384), (0xD392, 0xD39A),
+    (0xD3AE, 0xD41A), (0xD41E, 0xD458), (0xD466, 0xD4B8), (0xD4C2, 0xD4D2),
+    (0xD4EA, 0xD4F4), (0xD516, 0xD520), (0xD522, 0xD542),
 )
 
 V122_LOADER_CLOSURE = (
-    (0x1F4, 0x284), (0x324, 0x37C), (0x3B8, 0x680), (0x748, 0x83E),
-    (0x8C6, 0x954), (0x964, 0x98C), (0x996, 0x9B6), (0x9D6, 0xA02),
-    (0xAC0, 0xB2C), (0xB3C, 0xBA2), (0xBAC, 0x1490), (0x14AC, 0x14C4),
-    (0x1560, 0x15D8), (0x15E8, 0x16C8), (0x16F6, 0x1A92), (0x1B12, 0x1EEC),
-    (0x1EF8, 0x200E), (0x201E, 0x2042), (0x2048, 0x2128), (0x2134, 0x2210),
-    (0x22C0, 0x22D0), (0x2508, 0x2640), (0x27B8, 0x27EA), (0x27F4, 0x28EE),
-    (0x28FC, 0x2962), (0x296C, 0x2A2E), (0x2A3C, 0x2A88), (0x2A90, 0x2B9E),
-    (0x2BA4, 0x2C6A), (0x2C74, 0x2D3E), (0x2D48, 0x2D78), (0x2D80, 0x2E4C),
-    (0x2E58, 0x2E8A), (0x307C, 0x30F0), (0x30F8, 0x3194), (0x319C, 0x31A8),
-    (0x31CC, 0x31E6), (0x34CC, 0x355E), (0x3718, 0x3734), (0x38D4, 0x3924),
-    (0x3984, 0x3994), (0x3B5C, 0x3BA2), (0x3E2C, 0x3F26), (0x3F7A, 0x4008),
-    (0x402C, 0x404C), (0x4080, 0x4124), (0x41A4, 0x41C8), (0x41D0, 0x41D6),
-    (0x426C, 0x428E), (0x42D0, 0x42DE), (0x4634, 0x4656), (0x4888, 0x4936),
-    (0x4A8C, 0x4A98), (0x5068, 0x5074), (0x5086, 0x5088), (0x50C4, 0x50CC),
-    (0x511C, 0x5120), (0x52C4, 0x52EE), (0x5304, 0x5480), (0x5498, 0x54AE),
-    (0x54BC, 0x54D6), (0x54E8, 0x5516), (0x551C, 0x55D2), (0x55F4, 0x57EC),
-    (0x5828, 0x584A), (0x5850, 0x5866), (0x5878, 0x58CA), (0x5934, 0x59A4),
-    (0x5A68, 0x5A92), (0x6FB4, 0x702E), (0x7444, 0x7498), (0x7714, 0x7720),
-    (0x773A, 0x775C), (0x7780, 0x77A6), (0x77BC, 0x77F8), (0x78B0, 0x78D4),
-    (0x79B0, 0x79C4), (0x79E8, 0x7A0A), (0x7A10, 0x7A20), (0x7A4C, 0x7A5A),
-    (0x7AE4, 0x7AF4), (0x7C1C, 0x7C8C), (0x8720, 0x8740), (0x8898, 0x88B2),
-    (0x88FA, 0x88FE), (0x8906, 0x890C), (0x8914, 0x893A), (0x8FEC, 0x9012),
-    (0x927C, 0x9324), (0x9344, 0x94D2), (0x953C, 0x95A2), (0x95AC, 0x963C),
-    (0x9700, 0x9716), (0x9720, 0x972A), (0x97C4, 0x9802), (0x9904, 0x9928),
-    (0x9934, 0x9958), (0x9960, 0x9966), (0x996C, 0x9972), (0x9978, 0x997E),
-    (0x9984, 0x99CE), (0x99D4, 0x99E2), (0x99E8, 0x99F6), (0x99FC, 0x9A0A),
-    (0x9A10, 0x9A3A), (0x9A40, 0x9A46), (0x9A4C, 0x9A52), (0x9B80, 0x9BE8),
-    (0x9C2C, 0x9C86), (0x9C94, 0x9CA4), (0x9F74, 0x9F7E), (0x9F84, 0xA0EE),
-    (0xA208, 0xA316), (0xA4D4, 0xA50C), (0xA53A, 0xA58C), (0xA59C, 0xA5BA),
-    (0xA5C0, 0xA5E2), (0xA5E8, 0xA5F2), (0xA5F8, 0xA602), (0xA608, 0xA610),
-    (0xAA10, 0xAA12), (0xB14E, 0xB156),
+    (0x1F4, 0x284), (0x324, 0x34A), (0x34C, 0x37C), (0x3B8, 0x5DC),
+    (0x5E0, 0x680), (0x748, 0x790), (0x7AC, 0x82C), (0x8C6, 0x8EA),
+    (0x8EC, 0x954), (0x964, 0x98C), (0x996, 0x9B6), (0x9BC, 0x9C6),
+    (0x9D6, 0xA02), (0xA04, 0xABA), (0xAC0, 0xB2C), (0xB3C, 0xBA2),
+    (0xBAC, 0xC3C), (0xC40, 0xD7C), (0xD7E, 0x119A), (0x119C, 0x1490),
+    (0x1498, 0x1504), (0x1550, 0x155A), (0x1560, 0x1564), (0x1568, 0x15D8),
+    (0x15E8, 0x16C8), (0x16F6, 0x1734), (0x177A, 0x1782), (0x17DA, 0x1A92),
+    (0x1B12, 0x1DBE), (0x1DCC, 0x1E34), (0x1E42, 0x1E7A), (0x1E86, 0x1EEC),
+    (0x1EF8, 0x1F74), (0x1F78, 0x200E), (0x2024, 0x2042), (0x2048, 0x2128),
+    (0x2134, 0x2210), (0x2220, 0x22D0), (0x2508, 0x2538), (0x253C, 0x2640),
+    (0x27B8, 0x27EA), (0x27F4, 0x28EE), (0x28FC, 0x2962), (0x296C, 0x2A2E),
+    (0x2A3C, 0x2A88), (0x2A90, 0x2AF8), (0x2AFC, 0x2B9E), (0x2BA4, 0x2C6A),
+    (0x2C74, 0x2D3E), (0x2D48, 0x2D78), (0x2D80, 0x2E4C), (0x2E58, 0x2E60),
+    (0x2E64, 0x2E8A), (0x307C, 0x30A6), (0x30A8, 0x30F0), (0x30F8, 0x3194),
+    (0x319C, 0x31A8), (0x31CC, 0x31E6), (0x34CC, 0x355E), (0x3718, 0x3734),
+    (0x38D4, 0x38F2), (0x38F4, 0x3908), (0x390C, 0x3924), (0x392A, 0x3994),
+    (0x3B5C, 0x3BA2), (0x3E2C, 0x3F26), (0x3F7A, 0x4008), (0x402C, 0x404C),
+    (0x4080, 0x4124), (0x41A4, 0x41C8), (0x41D0, 0x41D6), (0x426C, 0x428E),
+    (0x4294, 0x42DE), (0x4634, 0x4642), (0x4644, 0x4656), (0x4888, 0x4936),
+    (0x4A8C, 0x4A98), (0x5068, 0x5074), (0x5084, 0x50CC), (0x50DC, 0x5120),
+    (0x52C4, 0x52EE), (0x5304, 0x5480), (0x5498, 0x54AE), (0x54BC, 0x54D6),
+    (0x54E8, 0x5516), (0x551C, 0x55D2), (0x55F4, 0x57EC), (0x5828, 0x584A),
+    (0x5850, 0x5866), (0x5878, 0x58B4), (0x58B8, 0x58CA), (0x5934, 0x59A4),
+    (0x5A68, 0x5A70), (0x5A74, 0x5A92), (0x6FB4, 0x702E), (0x7444, 0x7498),
+    (0x7714, 0x7720), (0x773A, 0x7750), (0x7754, 0x775C), (0x7780, 0x77A6),
+    (0x77BC, 0x77F8), (0x7800, 0x780C), (0x7810, 0x781C), (0x7820, 0x7850),
+    (0x7854, 0x7860), (0x7864, 0x7870), (0x7874, 0x7884), (0x7888, 0x7898),
+    (0x789C, 0x78AC), (0x78B0, 0x78C0), (0x78C4, 0x78D4), (0x78D8, 0x78E8),
+    (0x78EC, 0x78FC), (0x7900, 0x7910), (0x7914, 0x7922), (0x7928, 0x7936),
+    (0x793C, 0x794A), (0x7950, 0x7960), (0x7964, 0x7974), (0x7978, 0x797E),
+    (0x7984, 0x7994), (0x7998, 0x799E), (0x79A4, 0x79AC), (0x79B0, 0x79C4),
+    (0x79C8, 0x79D8), (0x79DC, 0x79E2), (0x79E8, 0x79F8), (0x79FC, 0x7A0A),
+    (0x7A10, 0x7A20), (0x7A24, 0x7A34), (0x7A38, 0x7A48), (0x7A4C, 0x7A5A),
+    (0x7A60, 0x7A66), (0x7A6C, 0x7A72), (0x7A78, 0x7A7E), (0x7A84, 0x7A8A),
+    (0x7A90, 0x7A98), (0x7A9C, 0x7AE2), (0x7AE4, 0x7AF4), (0x7AFC, 0x7B8A),
+    (0x7B9C, 0x7BE4), (0x7BE8, 0x7C14), (0x7C1C, 0x7C8C), (0x7C94, 0x7D76),
+    (0x7D84, 0x7E50), (0x7E60, 0x7EC6), (0x7ECC, 0x7F04), (0x7F0C, 0x7F52),
+    (0x7F54, 0x7F5E), (0x7F60, 0x7F7E), (0x7F88, 0x7FD4), (0x7FDC, 0x8292),
+    (0x8294, 0x832E), (0x8340, 0x8382), (0x838A, 0x85CC), (0x85D4, 0x8632),
+    (0x8634, 0x86E6), (0x86E8, 0x8718), (0x8720, 0x8740), (0x8898, 0x88B2),
+    (0x88B8, 0x890C), (0x8914, 0x893A), (0x8FEC, 0x9012), (0x927C, 0x9324),
+    (0x9344, 0x94D2), (0x953C, 0x95A2), (0x95AC, 0x963C), (0x9700, 0x9716),
+    (0x9720, 0x972A), (0x97C4, 0x9802), (0x9904, 0x9928), (0x9934, 0x9958),
+    (0x9960, 0x9966), (0x996C, 0x9972), (0x9978, 0x997E), (0x9984, 0x99CE),
+    (0x99D4, 0x99E2), (0x99E8, 0x99F6), (0x99FC, 0x9A0A), (0x9A10, 0x9A20),
+    (0x9A24, 0x9A30), (0x9A34, 0x9A3A), (0x9A40, 0x9A46), (0x9A4C, 0x9A52),
+    (0x9B80, 0x9BE8), (0x9C2C, 0x9C86), (0x9C94, 0x9CA4), (0x9F74, 0x9F7E),
+    (0x9F84, 0x9F86), (0x9F88, 0xA0EE), (0xA208, 0xA316), (0xA4D4, 0xA4D6),
+    (0xA4D8, 0xA50C), (0xA512, 0xA58C), (0xA59C, 0xA5BA), (0xA5C0, 0xA5DA),
+    (0xA5DC, 0xA5E2), (0xA5E8, 0xA5F2), (0xA5F8, 0xA602), (0xA608, 0xA610),
+    (0xAA10, 0xAA12), (0xAC1C, 0xAC72), (0xAC84, 0xAC98), (0xACA0, 0xACC0),
+    (0xACC2, 0xAD96), (0xAE04, 0xAE38), (0xAE42, 0xAE58), (0xAE64, 0xAE9C),
+    (0xAEA4, 0xAEBE), (0xAEC8, 0xAECA), (0xAECC, 0xAF30), (0xAF74, 0xAFA4),
+    (0xAFB2, 0xAFBA), (0xAFCE, 0xB03A), (0xB03E, 0xB064), (0xB072, 0xB0C4),
+    (0xB0CE, 0xB0DE), (0xB0F6, 0xB100), (0xB122, 0xB12C), (0xB12E, 0xB156),
 )
 
 V122_THUNK_TARGETS = (
@@ -226,6 +273,8 @@ PROFILES: dict[str, Region0Profile] = {
         region1_copy_offset=0x6F80,
         memcpy_offset=0x8D0,
         primask_release_offset=0x6EA6,
+        priority_table_offset=0xD54C,
+        priority_table_entries=43,
         scatter_table_offset=0xD75C,
         scatter_table_end=0xD79C,
         scatter_entries=(
@@ -246,23 +295,51 @@ PROFILES: dict[str, Region0Profile] = {
         ),
         zero_vectors=frozenset((7, 8, 9, 10, 13, 73, 74, 75, 76, 77, 78)),
         usb_irq_vector=(22, 0x000062C9),
+        reset_closure_seeds=(0x2F4, 0x17C, 0x1E0, 0x1FC),
+        reset_closure_stop=0x2196,
         reset_closure_ranges=V122_RESET_CLOSURE,
         reset_closure_sha256=(
-            "cf3628a2305c44005c808b5c297debf840351db956dd8311572b26d9161e0762"
+            "aaf0d43858c60e1ecbcf316a92d784ea145c16cafd827877a7d647d253326a4e"
+        ),
+        reset_closure_unresolved=(
+            (0x172, "BX r3: scatter-table handler dispatch; the three handlers "
+                    "are seeded from the table at 0xd75c"),
+            (0x707A, "BLX r5: mask ROM 0x0800603d, loaded from the literal at "
+                     "0x7026 in the caller's earlier block"),
+            (0x8A94, "BLX r6: mask ROM 0x08001491, the persistent-record "
+                     "service reached only from the failure recorder"),
+            (0xD414, "BX ip: computed multi-return inside the soft-float "
+                     "multiply helper"),
         ),
         reset_closure_sram_constants=(
-            0x1801656C, 0x18023808, 0x18024950, 0x18024958, 0x18024970,
-            0x180249B0, 0x1802A9B0, 0x1803D5C0, 0x1803F5C0,
+            0x1801656C,
+            0x18023808,
+            0x18024950,
+            0x18024958,
+            0x18024970,
+            0x180249B0,
+            0x1802A9B0,
+            0x1803D5C0,
+            0x1803F5C0,
         ),
         reset_closure_rom_calls=(0x08001491, 0x0800603D),
+        loader_closure_seeds=(0x5934,),
         loader_closure_ranges=V122_LOADER_CLOSURE,
         loader_closure_sha256=(
-            "e48c4456dcb469f09d60e9556e19eae65fe523b525862948032e033874b9f7df"
+            "1b510b60b67ee3c886e0d45a16c52e524193b00457980767f22c6d57ad2c7e5b"
         ),
-        # Two MOV.W modified immediates equal to the single bit 0x10000000:
-        # a shift operand in an arithmetic helper and a register value passed
-        # to a peripheral-setup helper.  Neither is loaded as a pointer.
-        loader_closure_aperture_bit_immediates=(0x1246, 0x7C6A),
+        # MOV.W/ORR modified immediates equal to the single bit 0x10000000:
+        # shift operands in arithmetic helpers and register values passed to
+        # peripheral-setup helpers.  None is loaded as a pointer.
+        loader_closure_aperture_bit_immediates=(0x1246, 0x7C6A, 0x7CE2, 0x7DB6, 0x7F56),
+        loader_app_pointer_store_call_offset=0x596C,
+        loader_app_pointer_store_offset=0x5A68,
+        loader_launch_call_offset=0x5978,
+        loader_launch_veneer_offset=0x1E86,
+        loader_helper_descriptor_offset=0xB5E4,
+        loader_helper_offset=0xB740,
+        loader_helper_bytes=0x50,
+        loader_helper_sram=0x18010000,
         thunk_count=79,
         thunk_targets=V122_THUNK_TARGETS,
         veneer_count=36,
@@ -329,6 +406,122 @@ def _movw_movt(data: bytes, offset: int, register: int) -> int:
     _require(low[1] == 4, f"MOVW at {hex32(offset)} is not the wide form")
     high = _expect(data, offset + 4, "movt", register)
     return ((high[3] & 0xFFFF) << 16) | (low[3] & 0xFFFF)
+
+
+def _expect_lsr_immediate(data: bytes, offset: int, rd: int, rm: int,
+                          shift: int) -> None:
+    """Thumb-1 LSR (immediate): 000 01 imm5 Rm Rd."""
+
+    instruction = _u16(data, offset)
+    _require(instruction & 0xF800 == 0x0800 and instruction & 7 == rd and
+             (instruction >> 3) & 7 == rm and (instruction >> 6) & 0x1F == shift,
+             f"expected LSRS r{rd}, r{rm}, #{shift} at {hex32(offset)}")
+
+
+def _branch_sites(data: bytes, target: int) -> list[tuple[int, str]]:
+    """Every BL, B.W, conditional B.W, 16-bit B/Bcond and literal word that
+    reaches target (a Thumb function address without its low bit)."""
+
+    sites: list[tuple[int, str]] = []
+    for offset in range(0, len(data) - 1, 2):
+        first = _u16(data, offset)
+        if first & 0xF800 == 0xF000 and offset + 4 <= len(data):
+            second = _u16(data, offset + 2)
+            if second & 0xD000 == 0xD000:
+                if _reentry.decode_thumb_bl(data, offset, REGION0_RUNTIME_BASE) == target:
+                    sites.append((offset, "bl"))
+                continue
+            if second & 0x8000:
+                decoded = decode(data, offset)
+                if decoded[0] == "b" and decoded[2] == target:
+                    sites.append((offset, "b.w"))
+                elif decoded[0] == "bcond" and decoded[3] == target:
+                    sites.append((offset, "bcond.w"))
+                continue
+        top5 = first >> 11
+        if top5 == 0b11100:
+            if offset + 4 + _reentry._sign_extend(first & 0x7FF, 11) * 2 == target:
+                sites.append((offset, "b"))
+        elif top5 in (0b11010, 0b11011) and (first >> 8) & 0xF < 0xE:
+            if offset + 4 + _reentry._sign_extend(first & 0xFF, 8) * 2 == target:
+                sites.append((offset, "bcond"))
+    for offset in range(0, len(data) - 3, 4):
+        if _u32(data, offset) in (target, target | 1):
+            sites.append((offset, "literal"))
+    return sites
+
+
+def _verify_loader_launch(loader: bytes, profile: Region0Profile) -> dict[str, Any]:
+    """The loader stores the application pointer, then launches region 0 by a
+    system reset from an SRAM-resident helper, so region 0 starts from reset
+    state (NVIC, SysTick, VTOR, PRIMASK all at their reset values)."""
+
+    store = profile.loader_app_pointer_store_offset
+    _require(_reentry.decode_thumb_bl(loader, profile.loader_app_pointer_store_call_offset,
+                                      REGION0_RUNTIME_BASE) == store,
+             "loader main does not call the application-pointer store")
+    _, vtor = _literal(loader, store, 1)
+    _require(vtor == VTOR, "application-pointer store does not address VTOR")
+    _expect(loader, store + 2, "ldr_imm", 1, 1, 0)
+    _expect(loader, store + 4, "str_imm", 0, 1, 0x1C)
+    _expect(loader, store + 6, "bx", 14)
+    veneer = profile.loader_launch_veneer_offset
+    _require(_reentry.decode_thumb_bl(loader, profile.loader_launch_call_offset,
+                                      REGION0_RUNTIME_BASE) == veneer,
+             "loader main does not call the launch veneer")
+    _require(_movw_movt(loader, veneer, REG_IP) == profile.loader_helper_sram | 1,
+             "launch veneer does not target the SRAM helper")
+    _expect(loader, veneer + 8, "bx", REG_IP)
+    descriptor = profile.loader_helper_descriptor_offset
+    _require((_u32(loader, descriptor), _u32(loader, descriptor + 4),
+              _u32(loader, descriptor + 8)) ==
+             (profile.loader_helper_offset, profile.loader_helper_sram,
+              profile.loader_helper_bytes),
+             "helper copy descriptor does not describe the pinned helper")
+    helper = profile.loader_helper_offset
+    sram = profile.loader_helper_sram
+    _expect(loader, helper, "mov_reg", 3, 0)
+    _expect(loader, helper + 2, "mov_reg", 5, 3)
+    _expect(loader, helper + 4, "mov_reg", 6, 1)
+    _expect(loader, helper + 6, "mov_imm", 4, 1, True)
+    _expect(loader, helper + 8, "msr", 4, 0x10)
+    _expect_lsr_immediate(loader, helper + 0xE, 2, 2, 2)
+    _expect(loader, helper + 0x10, "mov_imm", 0, 0, True)
+    _expect(loader, helper + 0x12, "b", helper + 0x1E)
+    _expect(loader, helper + 0x14, "ldr_reg", 4, 6, 0, 2)
+    _expect(loader, helper + 0x18, "str_reg", 4, 5, 0, 2)
+    _expect(loader, helper + 0x1C, "add_imm", 0, 0, 1, True)
+    _expect(loader, helper + 0x1E, "cmp_reg", 0, 2)
+    _expect(loader, helper + 0x20, "bcond", 0x3, helper + 0x14)
+    _expect(loader, helper + 0x24, "barrier", "dsb")
+    literal_offset, aircr = _literal(loader, helper + 0x28, 4)
+    _require(aircr == _reentry.AIRCR_ADDRESS and
+             literal_offset < helper + profile.loader_helper_bytes,
+             "helper does not address AIRCR from its own literal pool")
+    _expect(loader, helper + 0x2A, "ldr_imm", 4, 4, 0)
+    _expect(loader, helper + 0x2C, "and_imm", 4, 4, _reentry.AIRCR_PRIGROUP_MASK, False)
+    _, key = _literal(loader, helper + 0x30, 7)
+    _require(key == _reentry.AIRCR_KEY_BASE, "helper does not use the AIRCR key")
+    _expect(loader, helper + 0x32, "orr_reg", 4, 4, 7, True)
+    _expect(loader, helper + 0x34, "add_imm", 4, 4, _reentry.AIRCR_SYSRESETREQ, True)
+    _, aircr_again = _literal(loader, helper + 0x36, 7)
+    _require(aircr_again == _reentry.AIRCR_ADDRESS, "helper reset store is not to AIRCR")
+    _expect(loader, helper + 0x38, "str_imm", 4, 7, 0)
+    _expect(loader, helper + 0x3A, "barrier", "dsb")
+    loop = _expect(loader, helper + 0x44, "b")
+    _require(loop[2] <= helper + 0x44, "helper does not end in an endless loop")
+    return {
+        "application_pointer_store": hex32(store),
+        "stored_at": "VTOR + 0x1c",
+        "launch_veneer": hex32(veneer),
+        "helper_flash_offset": hex32(helper),
+        "helper_sram": hex32(sram),
+        "helper_bytes": profile.loader_helper_bytes,
+        "primask_set_before_copy": True,
+        "copy_words": "r2 >> 2 words from r1 to r0 (main passes 0, 0x60011000, 0x10000)",
+        "aircr_expression": "(AIRCR & 0x00000700) | 0x05fa0000 + 4",
+        "region0_starts_from_system_reset": True,
+    }
 
 
 def _verify_identity(name: str, data: bytes, size: int, digest: str) -> dict[str, Any]:
@@ -473,7 +666,30 @@ def _verify_primask_release(core0: bytes, profile: Region0Profile) -> dict[str, 
     _expect(core0, base, "msr", 0, 0x10)
     _expect(core0, base + 4, "hint", 0)
     _expect(core0, base + 6, "pop")
-    return {"primask_written": 0, "interrupts_enabled_at_handoff": True}
+    # The loop reads a table of (IRQ number, priority) words ending in -1.
+    _, table = _literal(core0, base - 14, 0)
+    _require(table == profile.priority_table_offset,
+             "priority loop does not read the pinned table")
+    entries = []
+    offset = table
+    while _u32(core0, offset) != 0xFFFFFFFF:
+        entries.append(_u32(core0, offset))
+        offset += 4
+        _require(len(entries) <= 128, "priority table has no terminator")
+    numbers = [entry & 0xFF for entry in entries]
+    _require(len(entries) == profile.priority_table_entries and
+             all(number < 0x80 for number in numbers) and
+             all(16 + number < VECTOR_COUNT for number in numbers),
+             "priority table sets a system handler or an out-of-range IRQ")
+    return {
+        "primask_written": 0,
+        "interrupts_enabled_at_handoff": True,
+        "priority_table": hex32(table),
+        "priority_entries": len(entries),
+        "irq_range": [min(numbers), max(numbers)],
+        "system_handler_priorities_set": 0,
+        "nvic_enable_writes": 0,
+    }
 
 
 def _verify_scatter(core0: bytes, profile: Region0Profile) -> dict[str, Any]:
@@ -541,14 +757,9 @@ def _verify_runtime_entry(core0: bytes, profile: Region0Profile) -> dict[str, An
     _expect(core0, veneer + 8, "bx", REG_IP)
     _require(target == profile.region1_entry,
              "handoff veneer does not target the pinned region-1 entry")
-    sites = []
-    for offset in range(0, len(core0) - 3, 2):
-        first = _u16(core0, offset)
-        second = _u16(core0, offset + 2)
-        if first & 0xF800 == 0xF000 and second & 0xD000 == 0xD000:
-            if _bl_target(core0, offset) == veneer:
-                sites.append(offset)
-    _require(sites == [base + 10], "the handoff veneer has more than one caller")
+    sites = _branch_sites(core0, veneer)
+    _require(sites == [(base + 10, "bl")],
+             "the handoff veneer has a caller or reference beyond the one BL")
     # Stack descriptor: r0 heap base, r1 stack top, r2 heap limit, r3 stack limit.
     descriptor = profile.stack_descriptor_offset
     values = []
@@ -653,6 +864,12 @@ def _verify_reset_closure(core0: bytes, profile: Region0Profile) -> dict[str, An
     _require(REGION1_FLASH_SOURCE in constants and REGION1_OPI_COPY in constants,
              "reset-path closure lost the region-1 copy constants")
     return {
+        "derivation": "tools/derive_boot_closure.py recursive descent",
+        "seeds": [hex32(seed) for seed in profile.reset_closure_seeds],
+        "stop": hex32(profile.reset_closure_stop),
+        "unresolved_resolved_by_reading": [
+            {"site": hex32(site), "resolution": note}
+            for site, note in profile.reset_closure_unresolved],
         "ranges": len(profile.reset_closure_ranges),
         "bytes": len(blob),
         "sha256": profile.reset_closure_sha256,
@@ -684,6 +901,8 @@ def _verify_loader_closure(loader: bytes, profile: Region0Profile) -> dict[str, 
     _require(bit_sites == profile.loader_closure_aperture_bit_immediates,
              "loader launch closure single-bit 0x10000000 immediates changed")
     return {
+        "derivation": "tools/derive_boot_closure.py recursive descent",
+        "seeds": [hex32(seed) for seed in profile.loader_closure_seeds],
         "ranges": len(profile.loader_closure_ranges),
         "bytes": len(blob),
         "sha256": profile.loader_closure_sha256,
@@ -781,6 +1000,7 @@ def verify_images(profile: Region0Profile, core0: bytes, core1: bytes,
         ("runtime_entry", lambda: _verify_runtime_entry(core0, profile)),
         ("reset_closure", lambda: _verify_reset_closure(core0, profile)),
         ("loader_closure", lambda: _verify_loader_closure(loader, profile)),
+        ("loader_launch", lambda: _verify_loader_launch(loader, profile)),
         ("veneers", lambda: _verify_veneers(core0, profile)),
         ("thunks", lambda: _verify_thunks(core1, profile)),
         ("region1_entry", lambda: _verify_region1_entry(core1, profile)),
@@ -809,11 +1029,12 @@ def verify_images(profile: Region0Profile, core0: bytes, core1: bytes,
         "facts": facts,
         "proof_boundary": (
             "Static identity and instruction semantics of the stock reset path "
-            "only.  The reachable-code ranges were derived offline and are "
-            "pinned by hash; indirect branches inside them were resolved by "
-            "hand and are listed in the contract document.  This proves what "
-            "stock region 0 does before it calls region 1; it does not prove "
-            "that custom region-1 code runs on hardware."
+            "only.  The reachable-code ranges were derived offline by "
+            "recursive descent and are pinned by hash; the indirect branches "
+            "the derivation could not resolve are listed with their "
+            "resolution by reading.  This proves what stock region 0 does "
+            "before it calls region 1; it does not prove that custom region-1 "
+            "code runs on hardware."
         ),
         "device_accessed": False,
         "files_written": False,
