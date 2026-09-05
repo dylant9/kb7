@@ -15,7 +15,7 @@ from pathlib import Path
 # substring test would accept a second, later assignment.
 EXPECTED_LOADER_PROOF_GATES = {
     "LIVE_READ_ONLY_PREFLIGHT_ENABLED": True,
-    "LIVE_PROOF_CAMPAIGN_ENABLED": False,
+    "LIVE_PROOF_CAMPAIGN_ENABLED": True,
 }
 
 
@@ -252,10 +252,11 @@ def main() -> int:
             'EXPECTED_CAMPAIGN_ID = (',
             '"9a582f1cf35ccb219d5477299ece6caa1285fcbff448e7901fdcaaae83e5c267"',
             'EXPECTED_POLICY_SHA256 = (',
-            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "aa9abc64e33df353aad585231c8abfd5',
+            'EXPECTED_EXECUTOR_DESCRIPTOR_SHA256 = "27a04ad46617feab56b77a2dd82707ee',
             '"kb7_region1_reentry_campaign_for_executor"',
             '"read_only_preflight_diagnostic_authorized": True',
-            '"fixed_proof_hardware_test_authorized": False',
+            '"fixed_proof_hardware_test_authorized": True',
+            '"generic_executor_live_mutation_enabled": False',
             '"region0_operation_count": 0,',
             '"core0_campaign_source_sha256": _source_sha256(',
             '"durable_terminal_intent_before_backend_or_usb": True',

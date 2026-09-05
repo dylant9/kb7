@@ -1165,7 +1165,7 @@ def validate_region1_campaign(evidence: dict[str, object]) -> None:
     campaign = evidence["fixed_region1_patch_campaign"]
     require(
         campaign["status"] ==
-        "reviewed_read_only_preflight_authorized_proof_mutation_locked" and
+        "fixed_region1_patch_campaign_authorized_for_exact_reviewed_campaign" and
         campaign["designed_on"] == "2026-09-05" and
         campaign["supersedes_core0_campaign_as_first_hardware_step"] is True and
         campaign["campaign_tool"] ==
@@ -1226,13 +1226,14 @@ def validate_region1_campaign(evidence: dict[str, object]) -> None:
     authorization = campaign["authorization"]
     require(
         authorization["live_read_only_preflight_enabled"] is True and
-        authorization["live_proof_campaign_enabled"] is False and
-        authorization["execution_authorized"] is False and
+        authorization["live_proof_campaign_enabled"] is True and
+        authorization["execution_authorized"] is True and
         authorization["independently_reviewed"] is True and
         authorization["independent_review_date"] == "2026-09-05" and
         authorization["authorization_scope"] ==
-        "read-only full-chip preflight authorized for the exact reviewed "
-        "region-1 patch campaign after its 2026-09-05 review; proof mutation "
+        "fixed region-1 patch install and exact-stock restore campaign "
+        "authorized for the exact reviewed campaign after the 2026-09-05 "
+        "review and read-only preflight pass; general firmware mutation "
         "remains hard-disabled" and
         authorization["expected_campaign_id"] ==
         "9a582f1cf35ccb219d5477299ece6caa1285fcbff448e7901fdcaaae83e5c267" and
@@ -1249,11 +1250,11 @@ def validate_region1_campaign(evidence: dict[str, object]) -> None:
                 "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
         } and
         authorization["policy_sha256"] ==
-        "130095e976043e1ae93fd9b587d021aa35e5735eba2054267b1fcbbc03d29240" and
+        "c5a7d7f37009d562a196caec34fb03c3df70183e11cfaa5d38e358bd8ac6f33b" and
         authorization["executor_descriptor_sha256"] ==
-        "aa9abc64e33df353aad585231c8abfd55eda6ef176d10e0188cbff042ab3caf6" and
+        "27a04ad46617feab56b77a2dd82707eeb8f7eef1a3d07f1b5a54e6fa95363952" and
         authorization["executor_source_sha256"] ==
-        "f59ca0b0dd2786ea739f0a7dcf56eae88917725400ce94a0d07f229422492916" and
+        "ba487415d24a0af4cdbf05116ba3592a890a3f1005eaabae34d503aee3477632" and
         authorization["live_region_policy_unchanged_from_core0_revision"] is True and
         authorization["generic_firmware_executor_mutation_enabled"] is False and
         authorization["flash_approved"] is False,
@@ -1279,7 +1280,7 @@ def validate_region1_campaign(evidence: dict[str, object]) -> None:
         "runs": 1,
         "read_only_preflight_2026_09_05_revision": "region1-reentry-preflight-only",
         "read_only_preflight_2026_09_05_executor_source_sha256":
-            "f59ca0b0dd2786ea739f0a7dcf56eae88917725400ce94a0d07f229422492916",
+            "ba487415d24a0af4cdbf05116ba3592a890a3f1005eaabae34d503aee3477632",
         "read_only_preflight_2026_09_05_exit_status": 0,
         "read_only_preflight_2026_09_05_journal_status": "boundary_verified",
         "read_only_preflight_2026_09_05_boundary_index": 0,

@@ -6,8 +6,10 @@ Status: the preflight-only revision on branch
 `region1-reentry-preflight-only`
 ([record](REGION1-REENTRY-PREFLIGHT-ONLY-REVISION-2026-09-05.md)) passed
 its read-only preflight on 2026-09-05
-([result](REGION1-REENTRY-PREFLIGHT-2026-09-05.md)); **no mutation-enabled
-revision exists.** This runbook describes the two gated
+([result](REGION1-REENTRY-PREFLIGHT-2026-09-05.md)); the mutation-enabled
+revision is branch `region1-reentry-mutation-enabled`
+([record](REGION1-REENTRY-MUTATION-REVISION-2026-09-05.md)), pending its
+own independent review. This runbook describes the two gated
 revisions, in order, and the hardware sequence each runs. Nothing here
 authorizes execution; the gates do.
 
@@ -45,7 +47,10 @@ preflight; a journal from one revision is refused by the next.
   between steps.
 - Temporary sudo drop-in for the session, removed afterwards. The
   executor's journal is root-owned; run `inspect` under sudo too.
-- Every `--commit` detached from the terminal (`setsid nohup …`); a hang-up
+- Every `--commit` run as a transient root service (`sudo systemd-run
+  --unit … --collect --property=WorkingDirectory=… --setenv=PYTHONDONTWRITEBYTECODE=1
+  /bin/sh -c '… > log 2>&1; echo exit=$? >> log'`) and its log polled;
+  background shells were killed mid-run in earlier sessions, and a hang-up
   after an intent is an exit 3.
 
 ## Sequence

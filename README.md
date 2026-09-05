@@ -76,9 +76,12 @@ image generation is disabled.
   [40-operation single-sector patch campaign](docs/REGION1-REENTRY-CAMPAIGN-2026-09-05.md)
   is built and simulated offline, and the fixed executor is bound to it. It
   was independently reviewed on 2026-09-05 (clean with non-blocking notes,
-  since closed). This branch is the separate preflight-only revision: it
-  enables the read-only full-chip preflight for that campaign and nothing
-  else; proof mutation stays hard-disabled, and nothing has run on hardware.
+  since closed), and its read-only preflight passed on the board the same
+  day. This branch is the mutation-enabled revision: it enables the fixed
+  region-1 patch install and exact-stock restore campaign for that campaign
+  identity and nothing else, pending its own independent review. Any other
+  campaign, any pin drift and the general paired-firmware executor stay
+  refused, and `flash_approved=false`.
 - The flash-access tooling adds proven external SPI recovery workflows,
   read-only USB-ISP diagnostics and fixed, dry-run-default USB mutation
   experiments. On 2026-08-23 one guarded V1.22 cycle at offset `0x0008e000`
