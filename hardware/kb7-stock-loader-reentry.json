@@ -347,7 +347,7 @@
     }
   },
   "fixed_region1_patch_campaign": {
-    "status": "offline_built_simulated_executor_bound_unreviewed",
+    "status": "reviewed_read_only_preflight_authorized_proof_mutation_locked",
     "designed_on": "2026-09-05",
     "supersedes_core0_campaign_as_first_hardware_step": true,
     "campaign_tool": "tools/flash-access/kb7-region1-reentry-campaign.py",
@@ -395,11 +395,12 @@
       "automatic_retry": false
     },
     "authorization": {
-      "live_read_only_preflight_enabled": false,
+      "live_read_only_preflight_enabled": true,
       "live_proof_campaign_enabled": false,
       "execution_authorized": false,
-      "independently_reviewed": false,
-      "authorization_scope": "region-1 patch campaign bound; offline only pending independent review",
+      "independently_reviewed": true,
+      "independent_review_date": "2026-09-05",
+      "authorization_scope": "read-only full-chip preflight authorized for the exact reviewed region-1 patch campaign after its 2026-09-05 review; proof mutation remains hard-disabled",
       "expected_campaign_id": "9a582f1cf35ccb219d5477299ece6caa1285fcbff448e7901fdcaaae83e5c267",
       "implementation_source_sha256": {
         "campaign": "a7b255cb207182717d2e91dfbdd9073db6462654ef0229654f3200e03a489ff8",
@@ -408,9 +409,9 @@
         "verifier": "9b19d393cf64c66168e08de2f3d4fe352a85a2fd69545e374dee0fa015dea338",
         "writer": "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5"
       },
-      "policy_sha256": "7786dcee0662f85cb4a6a2c4b95adec88fef3b9de2959c5d75f0ffac1bd799e7",
-      "executor_descriptor_sha256": "fdf29869de2ebabe336053d8eabb6761be689523c8ef442116c252bea6418dad",
-      "executor_source_sha256": "f131420fa0fe50564ada168c026cbd307c2a65f8060f14fc4cb5021d5a53372b",
+      "policy_sha256": "130095e976043e1ae93fd9b587d021aa35e5735eba2054267b1fcbbc03d29240",
+      "executor_descriptor_sha256": "aa9abc64e33df353aad585231c8abfd55eda6ef176d10e0188cbff042ab3caf6",
+      "executor_source_sha256": "f59ca0b0dd2786ea739f0a7dcf56eae88917725400ce94a0d07f229422492916",
       "live_region_policy_unchanged_from_core0_revision": true,
       "generic_firmware_executor_mutation_enabled": false,
       "flash_approved": false

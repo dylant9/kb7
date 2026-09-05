@@ -2,9 +2,12 @@
 
 Written: 2026-09-05, after the independent review of the offline revision
 (CLEAN WITH NON-BLOCKING NOTES, notes closed in the following commit).
-Status: **no revision with a live gate exists yet.** This runbook describes
-the two gated revisions that must follow, in order, and the hardware
-sequence each runs. Nothing here authorizes execution; the gates do.
+Status: the preflight-only revision exists on branch
+`region1-reentry-preflight-only`
+([record](REGION1-REENTRY-PREFLIGHT-ONLY-REVISION-2026-09-05.md)); **no
+mutation-enabled revision exists.** This runbook describes the two gated
+revisions, in order, and the hardware sequence each runs. Nothing here
+authorizes execution; the gates do.
 
 ## Revisions
 

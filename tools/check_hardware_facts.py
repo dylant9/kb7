@@ -1165,7 +1165,7 @@ def validate_region1_campaign(evidence: dict[str, object]) -> None:
     campaign = evidence["fixed_region1_patch_campaign"]
     require(
         campaign["status"] ==
-        "offline_built_simulated_executor_bound_unreviewed" and
+        "reviewed_read_only_preflight_authorized_proof_mutation_locked" and
         campaign["designed_on"] == "2026-09-05" and
         campaign["supersedes_core0_campaign_as_first_hardware_step"] is True and
         campaign["campaign_tool"] ==
@@ -1225,12 +1225,15 @@ def validate_region1_campaign(evidence: dict[str, object]) -> None:
         "region-1 patch safety model changed")
     authorization = campaign["authorization"]
     require(
-        authorization["live_read_only_preflight_enabled"] is False and
+        authorization["live_read_only_preflight_enabled"] is True and
         authorization["live_proof_campaign_enabled"] is False and
         authorization["execution_authorized"] is False and
-        authorization["independently_reviewed"] is False and
+        authorization["independently_reviewed"] is True and
+        authorization["independent_review_date"] == "2026-09-05" and
         authorization["authorization_scope"] ==
-        "region-1 patch campaign bound; offline only pending independent review" and
+        "read-only full-chip preflight authorized for the exact reviewed "
+        "region-1 patch campaign after its 2026-09-05 review; proof mutation "
+        "remains hard-disabled" and
         authorization["expected_campaign_id"] ==
         "9a582f1cf35ccb219d5477299ece6caa1285fcbff448e7901fdcaaae83e5c267" and
         authorization["implementation_source_sha256"] == {
@@ -1246,11 +1249,11 @@ def validate_region1_campaign(evidence: dict[str, object]) -> None:
                 "f706cb355297e4b010fd49f10a1c0e68834d73e99a33005780046ced4e1dc6e5",
         } and
         authorization["policy_sha256"] ==
-        "7786dcee0662f85cb4a6a2c4b95adec88fef3b9de2959c5d75f0ffac1bd799e7" and
+        "130095e976043e1ae93fd9b587d021aa35e5735eba2054267b1fcbbc03d29240" and
         authorization["executor_descriptor_sha256"] ==
-        "fdf29869de2ebabe336053d8eabb6761be689523c8ef442116c252bea6418dad" and
+        "aa9abc64e33df353aad585231c8abfd55eda6ef176d10e0188cbff042ab3caf6" and
         authorization["executor_source_sha256"] ==
-        "f131420fa0fe50564ada168c026cbd307c2a65f8060f14fc4cb5021d5a53372b" and
+        "f59ca0b0dd2786ea739f0a7dcf56eae88917725400ce94a0d07f229422492916" and
         authorization["live_region_policy_unchanged_from_core0_revision"] is True and
         authorization["generic_firmware_executor_mutation_enabled"] is False and
         authorization["flash_approved"] is False,

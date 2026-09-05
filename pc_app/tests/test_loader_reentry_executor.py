@@ -1209,9 +1209,13 @@ class LoaderReentryExecutorTests(_ExecutorFixture):
 class LoaderReentryLockTests(_ExecutorFixture):
     """Production constants: both gates false, owner campaign pin in force."""
 
-    def test_exact_proof_campaign_and_preflight_are_relocked(self) -> None:
-        self.assertFalse(EXECUTOR.LIVE_READ_ONLY_PREFLIGHT_ENABLED)
+    def test_read_only_preflight_authorized_and_proof_mutation_relocked(self) -> None:
+        self.assertTrue(EXECUTOR.LIVE_READ_ONLY_PREFLIGHT_ENABLED)
         self.assertFalse(EXECUTOR.LIVE_PROOF_CAMPAIGN_ENABLED)
+        policy = EXECUTOR.policy_descriptor()
+        self.assertIs(policy["read_only_preflight_diagnostic_authorized"], True)
+        self.assertIs(policy["fixed_proof_hardware_test_authorized"], False)
+        self.assertIs(policy["generic_executor_live_mutation_enabled"], False)
         self.assertEqual(
             EXECUTOR.EXPECTED_CAMPAIGN_ID,
             "9a582f1cf35ccb219d5477299ece6caa1285fcbff448e7901fdcaaae83e5c267")
@@ -1222,8 +1226,12 @@ class LoaderReentryLockTests(_ExecutorFixture):
         self.assertEqual(EXECUTOR.EXPECTED_EXECUTOR_DESCRIPTOR_SHA256,
                          EXECUTOR._executor_descriptor_sha256())
         reviewed = mock.Mock(campaign_id=EXECUTOR.EXPECTED_CAMPAIGN_ID)
+        # The exact reviewed campaign identity passes the read-only gate; any
+        # other identity and every mutation path stay locked.
+        EXECUTOR.require_read_only_preflight_authorization(reviewed)
         with self.assertRaises(EXECUTOR.ExecutionLocked):
-            EXECUTOR.require_read_only_preflight_authorization(reviewed)
+            EXECUTOR.require_read_only_preflight_authorization(
+                mock.Mock(campaign_id="0" * 64))
         with self.assertRaises(EXECUTOR.ExecutionLocked):
             EXECUTOR.require_live_authorization(reviewed)
         general = (ROOT / "tools/flash-access/kb7-updater-executor.py").read_text()
