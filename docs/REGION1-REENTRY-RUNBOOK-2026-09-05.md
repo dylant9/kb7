@@ -2,10 +2,12 @@
 
 Written: 2026-09-05, after the independent review of the offline revision
 (CLEAN WITH NON-BLOCKING NOTES, notes closed in the following commit).
-Status: the preflight-only revision exists on branch
+Status: the preflight-only revision on branch
 `region1-reentry-preflight-only`
-([record](REGION1-REENTRY-PREFLIGHT-ONLY-REVISION-2026-09-05.md)); **no
-mutation-enabled revision exists.** This runbook describes the two gated
+([record](REGION1-REENTRY-PREFLIGHT-ONLY-REVISION-2026-09-05.md)) passed
+its read-only preflight on 2026-09-05
+([result](REGION1-REENTRY-PREFLIGHT-2026-09-05.md)); **no mutation-enabled
+revision exists.** This runbook describes the two gated
 revisions, in order, and the hardware sequence each runs. Nothing here
 authorizes execution; the gates do.
 

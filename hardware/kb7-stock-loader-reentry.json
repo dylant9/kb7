@@ -433,7 +433,17 @@
       "install_then_restore_exact_full_baseline": true
     },
     "hardware_validation": {
-      "runs": 0,
+      "runs": 1,
+      "read_only_preflight_2026_09_05_revision": "region1-reentry-preflight-only",
+      "read_only_preflight_2026_09_05_executor_source_sha256": "f59ca0b0dd2786ea739f0a7dcf56eae88917725400ce94a0d07f229422492916",
+      "read_only_preflight_2026_09_05_exit_status": 0,
+      "read_only_preflight_2026_09_05_journal_status": "boundary_verified",
+      "read_only_preflight_2026_09_05_boundary_index": 0,
+      "read_only_preflight_2026_09_05_usb_address": 4,
+      "read_only_preflight_2026_09_05_observed_full_sha256": "35968ec55f16c64fcdca72a6c39edb9b563e5e466657dce67827dc63149566fa",
+      "read_only_preflight_2026_09_05_live_region_sha256": "04b21e7889e26171b3d2b338554672faa3f86a40e550d566a89f2eafa67d70b4",
+      "read_only_preflight_2026_09_05_live_region_unchanged_since_2026_09_03": true,
+      "read_only_preflight_2026_09_05_program_or_erase_commands": 0,
       "proof_boot_observed": false
     }
   },
